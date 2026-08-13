@@ -18,7 +18,8 @@ out/
 *.sln.iml
 
 # VS Code
-.vscode/
+.vscode/*
+!.vscode/settings.json
 
 # NuGet
 *.nupkg
@@ -90,6 +91,9 @@ node_modules/
 
 # Local prompt scratch folder
 docs/implementation/prompt/
+
+# Archived original rule documents (local reference only)
+docs/implementation/archived_original_rules/
 
 # Temporary docs scratch folder
 docs/tmp/
