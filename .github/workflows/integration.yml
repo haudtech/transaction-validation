@@ -13,12 +13,20 @@ jobs:
     environment: integration
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '8.0.x'
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            Directory.Packages.props
+            global.json
+
+      - name: SDK info
+        run: dotnet --info
 
       - name: Restore
         run: dotnet restore
@@ -29,4 +37,4 @@ jobs:
       - name: Run integration tests
         run: |
           # Run integration tests - tests should be marked with Trait Category=Integration
-          dotnet test --no-build --verbosity normal --filter "Category=Integration"
+          dotnet test tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj --no-build --configuration Release --verbosity normal --filter "Category=Integration"
