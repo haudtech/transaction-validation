@@ -2,48 +2,105 @@
 
 A lightweight Backend-For-Frontend (BFF) to mediate partner integrations for transaction verification and routing.
 
-Key points
-- Target: .NET 8 (net8.0)
-- Purpose: Validate partner requests, enrich/transform payloads, and publish validated messages to RabbitMQ for downstream processing.
-- Observability: Serilog + OpenTelemetry (instrumentation ready); optional Application Insights exporter.
-- Validation: FluentValidation for request model validation.
-- Resilience: Polly for HttpClient resilience strategies.
+Technology stack
 
-Current status
-- Documentation scaffold, phased implementation plan, Docker examples, and environment-variable conventions are present under `docs/`.
-- Implementation code (solution and projects under `src/`) is not yet generated — this README will be updated once the implementation is created.
+| Area | Stack |
+|---|---|
+| Runtime / Framework | .NET 8 (`net8.0`) |
+| API | ASP.NET Core Web API |
+| Validation | FluentValidation |
+| Resilience | Polly |
+| Messaging | RabbitMQ |
+| Observability | Serilog, OpenTelemetry |
+| Architecture | Multi-project solution (`Api`, `Configuration`, `Core`, `Integration`, `Messaging`, `Mock`, `Tests`) |
+| Quality gates | Split CI workflows for unit and integration tests with explicit category filters |
 
-Getting started (docs)
-- Prerequisites and environment setup: docs/implementation/Prerequisites/README.md
-- Implementation phases and checklist: docs/implementation/implementation_phases.md
-- Scaffold and wiring guidance: docs/implementation/implementation_scaffold.md
+## Architecture Overview (Sequence)
 
-Quick local run (after implementation)
-1. Ensure .NET 8 SDK is installed:
+Primary architecture flow (mirrors [docs/diagram/use_case_sequence_diagram.md](docs/diagram/use_case_sequence_diagram.md)):
 
-```bash
-dotnet --version
+```mermaid
+sequenceDiagram
+	autonumber
+	participant P as Partner/Client
+	participant API as TransactionValidation API
+	participant Auth as API Key Middleware
+	participant Cache as Dedupe Cache
+	participant Validator as Request Validator
+	participant Verifier as PartnerVerifier
+	participant Mock as MockPartnerVerification
+	participant Publisher as MessagePublisher
+	participant MQ as RabbitMQ
+
+	P->>API: POST /api/v1/partner/transactions
+	API->>Auth: Validate X-API-Key
+	Auth-->>API: Authorized
+	API->>Cache: Check `partnerId|transactionReference`
+	alt Duplicate request in TTL window
+		Cache-->>API: Already accepted
+		API-->>P: 202 Accepted (cached)
+	else New request
+		API->>Validator: Validate payload
+		Validator-->>API: OK / ValidationError
+		alt Valid payload
+			API->>Verifier: Verify(partnerId)
+			Verifier->>Mock: Call mock verification endpoint
+			Mock-->>Verifier: Verified / TimeoutException
+			alt Verified
+				Verifier-->>API: Verified
+				API->>Publisher: Publish internal envelope
+				Publisher->>MQ: Enqueue persistent message + wait confirms
+				MQ-->>Publisher: Ack
+				Publisher-->>API: Published
+				API->>Cache: Store dedupe key with TTL
+				API-->>P: 202 Accepted
+			else Verification failed
+				Verifier-->>API: Partner not verified
+				API-->>P: 503 Service Unavailable / 400
+			end
+		else Invalid payload
+			Validator-->>API: Validation errors
+			API-->>P: 400 Bad Request
+		end
+	end
 ```
 
-2. Start local infra (example):
-
+Quick local run
 ```bash
-docker compose up -d
-```
-
-3. Build and run API (example):
-
-```bash
+dotnet restore
 dotnet build
-dotnet run --project src/TransactionValidation.Api
+dotnet test -v normal
 ```
 
-Update guidance
-- Replace this file with detailed build/run instructions, API endpoints, project list, and test commands after the code generation (Phase 1) and initial implementation (Phase 2) are complete.
+Repository entrypoint for implementation, workflow, and architecture documentation.
 
-Contributing
-- Follow the phased checklist in docs/implementation/implementation_phases.md.
-- Open issues for per-phase tasks if you want them tracked individually.
+## Documentation Map
 
-License
+### Implementation
+- Prerequisites: [docs/implementation/Prerequisites/README.md](docs/implementation/Prerequisites/README.md)
+- Phase plan and checklist: [docs/implementation/implementation_phases.md](docs/implementation/implementation_phases.md)
+- Scaffold and wiring guidance: [docs/implementation/implementation_scaffold.md](docs/implementation/implementation_scaffold.md)
+- Principle rules (MUST/SHOULD): [docs/implementation/principle_rules.md](docs/implementation/principle_rules.md)
+
+### GitHub Workflow Actions
+- Workflow docs index: [docs/workflow_actions/github/README.md](docs/workflow_actions/github/README.md)
+- CI workflow details: [docs/workflow_actions/github/ci_workflow.md](docs/workflow_actions/github/ci_workflow.md)
+- Integration workflow details: [docs/workflow_actions/github/integration_workflow.md](docs/workflow_actions/github/integration_workflow.md)
+- Workflow fix case studies: [docs/workflow_actions/github/workflow_case_studies.md](docs/workflow_actions/github/workflow_case_studies.md)
+
+### Analysis and Design
+- Solution analysis: [docs/analysis/solution_analysis.md](docs/analysis/solution_analysis.md)
+- Use case diagram: [docs/diagram/use_case_diagram.md](docs/diagram/use_case_diagram.md)
+- Use case sequence diagram: [docs/diagram/use_case_sequence_diagram.md](docs/diagram/use_case_sequence_diagram.md)
+
+### Requirements
+- Interview requirements: [reqs/Senior_net_interview_2026.md](reqs/Senior_net_interview_2026.md)
+
+## Contributing
+
+- Follow the implementation phases: [docs/implementation/implementation_phases.md](docs/implementation/implementation_phases.md)
+- Keep workflow/documentation updates aligned with: [docs/workflow_actions/github/README.md](docs/workflow_actions/github/README.md)
+
+## License
+
 - TBD
