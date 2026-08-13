@@ -90,3 +90,6 @@ node_modules/
 
 # Local prompt scratch folder
 docs/implementation/prompt/
+
+# Temporary docs scratch folder
+docs/tmp/
