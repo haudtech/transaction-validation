@@ -2,6 +2,40 @@
 
 ## 1) Command line-by-line explanation
 
+### Step: Checkout
+Configuration:
+```yaml
+uses: actions/checkout@v5
+```
+Explanation:
+- Checks out repository source code into the GitHub runner workspace.
+- `@v5` is the current major action version used in this repository.
+
+### Step: Setup .NET SDK
+Configuration:
+```yaml
+uses: actions/setup-dotnet@v5
+with:
+  dotnet-version: '8.0.x'
+  cache: true
+  cache-dependency-path: |
+    **/*.csproj
+    Directory.Packages.props
+    global.json
+```
+Explanation:
+- Installs .NET SDK 8.x for the workflow.
+- Enables built-in NuGet cache (`cache: true`).
+- Cache invalidation keys are based on project/package/sdk files listed in `cache-dependency-path`.
+
+### Step: SDK info
+Command:
+```bash
+dotnet --info
+```
+Explanation:
+- Prints installed SDKs/runtimes and environment details for diagnostics.
+
 ### Step: Restore
 Command:
 ```bash
@@ -26,34 +60,26 @@ Explanation:
 ### Step: Test (unit only)
 Command:
 ```bash
-dotnet test --no-build --verbosity normal --filter "Category!=Integration"
+dotnet test tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj --configuration Release --verbosity normal --filter "Category!=Integration"
 ```
 Explanation:
 - `dotnet`: invokes the .NET CLI.
 - `test`: runs tests.
-- `--no-build`: skips build because build already happened in the previous step.
+- `tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj`: targets the test project explicitly.
+- `--configuration Release`: uses the same build configuration as the build step.
 - `--verbosity normal`: shows standard test output detail.
 - `--filter "Category!=Integration"`: excludes tests tagged as Integration and runs non-integration tests (unit/default tests).
-
-### Step: Install dotnet-format
-Commands:
-```bash
-dotnet tool install -g dotnet-format || true
-echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
-```
-Explanation:
-- `dotnet tool install -g dotnet-format`: installs `dotnet-format` as a global tool in the runner.
-- `|| true`: prevents workflow failure if the tool is already installed.
-- `echo "$HOME/.dotnet/tools" >> $GITHUB_PATH`: appends global tool location to `PATH` for subsequent steps.
 
 ### Step: Verify formatting
 Command:
 ```bash
-dotnet format --verify-no-changes
+dotnet format TransactionValidation.sln --verify-no-changes --verbosity diagnostic
 ```
 Explanation:
 - `dotnet format`: runs code formatting checks.
+- `TransactionValidation.sln`: scopes formatting checks to the solution.
 - `--verify-no-changes`: fails the step if formatting changes would be required.
+- `--verbosity diagnostic`: outputs detailed diagnostics when formatting checks fail.
 
 ## 2) When it is triggered
 
