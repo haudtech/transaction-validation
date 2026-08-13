@@ -1,0 +1,24 @@
+root = true
+
+[*.cs]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+max_line_length = 120
+
+# Place System directives first and sort usings
+dotnet_sort_system_directives_first = true
+csharp_using_directive_placement = inside_namespace
+
+# Prefer expression-bodied members where concise
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+
+# Filename casing: PascalCase for types
+dotnet_naming_rule.types_should_be_pascal_case.severity = suggestion
+
+[*.{cs,vb}]
+# Keep generated files excluded from format enforcement (if generated file pattern used)
+generated_code = true

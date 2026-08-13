@@ -53,6 +53,9 @@ docker-compose.override.yml
 # macOS
 .DS_Store
 
+# Local machine/tooling artifacts
+Library/
+
 # Windows
 Thumbs.db
 
@@ -84,3 +87,6 @@ node_modules/
 
 # JetBrains Rider caches
 .idea/
+
+# Local prompt scratch folder
+docs/implementation/prompt/

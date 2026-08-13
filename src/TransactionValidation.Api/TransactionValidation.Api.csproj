@@ -1,12 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
-  <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.0" />
-    <PackageReference Include="Serilog.AspNetCore" Version="8.1.0" />
-    <PackageReference Include="Serilog.Sinks.Console" Version="4.1.0" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TransactionValidation.Configuration\TransactionValidation.Configuration.csproj" />
+    <ProjectReference Include="..\TransactionValidation.Core\TransactionValidation.Core.csproj" />
+    <ProjectReference Include="..\TransactionValidation.Integration\TransactionValidation.Integration.csproj" />
+    <ProjectReference Include="..\TransactionValidation.Messaging\TransactionValidation.Messaging.csproj" />
   </ItemGroup>
 </Project>

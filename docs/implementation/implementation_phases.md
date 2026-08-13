@@ -10,6 +10,8 @@ Each phase mirrors the scaffold in `docs/implementation/implementation_scaffold.
 - The implementation must follow the scaffold structure and options described in the scaffold doc.
 Use the shared configuration project for wiring and keep the API project minimal.
 Keep the Web API behavior aligned with the assignment: validation, partner verification, queue publishing, resiliency, security, and observability.
+- The project standard is .NET 8 only.
+- Use Central Package Management via `Directory.Packages.props`; avoid inline `Version` attributes in project `PackageReference` entries.
 
 ---
 
@@ -21,6 +23,8 @@ Follow this checklist to ensure each phase is implemented and documented before 
 - [ ] Create `TransactionValidation.sln`
 - [ ] Create projects under `src/` and `tests/` (Api, Configuration, Core, Integration, Messaging, Mock, Tests)
 - [ ] Ensure each project has a `.csproj` and correct target framework (`net8.0`)
+- [ ] Add repository-level build standards: `global.json`, `Directory.Build.props`, `.editorconfig`
+- [ ] Add central package management: `Directory.Packages.props`
 - [ ] Add solution project references as described in scaffold
 - [ ] Commit and verify `dotnet build` succeeds
 
@@ -70,8 +74,11 @@ Follow this checklist to ensure each phase is implemented and documented before 
 
 ### Phase 8 — Testing and Quality
 - [ ] Add xUnit tests: validation, partner verifier, message publisher
+- [ ] Separate test folders into `Unit/` and `Integration/` under `tests/TransactionValidation.Tests`
+- [ ] Ensure unit test files mirror `src/` structure under `tests/TransactionValidation.Tests/Unit/`
+- [ ] Mark integration tests with `[Trait("Category", "Integration")]`
 - [ ] Achieve green tests for modified components
-- [ ] Add CI workflow or commit hook to run `dotnet test` (optional)
+- [ ] Ensure CI policy: unit tests in `ci.yml` (`Category!=Integration`) and integration tests in `integration.yml` (`Category=Integration`)
 - [ ] Commit tests and CI config
 
 ### Phase 9 — Docker and Local Infrastructure
@@ -263,6 +270,8 @@ Implement test coverage for validation and resilience.
 - Create `ValidationTests.cs` for request validation scenarios
 - Create `PartnerVerifierTests.cs` for service retry/resilience behavior
 - Add additional tests for publisher confirms or message publisher behavior if needed
+- Organize tests into `Unit/` and `Integration/` folders
+- Ensure integration tests use `[Trait("Category", "Integration")]`
 
 ### Deliverables
 - Unit test project with passing tests

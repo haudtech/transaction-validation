@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, "feature/**" ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test (unit only)
+        run: |
+          # Run only unit tests; integration tests are skipped by default (marked with Trait/Category)
+          dotnet test --no-build --verbosity normal --filter "Category!=Integration"
+
+      - name: Install dotnet-format
+        run: |
+          dotnet tool install -g dotnet-format || true
+          echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
+
+      - name: Verify formatting
+        run: dotnet format --verify-no-changes
