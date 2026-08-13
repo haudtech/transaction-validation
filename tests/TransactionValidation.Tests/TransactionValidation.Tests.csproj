@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.0" />
+    <PackageReference Include="Moq" Version="5.5.0" />
+    <PackageReference Include="FluentAssertions" Version="6.9.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TransactionValidation.Core\TransactionValidation.Core.csproj" />
+    <ProjectReference Include="..\..\src\TransactionValidation.Api\TransactionValidation.Api.csproj" />
+    <ProjectReference Include="..\..\src\TransactionValidation.Integration\TransactionValidation.Integration.csproj" />
+  </ItemGroup>
+</Project>

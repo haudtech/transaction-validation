@@ -1,0 +1,32 @@
+version: '3.9'
+services:
+  api:
+    build:
+      context: ./src/TransactionValidation.Api
+      dockerfile: Dockerfile
+    ports:
+      - '5000:80'
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - RABBITMQ__HOSTNAME=rabbitmq
+      - RABBITMQ__USERNAME=guest
+      - RABBITMQ__PASSWORD=guest
+      - RABBITMQ__QUEUENAME=partner-transactions
+      - PARTNERVERIFICATION__BASEURL=http://mock:80/
+      - SECURITY__APIKEY=secret-api-key
+    depends_on:
+      - rabbitmq
+      - mock
+
+  mock:
+    build:
+      context: ./src/TransactionValidation.Mock
+      dockerfile: Dockerfile
+    ports:
+      - '5002:80'
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - '5672:5672'
+      - '15672:15672'
