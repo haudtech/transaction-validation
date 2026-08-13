@@ -1,0 +1,89 @@
+# .gitignore for a .NET (net8.0) project
+
+# Build artifacts
+bin/
+obj/
+artifacts/
+out/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Rider
+.idea/
+*.sln.iml
+
+# VS Code
+.vscode/
+
+# NuGet
+*.nupkg
+packages/
+.nuget/
+
+# Dotnet local tool and SDK folders
+.dotnet/
+
+# Logs
+*.log
+logs/
+
+# Test results
+TestResults/
+*.trx
+*.coverage
+
+# Coverage
+coverage/
+coverage*.json
+
+# Docker
+docker-compose.override.yml
+.docker/
+
+# Environment files (keep examples)
+.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Secrets and user-specific
+secrets.json
+secrets.*.json
+*.pem
+*.key
+
+# Generated files
+**/Generated/
+
+# Node
+node_modules/
+
+# Other
+*.db
+*.sqlite
+
+# Temporary files
+*.tmp
+*.temp
+
+# Ignore publish output
+.publish/
+
+# NCrunch
+*.ncrunch*
+
+# JetBrains Rider caches
+.idea/
+
+# Scaffolding
+ScaffoldingReadMe.txt
