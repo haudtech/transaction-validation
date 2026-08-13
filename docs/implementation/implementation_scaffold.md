@@ -34,6 +34,14 @@ Example file tree:
 
 ```
 TransactionValidation.sln
+global.json
+Directory.Build.props
+Directory.Packages.props
+.editorconfig
+.github/
+    workflows/
+        ci.yml
+        integration.yml
 src/
   TransactionValidation.Api/
     Program.cs
@@ -63,10 +71,24 @@ src/
     Controllers/MockPartnerVerificationController.cs
 tests/
   TransactionValidation.Tests/
-    ValidationTests.cs
-    PartnerVerifierTests.cs
-    MessagePublisherTests.cs
+        Unit/
+            TransactionValidation.Core/
+                Models/
+                    PlaceholderTests.cs
+        Integration/
+            IntegrationTest1.cs
 ```
+
+### Repository-level standards (added)
+
+The scaffold should include these repository-level files to keep builds and dependencies consistent:
+
+- `global.json` - pin SDK to .NET 8 (`8.0.100`, `rollForward: latestMinor`)
+- `Directory.Build.props` - shared MSBuild defaults (`net8.0`, nullable, implicit usings, deterministic build)
+- `Directory.Packages.props` - central NuGet versions (Central Package Management)
+- `.editorconfig` - C# formatting and using-order conventions
+- `.github/workflows/ci.yml` - build + unit tests + format verification
+- `.github/workflows/integration.yml` - integration tests in a separate workflow (auto on `main` + manual dispatch)
 
 ### Shared configuration project
 
@@ -183,13 +205,16 @@ cd ../../..
 
 ## 3. Add required NuGet packages
 
+Use Central Package Management with `Directory.Packages.props`.
+Define package versions once at the repository root, then reference packages in project files without inline `Version` attributes.
+
 Add the following packages:
 
 ```bash
 cd src/TransactionValidation.Api
-dotnet add package Microsoft.AspNetCore.OpenApi --version 8.0.0
-dotnet add package Serilog.AspNetCore --version 8.1.0
-dotnet add package Serilog.Sinks.Console --version 4.1.0
+dotnet add package Microsoft.AspNetCore.OpenApi
+dotnet add package Serilog.AspNetCore
+dotnet add package Serilog.Sinks.Console
 
 cd ../TransactionValidation.Configuration
 dotnet add package FluentValidation.AspNetCore --version 11.0.0
@@ -209,11 +234,38 @@ dotnet add package RabbitMQ.Client --version 7.5.0
 
 cd ../../tests/TransactionValidation.Tests
 
-dotnet add package Moq --version 5.5.0
-dotnet add package FluentAssertions --version 6.9.0
+dotnet add package Microsoft.NET.Test.Sdk
+dotnet add package xunit
+dotnet add package xunit.runner.visualstudio
+dotnet add package Moq
+dotnet add package Castle.Core
+dotnet add package FluentAssertions
 ```
 
-> If you prefer .NET 10 in this workspace, change `-f net8.0` to `-f net10.0` consistently.
+Current centrally-managed versions in this repository:
+- `Microsoft.AspNetCore.OpenApi` = `8.0.0`
+- `Serilog.AspNetCore` = `9.0.0`
+- `Serilog.Sinks.Console` = `6.0.0`
+- `Microsoft.NET.Test.Sdk` = `17.11.1`
+- `xunit` = `2.5.3`
+- `xunit.runner.visualstudio` = `2.5.0`
+- `Moq` = `4.20.72`
+- `Castle.Core` = `5.1.1`
+- `FluentAssertions` = `6.9.0`
+
+The project standard is .NET 8 only.
+
+## 3.1 Test structure and execution policy
+
+The test project should be separated into `Unit/` and `Integration/` folders.
+
+- Unit test files should mirror `src/` structure under `tests/TransactionValidation.Tests/Unit/`.
+- Integration tests should be under `tests/TransactionValidation.Tests/Integration/`.
+- Integration tests should use a category trait: `[Trait("Category", "Integration")]`.
+
+Execution policy:
+- Main CI (`ci.yml`) runs unit tests by default using filter: `Category!=Integration`.
+- Integration CI (`integration.yml`) runs integration tests using filter: `Category=Integration`.
 
 ---
 
