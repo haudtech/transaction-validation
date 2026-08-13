@@ -4,6 +4,23 @@ This document is the maintainable checklist for the TransactionValidation implem
 
 This checklist reflects the current repository state and marks only the work that is already implemented and verified in the codebase.
 
+> Prerequisite gate: before a phase is considered ready, the required tooling, dependencies, and environment items from [Prerequisites/README.md](Prerequisites/README.md) must be prepared first. The checklist below references the prerequisite groups that must be in place.
+
+---
+
+## Prerequisite links by phase
+
+- Phase 1 — .NET SDK, `dotnet` CLI, IDE/editor readiness: [Prerequisites/README.md](Prerequisites/README.md#1-net-sdk), [Prerequisites/README.md](Prerequisites/README.md#2-dotnet-cli), [Prerequisites/README.md](Prerequisites/README.md#3-ide--editor)
+- Phase 2 — .NET SDK and toolchain readiness: [Prerequisites/README.md](Prerequisites/README.md#1-net-sdk), [Prerequisites/README.md](Prerequisites/README.md#2-dotnet-cli)
+- Phase 3 — NuGet packages, configuration, optional Azure monitoring: [Prerequisites/README.md](Prerequisites/README.md#5-nuget-package-dependencies), [Prerequisites/README.md](Prerequisites/README.md#7-environment-and-configuration), [Prerequisites/README.md](Prerequisites/README.md#6-optional-infrastructure)
+- Phase 4 — .NET SDK and local runtime readiness: [Prerequisites/README.md](Prerequisites/README.md#1-net-sdk), [Prerequisites/README.md](Prerequisites/README.md#2-dotnet-cli), [Prerequisites/README.md](Prerequisites/README.md#3-ide--editor)
+- Phase 5 — RabbitMQ, NuGet dependencies, environment configuration: [Prerequisites/README.md](Prerequisites/README.md#4-rabbitmq), [Prerequisites/README.md](Prerequisites/README.md#5-nuget-package-dependencies), [Prerequisites/README.md](Prerequisites/README.md#7-environment-and-configuration)
+- Phase 6 — .NET SDK, appsettings configuration, local runtime: [Prerequisites/README.md](Prerequisites/README.md#1-net-sdk), [Prerequisites/README.md](Prerequisites/README.md#7-environment-and-configuration), [Prerequisites/README.md](Prerequisites/README.md#8-recommended-cli-commands)
+- Phase 7 — Serilog/OpenTelemetry packages, optional Azure connection string: [Prerequisites/README.md](Prerequisites/README.md#5-nuget-package-dependencies), [Prerequisites/README.md](Prerequisites/README.md#6-optional-infrastructure), [Prerequisites/README.md](Prerequisites/README.md#7-environment-and-configuration)
+- Phase 8 — .NET SDK + test dependencies: [Prerequisites/README.md](Prerequisites/README.md#5-nuget-package-dependencies), [Prerequisites/README.md](Prerequisites/README.md#8-recommended-cli-commands)
+- Phase 9 — Docker, Docker Compose, RabbitMQ infrastructure: [Prerequisites/README.md](Prerequisites/README.md#4-rabbitmq), [Prerequisites/README.md](Prerequisites/README.md#6-optional-infrastructure)
+- Phase 10 — all previous prerequisites and final repo readiness: [Prerequisites/README.md](Prerequisites/README.md)
+
 ---
 
 ## Phase 1 — Solution and Project Setup

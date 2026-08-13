@@ -1,0 +1,163 @@
+# Shared Engineering Principles
+
+This document defines the common engineering standards that apply across repositories and teams. It is intentionally technology-agnostic and reusable, and it is separate from the repository-specific architecture rules.
+
+The repo-specific architecture decisions live in [repo_architecture_rules.md](repo_architecture_rules.md). This file keeps the broader standard practices that are useful outside a single project.
+
+---
+
+## 1. Import / Using statement grouping
+
+MUST:
+- Group `using` directives into three groups, in this order:
+  1. SDK / Framework (System.*)
+  2. Third-party libraries (NuGet packages)
+  3. Cross-project / solution references (internal namespaces)
+- Separate each group with a single blank line.
+- Sort directives alphabetically within each group.
+
+SHOULD:
+- Prefer `using` placement consistently across the repo and document the choice in `EditorConfig`.
+- Avoid unnecessary global usings for small projects.
+
+Example:
+
+```csharp
+using System;
+using System.Collections.Generic;
+
+using FluentValidation;
+using Polly;
+
+using TransactionValidation.Core;
+using TransactionValidation.Configuration;
+```
+
+---
+
+## 2. File structure and ordering
+
+MUST:
+- File layout must follow: file header (optional), `using` groups, namespace, single type per file unless small related types are intentionally grouped.
+- Keep `public` types near the top of the file and helper/private types below.
+
+SHOULD:
+- Keep lines under roughly 120 characters where practical.
+- Prefer clear helper methods instead of long inline logic.
+- Prefer immutable DTOs where appropriate.
+
+---
+
+## 3. Dependency injection and service registration
+
+MUST:
+- Keep DI registrations explicit and appropriate for lifetimes.
+- Keep registrations idempotent and easy to review.
+
+SHOULD:
+- Register interfaces before concrete types in the same extension method.
+- Register health checks and configuration options with `Configure<T>`.
+
+---
+
+## 4. Configuration and secrets
+
+MUST:
+- Follow a clear configuration precedence model.
+- Never hard-code secrets.
+- Use environment variables or secure configuration sources for credentials and endpoints.
+
+SHOULD:
+- Validate required configuration values at startup.
+- Keep configuration sections small and typed.
+
+---
+
+## 5. Build and dependency management
+
+MUST:
+- Keep package versions centralized when using central package management.
+- Prefer shared MSBuild properties for common settings.
+
+SHOULD:
+- Keep project files minimal and inherit common conventions from shared props files.
+
+---
+
+## 6. Error handling and exceptions
+
+MUST:
+- Use explicit exception types for domain or request errors.
+- Centralize translation from infrastructure exceptions to stable response models.
+
+SHOULD:
+- Keep exception messages descriptive but not overly implementation-specific.
+
+---
+
+## 7. Logging and observability
+
+MUST:
+- Inject `ILogger<T>` instead of using static loggers.
+- Capture important request context and correlation data.
+
+SHOULD:
+- Use structured logging fields such as correlation ID, request ID, trace ID, and domain identifiers.
+
+---
+
+## 8. Testing
+
+MUST:
+- Add tests for public behavior and contract-level logic.
+- Keep tests deterministic and focused.
+- Use xUnit and FluentAssertions for the standard project test style.
+
+SHOULD:
+- Keep unit tests fast and independent from external systems.
+- Separate integration tests from unit tests via clear project or trait structure.
+- Use `Theory` where helpful for data-driven validation.
+
+---
+
+## 9. CI and enforcement
+
+MUST:
+- Run build and test checks in CI.
+- Prefer format and analyzer checks as a gate for code quality.
+
+SHOULD:
+- Enforce targeted validation for unit and integration flow separately where helpful.
+
+---
+
+## 10. AI-generated scaffolding and review workflow
+
+MUST:
+- Treat AI-generated scaffolding as draft work until human review and validation.
+- Keep the generated changes small and reviewable.
+- Let a human validate, review, and commit.
+
+SHOULD:
+- Use phased PRs and tie each PR to a specific implementation milestone or checklist item.
+- Include a short summary of what was generated and what was manually verified.
+
+---
+
+## 11. Review checklist for shared engineering work
+
+Before merging any engineering standard or code change, confirm:
+
+- [ ] The change is clearly scoped and reviewable
+- [ ] It matches the relevant repo or shared standard, not both by accident
+- [ ] The design is simple and explicit
+- [ ] Security-sensitive values are not hard-coded
+- [ ] Logging and error handling are consistent
+- [ ] Relevant tests exist or are updated
+- [ ] Documentation reflects the actual implementation
+
+---
+
+## Final principle
+
+Shared engineering standards should guide quality, safety, and maintainability across projects. Repository architecture rules should define the actual decision-making for this solution. Separating them makes both more reliable.

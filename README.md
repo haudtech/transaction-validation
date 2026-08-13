@@ -74,32 +74,11 @@ dotnet test -v normal
 
 Repository entrypoint for implementation, workflow, and architecture documentation.
 
-## Documentation Map
+## Documentation
 
-### Implementation
-- Prerequisites: [docs/implementation/Prerequisites/README.md](docs/implementation/Prerequisites/README.md)
-- Phase plan and checklist: [docs/implementation/implementation_phases.md](docs/implementation/implementation_phases.md)
-- Scaffold and wiring guidance: [docs/implementation/implementation_scaffold.md](docs/implementation/implementation_scaffold.md)
-- Principle rules (MUST/SHOULD): [docs/implementation/principle_rules.md](docs/implementation/principle_rules.md)
+Start here: [docs/README.md](docs/README.md)
 
-### GitHub Workflow Actions
-- Workflow docs index: [docs/workflow_actions/github/README.md](docs/workflow_actions/github/README.md)
-- CI workflow details: [docs/workflow_actions/github/ci_workflow.md](docs/workflow_actions/github/ci_workflow.md)
-- Integration workflow details: [docs/workflow_actions/github/integration_workflow.md](docs/workflow_actions/github/integration_workflow.md)
-- Workflow fix case studies: [docs/workflow_actions/github/workflow_case_studies.md](docs/workflow_actions/github/workflow_case_studies.md)
-
-### Analysis and Design
-- Solution analysis: [docs/analysis/solution_analysis.md](docs/analysis/solution_analysis.md)
-- Use case diagram: [docs/diagram/use_case_diagram.md](docs/diagram/use_case_diagram.md)
-- Use case sequence diagram: [docs/diagram/use_case_sequence_diagram.md](docs/diagram/use_case_sequence_diagram.md)
-
-### Requirements
-- Interview requirements: [reqs/Senior_net_interview_2026.md](reqs/Senior_net_interview_2026.md)
-
-## Contributing
-
-- Follow the implementation phases: [docs/implementation/implementation_phases.md](docs/implementation/implementation_phases.md)
-- Keep workflow/documentation updates aligned with: [docs/workflow_actions/github/README.md](docs/workflow_actions/github/README.md)
+The detailed documentation map, contribution workflow, and topic navigation live in the docs index so the project README stays focused on the codebase and the primary entrypoint.
 
 ## License
 

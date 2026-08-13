@@ -56,3 +56,40 @@ dotnet build
 ## 9. Notes
 - The workspace currently uses a multi-project `.sln` layout with shared configuration, core, integration, messaging, and mock projects.
 - Follow the ordered implementation phases in `docs/implementation/implementation_phases.md` when generating code.
+
+## 10. Phase-to-prerequisite readiness map
+
+The implementation checklist depends on these prerequisite groups before a phase is treated as truly ready.
+
+- Phase 1 — Solution and Project Setup
+  - Required: .NET SDK, `dotnet` CLI, IDE/editor setup
+  - References: Sections 1, 2, 3
+- Phase 2 — Core Domain and Validation
+  - Required: .NET SDK and working local build/test toolchain
+  - References: Sections 1, 2, 8
+- Phase 3 — Shared Configuration and Middleware
+  - Required: NuGet package dependencies, configuration files, optional Azure settings
+  - References: Sections 5, 6, 7
+- Phase 4 — Mock Partner Verification API
+  - Required: .NET CLI, IDE, and local runtime choice for mock endpoint testing
+  - References: Sections 1, 2, 3, 8
+- Phase 5 — Integration and Messaging Implementations
+  - Required: RabbitMQ, `Polly`, `RabbitMQ.Client`, and configuration readiness
+  - References: Sections 4, 5, 7
+- Phase 6 — API Project and Endpoint
+  - Required: local runtime environment, appsettings configuration, and restore/build readiness
+  - References: Sections 1, 2, 7, 8
+- Phase 7 — Observability and Azure Integration
+  - Required: Serilog/OpenTelemetry packages and optional Azure Monitor connection string
+  - References: Sections 5, 6, 7
+- Phase 8 — Testing and Quality
+  - Required: restore/build pipeline, test packages (`Moq`, `FluentAssertions`), and validation toolchain
+  - References: Sections 5, 8
+- Phase 9 — Docker and Local Infrastructure
+  - Required: Docker/Compose, RabbitMQ service readiness, environment variables
+  - References: Sections 4, 6, 7
+- Phase 10 — Documentation and Final Review
+  - Required: all prior environment and dependency prerequisites must already be satisfied
+  - References: entire document
+
+This mapping is intentionally explicit so that a phase is not considered complete by checklist status alone; it must be backed by the prerequisite environment and dependencies described here.
