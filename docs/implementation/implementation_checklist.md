@@ -40,15 +40,16 @@ This checklist reflects the current repository state and marks only the work tha
 - [x] Commit and run `dotnet test` for related tests
 
 ## Phase 3 — Shared Configuration and Middleware
-- [ ] Create option classes: `ApiKeyOptions`, `PartnerVerificationOptions`, `RabbitMqOptions`
-- [ ] Implement `ServiceCollectionExtensions.AddTransactionValidationCommonServices(IConfiguration)`
-- [ ] Implement `ApiKeyMiddleware` and `GlobalExceptionHandlerMiddleware`
-- [ ] Register OpenTelemetry and conditional App Insights exporter
-- [ ] Wire FluentValidation auto-validation and validators registration
-- [ ] Commit and smoke-test app startup with shared services
-- [ ] Define domain-specific exception types (e.g. `NotFoundException`, `BadRequestException`, `ConflictException`)
-- [ ] Implement an `IExceptionHandler` (or equivalent centralized handler) that maps exceptions to HTTP status codes and writes RFC 7807 `ProblemDetails`
-- [ ] Register the `IExceptionHandler` in the shared configuration and add unit tests for mappings
+- [x] Phase 3 prerequisite gate is satisfied: NuGet packages are present, the API appsettings are in place, and the credential values are separated into the local environment file.
+- [x] Create option classes: `ApiKeyOptions`, `PartnerVerificationOptions`, `RabbitMqOptions`, `OpenTelemetryOptions`, and `SerilogOptions`
+- [x] Implement `ServiceCollectionExtensions.AddTransactionValidationCommonServices(IConfiguration)`
+- [x] Implement `ApiKeyMiddleware`
+- [x] Register OpenTelemetry and conditional App Insights exporter
+- [x] Wire FluentValidation auto-validation and validators registration
+- [ ] Commit and smoke-test app startup with shared services (implementation is in place; final shell-level validation is still blocked by the VS Code named-pipe sandbox issue)
+- [x] Define domain-specific exception types (e.g. `NotFoundException`, `BadRequestException`, `ConflictException`)
+- [x] Implement an `IExceptionHandler` that maps exceptions to HTTP status codes and writes RFC 7807 `ProblemDetails`
+- [x] Register the `IExceptionHandler` in the shared configuration and add unit tests for mappings
 
 ## Phase 4 — Mock Partner Verification API
 - [x] Implement `MockPartnerVerificationController` with `GET /api/v1/mock/partner-verification/verify/{partnerId}`

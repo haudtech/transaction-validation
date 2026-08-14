@@ -46,12 +46,12 @@ src/
   TransactionValidation.Api/
     Program.cs
     Controllers/PartnerTransactionsController.cs
-    Middleware/ApiKeyMiddleware.cs
-    Middleware/GlobalExceptionHandlerMiddleware.cs
     appsettings.json
     appsettings.Development.json
   TransactionValidation.Configuration/
     Extensions/ServiceCollectionExtensions.cs
+    Middleware/ApiKeyMiddleware.cs
+    Middleware/ApiExceptionHandler.cs
     Options/PartnerVerificationOptions.cs
     Options/RabbitMqOptions.cs
     Options/SecurityOptions.cs
@@ -509,25 +509,30 @@ public static class ServiceCollectionExtensions
             return new RabbitMqMessagePublisher(options);
         });
 
-        services.AddOpenTelemetryTracing(builder =>
-        {
-            builder
-                .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation()
-                .AddConsoleExporter();
-
-            var appInsightsConnectionString = configuration["ApplicationInsights:ConnectionString"];
-            if (!string.IsNullOrWhiteSpace(appInsightsConnectionString))
+        services.AddOpenTelemetry()
+            .ConfigureResource(resource => resource.AddService("TransactionValidation"))
+            .WithTracing(tracing =>
             {
-                builder.AddAzureMonitorTraceExporter(options =>
-                {
-                    options.ConnectionString = appInsightsConnectionString;
-                });
-            }
-        });
+                tracing.AddAspNetCoreInstrumentation();
+                tracing.AddHttpClientInstrumentation();
+                tracing.AddConsoleExporter();
+            })
+            .WithMetrics(metrics =>
+            {
+                metrics.AddAspNetCoreInstrumentation();
+                metrics.AddHttpClientInstrumentation();
+                metrics.AddConsoleExporter();
+            });
 
-        services.AddFluentValidationAutoValidation();
+        var appInsightsConnectionString = configuration["ApplicationInsights:ConnectionString"];
+        if (!string.IsNullOrWhiteSpace(appInsightsConnectionString))
+        {
+            services.AddOpenTelemetry().UseAzureMonitor();
+        }
+
         services.AddValidatorsFromAssemblyContaining<PartnerTransactionRequestValidator>();
+        services.AddProblemDetails();
+        services.AddExceptionHandler<ApiExceptionHandler>();
 
         services.AddSingleton<ApiKeyOptions>(sp => sp.GetRequiredService<IOptions<ApiKeyOptions>>().Value);
 
@@ -536,7 +541,7 @@ public static class ServiceCollectionExtensions
 
     public static IApplicationBuilder UseTransactionValidationCommon(this IApplicationBuilder app)
     {
-        app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
+        app.UseExceptionHandler();
         app.UseMiddleware<ApiKeyMiddleware>();
         return app;
     }
@@ -576,99 +581,86 @@ public sealed class ApiKeyMiddleware
 }
 ```
 
-### File: `src/TransactionValidation.Configuration/Middleware/GlobalExceptionHandlerMiddleware.cs`
+### File: `src/TransactionValidation.Configuration/Middleware/ApiExceptionHandler.cs`
 
 ```csharp
-using System.Net;
-using TransactionValidation.Core.Models;
+using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using TransactionValidation.Core.Exceptions;
 
 namespace TransactionValidation.Configuration.Middleware;
 
-public sealed class GlobalExceptionHandlerMiddleware
+public sealed class ApiExceptionHandler : IExceptionHandler
 {
-    private readonly RequestDelegate _next;
-
-    public GlobalExceptionHandlerMiddleware(RequestDelegate next) => _next = next;
-
-    public async Task InvokeAsync(HttpContext context)
+    public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        try
+        var problem = exception switch
         {
-            await _next(context);
-        }
-        catch (TimeoutException ex)
-        {
-            context.Response.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
-            await context.Response.WriteAsJsonAsync(new ErrorResponse
+            BadRequestException badRequest => new ProblemDetails
             {
-                Code = "TimeoutError",
-                Message = ex.Message
-            });
-        }
-        catch (Exception)
-        {
-            context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-            await context.Response.WriteAsJsonAsync(new ErrorResponse
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Bad Request",
+                Detail = badRequest.Message,
+                Type = "https://httpstatuses.com/400"
+            },
+            NotFoundException notFound => new ProblemDetails
             {
-                Code = "InternalServerError",
-                Message = "An unexpected error occurred."
-            });
-        }
+                Status = StatusCodes.Status404NotFound,
+                Title = "Not Found",
+                Detail = notFound.Message,
+                Type = "https://httpstatuses.com/404"
+            },
+            ConflictException conflict => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Conflict",
+                Detail = conflict.Message,
+                Type = "https://httpstatuses.com/409"
+            },
+            UnauthorizedAccessException unauthorized => new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Title = "Unauthorized",
+                Detail = unauthorized.Message,
+                Type = "https://httpstatuses.com/401"
+            },
+            _ => new ProblemDetails
+            {
+                Status = StatusCodes.Status500InternalServerError,
+                Title = "Internal Server Error",
+                Detail = "An unexpected error occurred.",
+                Type = "https://httpstatuses.com/500"
+            }
+        };
+
+        httpContext.Response.StatusCode = problem.Status ?? StatusCodes.Status500InternalServerError;
+        httpContext.Response.ContentType = "application/problem+json";
+        await httpContext.Response.WriteAsJsonAsync(problem, cancellationToken: cancellationToken);
+        return true;
     }
 }
 ```
 
     ### Exception handling best practices
 
-    Design and implement domain-specific exception types that map cleanly to HTTP status codes (for example `NotFoundException` → 404, `BadRequestException` → 400, `ConflictException` → 409). This improves clarity and keeps controller code thin.
+    Design and implement domain-specific exception types that map cleanly to HTTP status codes (for example `NotFoundException` → 404, `BadRequestException` → 400, `ConflictException` → 409). This keeps controller code thin and preserves a single centralized mapping layer.
 
-    Starting with .NET 8 you can implement the built-in `IExceptionHandler` to centralize exception mapping. Implement `IExceptionHandler` to inspect exceptions, map them to the appropriate HTTP status code, and write a standardized RFC 7807 `ProblemDetails` response body. Prefer this to scattering try/catch blocks across controllers.
+    In .NET 8, prefer the built-in `IExceptionHandler` contract over a custom middleware `try/catch` pipeline. The handler should inspect the exception type, choose the appropriate HTTP status code, and write a standardized RFC 7807 `ProblemDetails` response body.
 
     Example guidance:
-    - Define simple, sealed domain exception types in `TransactionValidation.Core.Exceptions` (e.g. `NotFoundException`, `BadRequestException`, `PartnerVerificationException`).
-    - Implement an `IExceptionHandler` in `TransactionValidation.Configuration` that:
-      - Matches on exception type and chooses the proper `StatusCode`.
-      - Produces a `ProblemDetails` body with `type`, `title`, `status`, `detail`, and optional `instance`/`extensions` fields.
-      - Logs exceptions with structured logging (Serilog) and includes correlation id when present.
-    - Register the `IExceptionHandler` implementation in the shared configuration wiring and ensure it runs early in the pipeline.
-
-    Small example (conceptual):
-    ```csharp
-    public sealed class ApiExceptionHandler : IExceptionHandler
-    {
-        public Task HandleAsync(HttpContext context, Exception exception)
-        {
-            var problem = new ProblemDetails();
-            switch (exception)
-            {
-                case NotFoundException nf:
-                    problem.Status = StatusCodes.Status404NotFound;
-                    problem.Title = "Resource not found";
-                    problem.Detail = nf.Message;
-                    break;
-                case BadRequestException br:
-                    problem.Status = StatusCodes.Status400BadRequest;
-                    problem.Title = "Bad request";
-                    problem.Detail = br.Message;
-                    break;
-                default:
-                    problem.Status = StatusCodes.Status500InternalServerError;
-                    problem.Title = "An unexpected error occurred";
-                    problem.Detail = "Unexpected server error.";
-                    break;
-            }
-
-            context.Response.StatusCode = problem.Status ?? 500;
-            context.Response.WriteAsJsonAsync(problem);
-            return Task.CompletedTask;
-        }
-    }
-    ```
+    - Define simple, sealed domain exception types in `TransactionValidation.Core.Exceptions` (for example `NotFoundException`, `BadRequestException`, `ConflictException`).
+    - Implement an `IExceptionHandler` in `TransactionValidation.Configuration/Middleware` that:
+      - switches on the exception type and chooses the correct `StatusCode`
+      - writes a `ProblemDetails` object with `type`, `title`, `status`, `detail`, and optional `instance`/extension values
+      - preserves a clear single source of truth for API error mapping
+    - Register the handler in the shared configuration wiring with `services.AddExceptionHandler<ApiExceptionHandler>();`
+    - Call `app.UseExceptionHandler();` early in the ASP.NET Core pipeline before custom middleware such as `ApiKeyMiddleware`
 
     Notes:
-    - Keep domain exceptions simple and avoid embedding transport concerns (HTTP codes) inside them — mapping belongs to the exception handler.
+    - Keep domain exceptions simple and avoid embedding transport concerns (HTTP codes) inside them; mapping belongs to the exception handler.
     - Use `ProblemDetails` to stay compatible with client libraries and tooling that understand RFC 7807.
-    - Add unit tests that assert exception → status code mapping and that problem details include expected fields.
+    - Add unit tests that assert exception → status code mapping and validate the expected `ProblemDetails` fields.
 
 
 ### File: `src/TransactionValidation.Api/Program.cs`
