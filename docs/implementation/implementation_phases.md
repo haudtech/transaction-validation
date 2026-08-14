@@ -132,7 +132,7 @@ Implement external integration and queue publisher components.
 - Create `src/TransactionValidation.Integration/PartnerVerificationOptions.cs` if not already created in configuration
 - Implement `src/TransactionValidation.Integration/PartnerVerifierClient.cs`
   - Use `HttpClient`
-  - Apply Polly retry + timeout + circuit breaker policies
+  - Apply .NET 8 resilience handler policies (retry + timeout + circuit breaker) via `Microsoft.Extensions.Http.Resilience`
   - Call the mock verification endpoint
 - Create `src/TransactionValidation.Messaging/RabbitMqOptions.cs` if not already created in configuration
 - Implement `src/TransactionValidation.Messaging/RabbitMqMessagePublisher.cs`
