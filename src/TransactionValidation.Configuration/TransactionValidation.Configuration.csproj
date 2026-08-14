@@ -7,18 +7,17 @@
     <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" />
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
-    <PackageReference Include="Microsoft.Extensions.Http.Polly" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
     <PackageReference Include="OpenTelemetry.Exporter.Console" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
-    <PackageReference Include="Polly" />
-    <PackageReference Include="Polly.Extensions.Http" />
     <PackageReference Include="RabbitMQ.Client" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\TransactionValidation.Core\TransactionValidation.Core.csproj" />
     <ProjectReference Include="..\TransactionValidation.Integration\TransactionValidation.Integration.csproj" />
+    <ProjectReference Include="..\TransactionValidation.Messaging\TransactionValidation.Messaging.csproj" />
   </ItemGroup>
 </Project>

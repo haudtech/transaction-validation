@@ -8,7 +8,12 @@ public sealed class PartnerVerificationOptions
 
     public int RetryCount { get; set; } = 3;
 
+    // Backward-compatible legacy timeout setting used as fallback.
     public int TimeoutSeconds { get; set; } = 10;
+
+    public int AttemptTimeoutSeconds { get; set; } = 10;
+
+    public int TotalRequestTimeoutSeconds { get; set; } = 30;
 
     public int CircuitBreakerFailures { get; set; } = 5;
 

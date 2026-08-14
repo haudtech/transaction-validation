@@ -4,17 +4,17 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using Polly;
-using Polly.Extensions.Http;
 using TransactionValidation.Configuration.Middleware;
 using TransactionValidation.Configuration.Options;
 using TransactionValidation.Core.Interfaces;
 using TransactionValidation.Core.Validation;
 using TransactionValidation.Integration;
+using TransactionValidation.Messaging;
 
 namespace TransactionValidation.Configuration.Extensions;
 
@@ -38,14 +38,49 @@ public static class ServiceCollectionExtensions
         services.AddProblemDetails();
         services.AddExceptionHandler<ApiExceptionHandler>();
 
-        services.AddHttpClient<IPartnerVerifier, PartnerVerifierPlaceholder>(client =>
+        var partnerVerificationOptions = configuration.GetSection(PartnerVerificationOptions.SectionName).Get<PartnerVerificationOptions>() ?? new PartnerVerificationOptions();
+
+        var fallbackTimeoutSeconds = Math.Max(1, partnerVerificationOptions.TimeoutSeconds);
+        var attemptTimeoutSeconds = partnerVerificationOptions.AttemptTimeoutSeconds > 0
+            ? partnerVerificationOptions.AttemptTimeoutSeconds
+            : fallbackTimeoutSeconds;
+        var totalTimeoutSeconds = partnerVerificationOptions.TotalRequestTimeoutSeconds > 0
+            ? partnerVerificationOptions.TotalRequestTimeoutSeconds
+            : Math.Max(attemptTimeoutSeconds + 1, attemptTimeoutSeconds * (partnerVerificationOptions.RetryCount + 1));
+
+        if (totalTimeoutSeconds <= attemptTimeoutSeconds)
         {
-            var options = configuration.GetSection(PartnerVerificationOptions.SectionName).Get<PartnerVerificationOptions>() ?? new PartnerVerificationOptions();
-            client.BaseAddress = new Uri(options.BaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+            totalTimeoutSeconds = attemptTimeoutSeconds + 1;
+        }
+
+        services.AddHttpClient<IPartnerVerifier, PartnerVerifierClient>(client =>
+        {
+            client.BaseAddress = new Uri(partnerVerificationOptions.BaseUrl);
+            client.Timeout = TimeSpan.FromSeconds(totalTimeoutSeconds);
         })
-        .AddPolicyHandler(GetRetryPolicy())
-        .AddPolicyHandler(GetTimeoutPolicy());
+        .AddStandardResilienceHandler(options =>
+        {
+            options.Retry.MaxRetryAttempts = partnerVerificationOptions.RetryCount;
+
+            options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(attemptTimeoutSeconds);
+            options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(totalTimeoutSeconds);
+
+            options.CircuitBreaker.MinimumThroughput = Math.Max(2, partnerVerificationOptions.CircuitBreakerFailures);
+            options.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(partnerVerificationOptions.CircuitBreakerDurationSeconds);
+        });
+
+        services.AddSingleton<IRabbitMqClientAdapter>(sp =>
+        {
+            var options = sp.GetRequiredService<RabbitMqOptions>();
+            return new RabbitMqClientAdapter(options.HostName, options.Port, options.UserName, options.Password);
+        });
+
+        services.AddSingleton<IMessagePublisher>(sp =>
+        {
+            var options = sp.GetRequiredService<RabbitMqOptions>();
+            var rabbitMqClientAdapter = sp.GetRequiredService<IRabbitMqClientAdapter>();
+            return new RabbitMqMessagePublisher(options.QueueName, options.Durable, rabbitMqClientAdapter);
+        });
 
         var telemetryOptions = configuration.GetSection(OpenTelemetryOptions.SectionName).Get<OpenTelemetryOptions>() ?? new OpenTelemetryOptions();
         var exporterName = telemetryOptions.Tracing.Exporter;
@@ -102,16 +137,4 @@ public static class ServiceCollectionExtensions
         return app;
     }
 
-    private static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
-    {
-        return HttpPolicyExtensions
-            .HandleTransientHttpError()
-            .OrResult(response => response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
-    }
-
-    private static IAsyncPolicy<HttpResponseMessage> GetTimeoutPolicy()
-    {
-        return Policy.TimeoutAsync<HttpResponseMessage>(10);
-    }
 }
