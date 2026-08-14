@@ -1,0 +1,142 @@
+@apiHost = http://localhost:5080
+@apiKey = 6a8ce36cb6f8e7265a4d49201fb0ff810ff0f4731cc0e6a974fb32bb2a53703b
+@runId = {{$timestamp}}
+@partnerId = partner-123
+@transactionReference = ref-{{runId}}
+@idempotencyKey = txn-{{runId}}
+
+###
+# TransactionValidation API manual smoke script
+# Prerequisites:
+# 1) TransactionValidation.Api is running (adjust @apiHost if needed)
+# 2) TransactionValidation.Mock is running on PartnerVerification:BaseUrl
+# 3) RabbitMQ is running
+
+### 1) Health/root check (should be 200 when API key is provided)
+# @name root
+GET {{apiHost}}/
+Accept: application/json
+X-API-Key: {{apiKey}}
+
+### 2) Happy path submit (should be 202 Accepted)
+# @name createAccepted
+POST {{apiHost}}/api/v1/partner/transactions
+Content-Type: application/json
+Accept: application/json
+X-API-Key: {{apiKey}}
+Idempotency-Key: {{idempotencyKey}}
+
+{
+  "partnerId": "{{partnerId}}",
+  "transactionReference": "{{transactionReference}}",
+  "amount": 120.50,
+  "currency": "USD",
+  "timestamp": "2026-08-14T10:30:00Z"
+}
+
+### 3) Same key + same payload via Idempotency-Key (should be 409 duplicate)
+# @name duplicateByHeaderSamePayload
+POST {{apiHost}}/api/v1/partner/transactions
+Content-Type: application/json
+Accept: application/problem+json
+X-API-Key: {{apiKey}}
+Idempotency-Key: {{idempotencyKey}}
+
+{
+  "partnerId": "{{partnerId}}",
+  "transactionReference": "{{transactionReference}}",
+  "amount": 120.50,
+  "currency": "USD",
+  "timestamp": "2026-08-14T10:30:00Z"
+}
+
+### 4) Same key + different payload via Idempotency-Key (should be 409 payload mismatch)
+# @name duplicateByHeaderDifferentPayload
+POST {{apiHost}}/api/v1/partner/transactions
+Content-Type: application/json
+Accept: application/problem+json
+X-API-Key: {{apiKey}}
+Idempotency-Key: {{idempotencyKey}}
+
+{
+  "partnerId": "{{partnerId}}",
+  "transactionReference": "ref-other-{{runId}}",
+  "amount": 99.99,
+  "currency": "USD",
+  "timestamp": "2026-08-14T10:31:00Z"
+}
+
+### 5) Same key + same payload via fallback partnerId|transactionReference (no header, should be 409 duplicate)
+# @name firstWithoutHeader
+POST {{apiHost}}/api/v1/partner/transactions
+Content-Type: application/json
+Accept: application/json
+X-API-Key: {{apiKey}}
+
+{
+  "partnerId": "partner-dup",
+  "transactionReference": "dup-ref-{{runId}}",
+  "amount": 42.00,
+  "currency": "EUR",
+  "timestamp": "2026-08-14T10:32:00Z"
+}
+
+###
+# @name duplicateWithoutHeaderSamePayload
+POST {{apiHost}}/api/v1/partner/transactions
+Content-Type: application/json
+Accept: application/problem+json
+X-API-Key: {{apiKey}}
+
+{
+  "partnerId": "partner-dup",
+  "transactionReference": "dup-ref-{{runId}}",
+  "amount": 42.00,
+  "currency": "EUR",
+  "timestamp": "2026-08-14T10:32:00Z"
+}
+
+### 6) Same key + different payload via fallback partnerId|transactionReference (no header, should be 409 payload mismatch)
+# @name duplicateWithoutHeaderDifferentPayload
+POST {{apiHost}}/api/v1/partner/transactions
+Content-Type: application/json
+Accept: application/problem+json
+X-API-Key: {{apiKey}}
+
+{
+  "partnerId": "partner-dup",
+  "transactionReference": "dup-ref-{{runId}}",
+  "amount": 43.00,
+  "currency": "EUR",
+  "timestamp": "2026-08-14T10:33:00Z"
+}
+
+### 7) Validation failure (should be 400 Bad Request)
+# @name invalidPayload
+POST {{apiHost}}/api/v1/partner/transactions
+Content-Type: application/json
+Accept: application/problem+json
+X-API-Key: {{apiKey}}
+Idempotency-Key: invalid-{{runId}}
+
+{
+  "partnerId": "",
+  "transactionReference": "",
+  "amount": -5,
+  "currency": "ZZZ",
+  "timestamp": "0001-01-01T00:00:00Z"
+}
+
+### 8) Missing API key (should be 401 Unauthorized)
+# @name missingApiKey
+POST {{apiHost}}/api/v1/partner/transactions
+Content-Type: application/json
+Accept: application/json
+
+{
+  "partnerId": "partner-unauthorized",
+  "transactionReference": "unauth-{{runId}}",
+  "amount": 10,
+  "currency": "USD",
+  "timestamp": "2026-08-14T10:34:00Z"
+}

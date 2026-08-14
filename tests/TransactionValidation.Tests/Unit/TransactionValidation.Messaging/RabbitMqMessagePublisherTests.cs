@@ -10,6 +10,19 @@ namespace TransactionValidation.Tests.Unit.TransactionValidation.Messaging;
 public sealed class RabbitMqMessagePublisherTests
 {
     [Fact]
+    public async Task TryInvokeWithResultAsync_WhenMethodReturnsValueTask_UsesResultValue()
+    {
+        var target = new ValueTaskResultTarget();
+
+        var result = await RabbitMqApiCompat.TryInvokeWithResultAsync(target, nameof(ValueTaskResultTarget.GetAsync));
+
+        result.found.Should().BeTrue();
+        result.result.Should().NotBeNull();
+        result.result.Should().BeOfType<ValueTaskResult>();
+        ((ValueTaskResult)result.result!).DeliveryTag.Should().Be(42UL);
+    }
+
+    [Fact]
     public async Task PublishAsync_WhenPublisherConfirms_DeclaresQueueAndPublishes()
     {
         var adapterMock = new Mock<IRabbitMqClientAdapter>();
@@ -57,5 +70,15 @@ public sealed class RabbitMqMessagePublisherTests
                 Timestamp = DateTime.UtcNow
             }
         };
+    }
+
+    private sealed class ValueTaskResultTarget
+    {
+        public ValueTask<ValueTaskResult> GetAsync() => new(new ValueTaskResult { DeliveryTag = 42UL });
+    }
+
+    private sealed class ValueTaskResult
+    {
+        public ulong DeliveryTag { get; set; }
     }
 }
