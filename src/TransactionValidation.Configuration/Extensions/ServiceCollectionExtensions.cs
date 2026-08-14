@@ -126,7 +126,10 @@ public static class ServiceCollectionExtensions
 
         if (!string.IsNullOrWhiteSpace(azureMonitorConnectionString))
         {
-            services.AddOpenTelemetry().UseAzureMonitor();
+            services.AddOpenTelemetry().UseAzureMonitor(options =>
+            {
+                options.ConnectionString = azureMonitorConnectionString;
+            });
         }
 
         return services;
