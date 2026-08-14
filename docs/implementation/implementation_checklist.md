@@ -58,11 +58,11 @@ This checklist reflects the current repository state and marks only the work tha
 - [ ] Commit mock project and verify it runs independently
 
 ## Phase 5 — Integration and Messaging Implementations
-- [ ] Implement `PartnerVerifierClient` using `HttpClient` and Polly policies
-- [ ] Implement `RabbitMqMessagePublisher` with durable queue and publisher confirms
-- [ ] Add configuration binding for their options and register in DI
-- [ ] Add unit tests/mocks for resiliency and publisher confirm failure
-- [ ] Commit and run tests
+- [x] Implement `PartnerVerifierClient` using `HttpClient` and .NET 8 resilience policies (`Microsoft.Extensions.Http.Resilience`)
+- [x] Implement `RabbitMqMessagePublisher` with durable queue and publisher confirms
+- [x] Add configuration binding for their options and register in DI
+- [x] Add unit tests/mocks for resiliency and publisher confirm failure
+- [ ] Commit and run tests (tests are verified locally; commit step remains pending)
 
 ## Phase 6 — API Project and Endpoint
 - [ ] Implement `Program.cs` to use shared configuration and Serilog

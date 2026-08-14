@@ -32,7 +32,7 @@ The implementation uses these NuGet packages across projects:
 - `OpenTelemetry.Instrumentation.Http`
 - `OpenTelemetry.Exporter.Console`
 - `Azure.Monitor.OpenTelemetry.Exporter`
-- `Polly`
+- `Microsoft.Extensions.Http.Resilience`
 - `RabbitMQ.Client`
 - `Moq`
 - `FluentAssertions`
@@ -74,7 +74,7 @@ The implementation checklist depends on these prerequisite groups before a phase
   - Required: .NET CLI, IDE, and local runtime choice for mock endpoint testing
   - References: Sections 1, 2, 3, 8
 - Phase 5 — Integration and Messaging Implementations
-  - Required: RabbitMQ, `Polly`, `RabbitMQ.Client`, and configuration readiness
+  - Required: RabbitMQ, `Microsoft.Extensions.Http.Resilience`, `RabbitMQ.Client`, and configuration readiness
   - References: Sections 4, 5, 7
 - Phase 6 — API Project and Endpoint
   - Required: local runtime environment, appsettings configuration, and restore/build readiness

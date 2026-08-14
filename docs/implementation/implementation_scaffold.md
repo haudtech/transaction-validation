@@ -12,7 +12,7 @@ The goal is to build a .NET 8 Web API that:
 - Validates payload
 - Verifies `partnerId` against a mock partner verifier
 - Publishes the verified transaction to a local RabbitMQ queue
-- Uses Polly for retries and timeouts
+- Uses .NET 8 resilience handlers (`Microsoft.Extensions.Http.Resilience`) for retries and timeouts
 - Secures the endpoint with API key middleware
 - Includes global exception handling and unit tests
 
@@ -224,10 +224,10 @@ dotnet add package OpenTelemetry.Instrumentation.Http --version 1.6.0
 dotnet add package OpenTelemetry.Exporter.Console --version 1.6.0
 dotnet add package Azure.Monitor.OpenTelemetry.Exporter --version 1.0.0
 
-dotnet add package Polly --version 8.1.0
+dotnet add package Microsoft.Extensions.Http.Resilience --version 8.0.0
 
 cd ../TransactionValidation.Integration
-dotnet add package Polly --version 8.1.0
+# no additional resilience package is required here when HttpClient policies are wired in TransactionValidation.Configuration
 
 cd ../TransactionValidation.Messaging
 dotnet add package RabbitMQ.Client --version 7.5.0
@@ -726,28 +726,36 @@ public sealed class MockPartnerVerificationController : ControllerBase
 
 ## 6. Integration project implementation
 
-### File: `src/TransactionValidation.Integration/PartnerVerificationOptions.cs`
+### File: `src/TransactionValidation.Configuration/Options/PartnerVerificationOptions.cs`
 
 ```csharp
-namespace TransactionValidation.Integration;
+namespace TransactionValidation.Configuration.Options;
 
 public sealed class PartnerVerificationOptions
 {
-    public required string BaseUrl { get; init; }
-    public int RetryCount { get; init; } = 3;
-    public int TimeoutSeconds { get; init; } = 2;
-    public int CircuitBreakerFailures { get; init; } = 5;
-    public int CircuitBreakerDurationSeconds { get; init; } = 60;
+    public const string SectionName = "PartnerVerification";
+
+    public string BaseUrl { get; set; } = "http://localhost:5002/";
+
+    public int RetryCount { get; set; } = 3;
+
+    // Backward-compatible legacy timeout setting used as fallback.
+    public int TimeoutSeconds { get; set; } = 10;
+
+    public int AttemptTimeoutSeconds { get; set; } = 10;
+
+    public int TotalRequestTimeoutSeconds { get; set; } = 30;
+
+    public int CircuitBreakerFailures { get; set; } = 5;
+
+    public int CircuitBreakerDurationSeconds { get; set; } = 30;
 }
 ```
 
 ### File: `src/TransactionValidation.Integration/PartnerVerifierClient.cs`
 
 ```csharp
-using System.Net.Http.Json;
-using Polly;
-using Polly.CircuitBreaker;
-using Polly.Timeout;
+using TransactionValidation.Core.Exceptions;
 using TransactionValidation.Core.Interfaces;
 
 namespace TransactionValidation.Integration;
@@ -755,48 +763,39 @@ namespace TransactionValidation.Integration;
 public sealed class PartnerVerifierClient : IPartnerVerifier
 {
     private readonly HttpClient _httpClient;
-    private readonly AsyncPolicyWrap _policy;
 
-    public PartnerVerifierClient(HttpClient httpClient, PartnerVerificationOptions options)
+    public PartnerVerifierClient(HttpClient httpClient)
     {
         _httpClient = httpClient;
-        var timeout = Policy.TimeoutAsync(TimeSpan.FromSeconds(options.TimeoutSeconds));
-
-        var retry = Policy.Handle<Exception>()
-            .WaitAndRetryAsync(options.RetryCount, attempt => TimeSpan.FromMilliseconds(200 * Math.Pow(2, attempt)),
-                (exception, timeSpan, retryCount, context) =>
-                {
-                    // Add logging if needed
-                });
-
-        var breaker = Policy.Handle<Exception>()
-            .CircuitBreakerAsync(options.CircuitBreakerFailures, TimeSpan.FromSeconds(options.CircuitBreakerDurationSeconds));
-
-        _policy = Policy.WrapAsync(retry, timeout, breaker);
     }
 
-    public async Task<bool> VerifyAsync(string partnerId, CancellationToken cancellationToken = default)
+    public async Task<bool> VerifyAsync(string partnerId, CancellationToken cancellationToken = default, bool? forceTimeout = null)
     {
-        return await _policy.ExecuteAsync(async ct =>
+        if (string.IsNullOrWhiteSpace(partnerId))
         {
-            var response = await _httpClient.GetAsync($"api/v1/mock/partner-verification/verify/{partnerId}", ct);
-            response.EnsureSuccessStatusCode();
-            var payload = await response.Content.ReadFromJsonAsync<PartnerVerificationResponse>(cancellationToken: ct);
-            return payload?.Verified ?? false;
-        }, cancellationToken);
-    }
+            throw new BadRequestException("partnerId is required.");
+        }
 
-    private sealed class PartnerVerificationResponse
-    {
-        public required string PartnerId { get; init; }
-        public bool Verified { get; init; }
+        var requestPath = $"api/v1/mock/partner-verification/verify/{Uri.EscapeDataString(partnerId)}";
+        if (forceTimeout.HasValue)
+        {
+            requestPath += $"?forceTimeout={forceTimeout.Value.ToString().ToLowerInvariant()}";
+        }
+
+        var response = await _httpClient.GetAsync(requestPath, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new NotFoundException($"Partner '{partnerId}' could not be verified.");
+        }
+
+        return true;
     }
 }
 ```
 
 ### Notes
-- The HTTP client base address is configured in the API project.
-- The policy wraps retry, timeout, and circuit breaker behavior.
+- The HTTP client base address is configured in shared configuration.
+- Resilience policies are wired in `ServiceCollectionExtensions` through `AddStandardResilienceHandler(...)`.
 
 ---
 

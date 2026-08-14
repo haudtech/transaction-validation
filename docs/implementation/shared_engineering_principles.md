@@ -27,7 +27,7 @@ using System;
 using System.Collections.Generic;
 
 using FluentValidation;
-using Polly;
+using Microsoft.Extensions.Http.Resilience;
 
 using TransactionValidation.Core;
 using TransactionValidation.Configuration;

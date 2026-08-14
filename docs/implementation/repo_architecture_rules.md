@@ -181,7 +181,7 @@ Partner verification is an external dependency and transient failures are expect
 
 ### Rule 5.2: Use bounded resilience policies
 
-For partner verification calls, use timeout, retry, and circuit-breaker patterns when appropriate. Polly is the expected approach in this repo.
+For partner verification calls, use timeout, retry, and circuit-breaker patterns when appropriate. `Microsoft.Extensions.Http.Resilience` with `AddStandardResilienceHandler(...)` is the expected approach in this repo.
 
 The design MUST ensure:
 

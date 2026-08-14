@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <PackageReference Include="RabbitMQ.Client" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\TransactionValidation.Core\TransactionValidation.Core.csproj" />
   </ItemGroup>
 </Project>
