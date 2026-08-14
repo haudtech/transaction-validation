@@ -86,10 +86,10 @@ Create the shared configuration project that centralizes startup wiring, options
   - `ApiKeyOptions.cs`
   - `PartnerVerificationOptions.cs`
   - `RabbitMqOptions.cs`
-- Create DI and middleware registration extensions in `src/TransactionValidation.Configuration/Extensions/ServiceCollectionExtensions.cs`
+- Create DI and startup registration extensions in `src/TransactionValidation.Configuration/Extensions/ServiceCollectionExtensions.cs`
 - Implement shared middleware in `src/TransactionValidation.Configuration/Middleware`:
   - `ApiKeyMiddleware.cs`
-  - `GlobalExceptionHandlerMiddleware.cs`
+  - `ApiExceptionHandler.cs`
 - Register:
   - configuration binding
   - `PartnerVerifierClient` HTTP client
