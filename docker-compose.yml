@@ -1,32 +1,54 @@
 version: '3.9'
 services:
   api:
+    env_file:
+      - .env
     build:
-      context: ./src/TransactionValidation.Api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: src/TransactionValidation.Api/Dockerfile
     ports:
-      - '5000:80'
+      - '${API_HOST_PORT:-5000}:8080'
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - RABBITMQ__HOSTNAME=rabbitmq
-      - RABBITMQ__USERNAME=guest
-      - RABBITMQ__PASSWORD=guest
-      - RABBITMQ__QUEUENAME=partner-transactions
-      - PARTNERVERIFICATION__BASEURL=http://mock:80/
-      - SECURITY__APIKEY=secret-api-key
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      SECURITY__APIKEY: ${SECURITY__APIKEY:-local-dev-api-key}
+      RABBITMQ__HOSTNAME: ${RABBITMQ__HOSTNAME:-rabbitmq}
+      RABBITMQ__PORT: ${RABBITMQ__PORT:-5672}
+      RABBITMQ__USERNAME: ${RABBITMQ__USERNAME:-guest}
+      RABBITMQ__PASSWORD: ${RABBITMQ__PASSWORD:-guest}
+      RABBITMQ__QUEUENAME: ${RABBITMQ__QUEUENAME:-partner-transactions}
+      PARTNERVERIFICATION__BASEURL: ${PARTNERVERIFICATION__BASEURL:-http://mock:8080/}
+      APPLICATIONINSIGHTS__CONNECTIONSTRING: ${APPLICATIONINSIGHTS__CONNECTIONSTRING:-}
     depends_on:
-      - rabbitmq
-      - mock
+      rabbitmq:
+        condition: service_started
+      mock:
+        condition: service_started
 
   mock:
+    env_file:
+      - .env
     build:
-      context: ./src/TransactionValidation.Mock
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: src/TransactionValidation.Mock/Dockerfile
     ports:
-      - '5002:80'
+      - '5002:8080'
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      RABBITMQCONSUMER__HOSTNAME: ${RABBITMQ__HOSTNAME:-rabbitmq}
+      RABBITMQCONSUMER__PORT: ${RABBITMQ__PORT:-5672}
+      RABBITMQCONSUMER__USERNAME: ${RABBITMQ__USERNAME:-guest}
+      RABBITMQCONSUMER__PASSWORD: ${RABBITMQ__PASSWORD:-guest}
+      RABBITMQCONSUMER__QUEUENAME: ${RABBITMQ__QUEUENAME:-partner-transactions}
+      RABBITMQCONSUMER__DURABLE: ${RABBITMQCONSUMER__DURABLE:-true}
+      RABBITMQCONSUMER__AUTOACK: ${RABBITMQCONSUMER__AUTOACK:-false}
 
   rabbitmq:
-    image: rabbitmq:3-management
+    env_file:
+      - .env
+    image: rabbitmq:3.12-management
     ports:
       - '5672:5672'
       - '15672:15672'
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ__USERNAME:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ__PASSWORD:-guest}

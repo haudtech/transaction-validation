@@ -8,16 +8,20 @@ Technology stack
 |---|---|
 | Runtime / Framework | .NET 8 (`net8.0`) |
 | API | ASP.NET Core Web API |
+| API documentation | Swagger / OpenAPI (`Swashbuckle.AspNetCore`) |
 | Validation | FluentValidation |
-| Resilience | Polly |
-| Messaging | RabbitMQ |
-| Observability | Serilog, OpenTelemetry |
+| Resilience | `Microsoft.Extensions.Http.Resilience` (Polly-based pipelines) |
+| Messaging | RabbitMQ (`RabbitMQ.Client`) |
+| Observability | Serilog, OpenTelemetry, optional Azure Monitor exporter |
+| Configuration | `appsettings*.json`, environment variables, `DotNetEnv` |
+| Containerization | Docker, Docker Compose |
 | Architecture | Multi-project solution (`Api`, `Configuration`, `Core`, `Integration`, `Messaging`, `Mock`, `Tests`) |
+| Testing | xUnit, Moq, FluentAssertions |
 | Quality gates | Split CI workflows for unit and integration tests with explicit category filters |
 
 ## Architecture Overview (Sequence)
 
-Primary architecture flow (mirrors [docs/diagram/use_case_sequence_diagram.md](docs/diagram/use_case_sequence_diagram.md)):
+Primary architecture overview: [docs/architecture_design/Architecture_design.md](docs/architecture_design/Architecture_design.md)
 
 ```mermaid
 sequenceDiagram
@@ -71,6 +75,18 @@ dotnet restore
 dotnet build
 dotnet test -v normal
 ```
+
+Docker compose run
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Service endpoints when compose is running:
+
+- API: http://localhost:5000
+- Mock partner verification API: http://localhost:5002
+- RabbitMQ management: http://localhost:15672
 
 Repository entrypoint for implementation, workflow, and architecture documentation.
 

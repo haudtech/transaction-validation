@@ -6,6 +6,7 @@ This folder is the central entry point for the project’s technical and enginee
 
 ## Start here
 
+- Primary architecture design overview: [architecture_design/Architecture_design.md](architecture_design/Architecture_design.md)
 - Project overview: [../README.md](../README.md)
 - Solution and architecture overview: [analysis/solution_analysis.md](analysis/solution_analysis.md)
 - Requirements and interview brief: [reqs/Senior_net_interview_2026.md](reqs/Senior_net_interview_2026.md)
@@ -39,9 +40,9 @@ This folder is the central entry point for the project’s technical and enginee
 ## Recommended reading order
 
 1. Read the project overview in [../README.md](../README.md).
-2. Review the repository-level analysis in [analysis/solution_analysis.md](analysis/solution_analysis.md).
-3. Read the implementation phases and checklist in [implementation/implementation_phases.md](implementation/implementation_phases.md) and [implementation/implementation_checklist.md](implementation/implementation_checklist.md).
-4. Use the architecture and diagram docs when validating design intent.
+2. Read the primary architecture overview in [architecture_design/Architecture_design.md](architecture_design/Architecture_design.md).
+3. Review the repository-level analysis in [analysis/solution_analysis.md](analysis/solution_analysis.md).
+4. Read the implementation phases and checklist in [implementation/implementation_phases.md](implementation/implementation_phases.md) and [implementation/implementation_checklist.md](implementation/implementation_checklist.md).
 5. Use workflow and debugging docs when diagnosing CI or developer-environment issues.
 
 ## Contributing
