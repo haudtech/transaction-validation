@@ -53,8 +53,8 @@ This checklist reflects the current repository state and marks only the work tha
 
 ## Phase 4 — Mock Partner Verification API
 - [x] Implement `MockPartnerVerificationController` with `GET /api/v1/mock/partner-verification/verify/{partnerId}`
-- [ ] Simulate timeout behavior (30%) and verified responses
-- [ ] Add integration test or manual smoke test to call mock endpoint
+- [x] Simulate timeout behavior (30%) and verified responses
+- [x] Add integration test or manual smoke test to call mock endpoint
 - [ ] Commit mock project and verify it runs independently
 
 ## Phase 5 — Integration and Messaging Implementations
