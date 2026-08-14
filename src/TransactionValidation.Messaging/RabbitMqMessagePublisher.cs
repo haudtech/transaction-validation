@@ -5,12 +5,21 @@ using TransactionValidation.Core.Models;
 
 namespace TransactionValidation.Messaging;
 
+/// <summary>
+/// Publishes transaction envelopes to RabbitMQ after ensuring queue declaration and broker confirmation.
+/// </summary>
 public sealed class RabbitMqMessagePublisher : IMessagePublisher
 {
     private readonly string _queueName;
     private readonly bool _durable;
     private readonly IRabbitMqClientAdapter _rabbitMqClientAdapter;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RabbitMqMessagePublisher"/> class.
+    /// </summary>
+    /// <param name="queueName">Target queue name used for publication.</param>
+    /// <param name="durable">Whether the target queue should be durable.</param>
+    /// <param name="rabbitMqClientAdapter">RabbitMQ adapter used for queue declaration and publish operations.</param>
     public RabbitMqMessagePublisher(string queueName, bool durable, IRabbitMqClientAdapter rabbitMqClientAdapter)
     {
         _queueName = queueName;
@@ -18,6 +27,12 @@ public sealed class RabbitMqMessagePublisher : IMessagePublisher
         _rabbitMqClientAdapter = rabbitMqClientAdapter;
     }
 
+    /// <summary>
+    /// Serializes and publishes the transaction envelope as a persistent RabbitMQ message.
+    /// </summary>
+    /// <param name="envelope">Transaction envelope to publish.</param>
+    /// <param name="cancellationToken">Cancellation token for async queue and publish operations.</param>
+    /// <exception cref="ConflictException">Thrown when broker publish confirmation is not received.</exception>
     public async Task PublishAsync(TransactionEnvelope envelope, CancellationToken cancellationToken = default)
     {
         var payload = JsonSerializer.Serialize(envelope);

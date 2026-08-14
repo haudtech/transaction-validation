@@ -10,6 +10,7 @@ For actual implementation, follow the ordered phase plan in `docs/implementation
 The goal is to build a .NET 8 Web API that:
 - Accepts `POST /api/v1/partner/transactions`
 - Validates payload
+- Enforces API idempotency with `Idempotency-Key` (fallback to `partnerId|transactionReference`) and TTL dedupe
 - Verifies `partnerId` against a mock partner verifier
 - Publishes the verified transaction to a local RabbitMQ queue
 - Uses .NET 8 resilience handlers (`Microsoft.Extensions.Http.Resilience`) for retries and timeouts
@@ -46,12 +47,15 @@ src/
   TransactionValidation.Api/
     Program.cs
     Controllers/PartnerTransactionsController.cs
+        Idempotency/IIdempotencyStore.cs
+        Idempotency/InMemoryIdempotencyStore.cs
     appsettings.json
     appsettings.Development.json
   TransactionValidation.Configuration/
     Extensions/ServiceCollectionExtensions.cs
     Middleware/ApiKeyMiddleware.cs
     Middleware/ApiExceptionHandler.cs
+        Options/IdempotencyOptions.cs
     Options/PartnerVerificationOptions.cs
     Options/RabbitMqOptions.cs
     Options/SecurityOptions.cs
@@ -889,21 +893,28 @@ public sealed class RabbitMqMessagePublisher : IMessagePublisher
 
 ```csharp
 using Serilog;
+using TransactionValidation.Api.Idempotency;
 using TransactionValidation.Configuration.Extensions;
+using TransactionValidation.Configuration.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
-Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration)
-    .Enrich.FromLogContext()
-    .WriteTo.Console()
-    .CreateLogger();
+builder.Host.UseSerilog((context, services, loggerConfiguration) =>
+    loggerConfiguration
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext());
 
-builder.Host.UseSerilog();
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+builder.Services.AddTransactionValidationCommonServices(builder.Configuration);
 
-builder.Services
-    .AddControllers()
-    .AddTransactionValidationCommonServices(builder.Configuration);
+builder.Services.AddSingleton<IIdempotencyStore>(sp =>
+{
+    var options = sp.GetRequiredService<IdempotencyOptions>();
+    var windowMinutes = Math.Clamp(options.WindowMinutes, 10, 15);
+    return new InMemoryIdempotencyStore(TimeSpan.FromMinutes(windowMinutes));
+});
 
 var app = builder.Build();
 
@@ -924,10 +935,12 @@ app.Run();
 ### File: `src/TransactionValidation.Api/Controllers/PartnerTransactionsController.cs`
 
 ```csharp
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using TransactionValidation.Api.Idempotency;
+using TransactionValidation.Core.Exceptions;
 using TransactionValidation.Core.Interfaces;
 using TransactionValidation.Core.Models;
-using TransactionValidation.Core.Validation;
 
 namespace TransactionValidation.Api.Controllers;
 
@@ -935,50 +948,105 @@ namespace TransactionValidation.Api.Controllers;
 [Route("api/v1/partner/transactions")]
 public sealed class PartnerTransactionsController : ControllerBase
 {
+    private readonly IValidator<PartnerTransactionRequest> _validator;
     private readonly IPartnerVerifier _partnerVerifier;
     private readonly IMessagePublisher _messagePublisher;
+    private readonly IIdempotencyStore _idempotencyStore;
 
-    public PartnerTransactionsController(IPartnerVerifier partnerVerifier, IMessagePublisher messagePublisher)
+    public PartnerTransactionsController(
+        IValidator<PartnerTransactionRequest> validator,
+        IPartnerVerifier partnerVerifier,
+        IMessagePublisher messagePublisher,
+        IIdempotencyStore idempotencyStore)
     {
+        _validator = validator;
         _partnerVerifier = partnerVerifier;
         _messagePublisher = messagePublisher;
+        _idempotencyStore = idempotencyStore;
     }
 
     [HttpPost]
-    public async Task<IActionResult> Post([FromBody] PartnerTransactionRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> CreateAsync([FromBody] PartnerTransactionRequest request, CancellationToken cancellationToken)
     {
-        if (!ModelState.IsValid)
+        var validationResult = await _validator.ValidateAsync(request, cancellationToken);
+        if (!validationResult.IsValid)
         {
-            return ValidationProblem(ModelState);
+            throw new BadRequestException(string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage)));
         }
 
-        var verified = await _partnerVerifier.VerifyAsync(request.PartnerId, cancellationToken);
-        if (!verified)
+        var idempotencyKey = BuildIdempotencyKey(request);
+        var requestFingerprint = BuildRequestFingerprint(request);
+        var acquireResult = _idempotencyStore.TryAcquire(idempotencyKey, requestFingerprint, DateTimeOffset.UtcNow);
+
+        if (acquireResult == IdempotencyAcquireResult.Duplicate)
         {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, new ErrorResponse
+            throw new ConflictException("Duplicate transaction detected within the idempotency window.");
+        }
+
+        if (acquireResult == IdempotencyAcquireResult.KeyReusedWithDifferentPayload)
+        {
+            throw new ConflictException("Idempotency key was already used with a different request payload.");
+        }
+
+        try
+        {
+            var verified = await _partnerVerifier.VerifyAsync(request.PartnerId, cancellationToken);
+
+            var envelope = new TransactionEnvelope
             {
-                Code = "PartnerVerificationFailed",
-                Message = "Partner verification failed or timed out."
-            });
+                MessageId = Guid.NewGuid().ToString("N"),
+                CorrelationId = HttpContext.TraceIdentifier,
+                ReceivedAt = DateTimeOffset.UtcNow,
+                Transaction = request,
+                PartnerVerified = verified
+            };
+
+            await _messagePublisher.PublishAsync(envelope, cancellationToken);
+
+            return Accepted(new { envelope.MessageId, envelope.CorrelationId, status = "accepted" });
+        }
+        catch
+        {
+            _idempotencyStore.Release(idempotencyKey);
+            throw;
+        }
+    }
+
+    private string BuildIdempotencyKey(PartnerTransactionRequest request)
+    {
+        if (Request.Headers.TryGetValue("Idempotency-Key", out var idempotencyHeader)
+            && !string.IsNullOrWhiteSpace(idempotencyHeader))
+        {
+            return $"{request.PartnerId.Trim()}|{idempotencyHeader.ToString().Trim()}";
         }
 
-        var envelope = new TransactionEnvelope
-        {
-            MessageId = Guid.NewGuid().ToString("D"),
-            CorrelationId = Request.Headers.TryGetValue("X-Correlation-ID", out var correlationId) && !string.IsNullOrWhiteSpace(correlationId)
-                ? correlationId.ToString()
-                : Guid.NewGuid().ToString("D"),
-            ReceivedAt = DateTimeOffset.UtcNow,
-            Transaction = request,
-            PartnerVerified = true
-        };
+        return $"{request.PartnerId.Trim()}|{request.TransactionReference.Trim()}";
+    }
 
-        await _messagePublisher.PublishAsync(envelope, cancellationToken);
+    private static string BuildRequestFingerprint(PartnerTransactionRequest request)
+    {
+        var canonical = string.Join(
+            "|",
+            request.PartnerId.Trim(),
+            request.TransactionReference.Trim(),
+            request.Amount.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            request.Currency.Trim().ToUpperInvariant(),
+            request.Timestamp.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture));
 
-        return Accepted(new { envelope.MessageId, envelope.CorrelationId });
+        var bytes = System.Text.Encoding.UTF8.GetBytes(canonical);
+        var hash = System.Security.Cryptography.SHA256.HashData(bytes);
+        return Convert.ToHexString(hash);
     }
 }
 ```
+
+### Phase 6 idempotency semantics
+
+- Idempotency window is configured via `Idempotency:WindowMinutes` (clamped to 10-15 for local safety).
+- The in-memory store hashes/encodes cache keys before lookup and storage.
+- Duplicate same-key same-payload requests return conflict (`409`).
+- Same-key different-payload replays return conflict (`409`) with explicit mismatch semantics.
+- On verification/publish failure after acquisition, the key is released so a retry can proceed.
 
 ### File: `src/TransactionValidation.Api/Middleware/ApiKeyMiddleware.cs`
 

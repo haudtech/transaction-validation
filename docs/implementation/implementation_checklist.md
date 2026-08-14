@@ -65,10 +65,13 @@ This checklist reflects the current repository state and marks only the work tha
 - [ ] Commit and run tests (tests are verified locally; commit step remains pending)
 
 ## Phase 6 — API Project and Endpoint
-- [ ] Implement `Program.cs` to use shared configuration and Serilog
-- [ ] Implement `PartnerTransactionsController` POST endpoint
-- [ ] Ensure request validation, partner verification, publishing and 202 Accepted response
-- [ ] Add Swagger/OpenAPI for local discovery
+- [x] Implement `Program.cs` to use shared configuration and Serilog
+- [x] Implement `PartnerTransactionsController` POST endpoint
+- [x] Ensure request validation, partner verification, publishing and 202 Accepted response
+- [x] Enforce idempotency in `CreateAsync` with in-memory TTL store and duplicate protection
+- [x] Support `Idempotency-Key` header with fallback to `partnerId|transactionReference`
+- [x] Reject key reuse with different payload using request fingerprint semantics
+- [x] Add Swagger/OpenAPI for local discovery
 - [ ] Commit and run end-to-end manual test locally
 
 ## Phase 7 — Observability and Azure Integration

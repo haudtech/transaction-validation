@@ -1,2 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
+	<ItemGroup>
+		<PackageReference Include="RabbitMQ.Client" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\TransactionValidation.Configuration\TransactionValidation.Configuration.csproj" />
+		<ProjectReference Include="..\TransactionValidation.Messaging\TransactionValidation.Messaging.csproj" />
+	</ItemGroup>
 </Project>

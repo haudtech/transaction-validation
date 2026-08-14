@@ -159,6 +159,9 @@ Build the API entrypoint and controller for the partner transaction workflow.
 - Implement `src/TransactionValidation.Api/Controllers/PartnerTransactionsController.cs`
   - Accept `POST /api/v1/partner/transactions`
   - Validate request via FluentValidation / model validation
+  - Enforce idempotency with in-memory TTL store (10-15 min window)
+  - Use `Idempotency-Key` header when present, otherwise fallback to `partnerId|transactionReference`
+  - Detect same key with different payload using request fingerprint and return conflict
   - Verify partner via `IPartnerVerifier`
   - Publish queue message via `IMessagePublisher`
   - Return `202 Accepted` on success
@@ -167,6 +170,7 @@ Build the API entrypoint and controller for the partner transaction workflow.
 
 ### Deliverables
 - API controller and startup configured with shared services
+- API-level idempotency semantics for duplicate and payload-mismatch protection
 - Minimal, well-structured API project implementation
 
 ---

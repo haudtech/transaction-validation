@@ -23,12 +23,14 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddTransactionValidationCommonServices(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<ApiKeyOptions>(configuration.GetSection(ApiKeyOptions.SectionName));
+        services.Configure<IdempotencyOptions>(configuration.GetSection(IdempotencyOptions.SectionName));
         services.Configure<PartnerVerificationOptions>(configuration.GetSection(PartnerVerificationOptions.SectionName));
         services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
         services.Configure<OpenTelemetryOptions>(configuration.GetSection(OpenTelemetryOptions.SectionName));
         services.Configure<SerilogOptions>(configuration.GetSection(SerilogOptions.SectionName));
 
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<ApiKeyOptions>>().Value);
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<IdempotencyOptions>>().Value);
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<PartnerVerificationOptions>>().Value);
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<RabbitMqOptions>>().Value);
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<OpenTelemetryOptions>>().Value);
