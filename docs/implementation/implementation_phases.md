@@ -196,19 +196,24 @@ Add logging, telemetry, and Azure monitoring support.
 ## Phase 8: Testing and Quality
 
 ### Goal
-Implement test coverage for validation and resilience.
+Implement test coverage for validation, resilience, and API startup integration behavior.
 
 ### Tasks
 - Add xUnit tests in `tests/TransactionValidation.Tests`
 - Create `ValidationTests.cs` for request validation scenarios
-- Create `PartnerVerifierTests.cs` for service retry/resilience behavior
+- Create `PartnerVerifierTests.cs` for service retry/resilience behavior (unit-test-first)
 - Add additional tests for publisher confirms or message publisher behavior if needed
 - Organize tests into `Unit/` and `Integration/` folders
 - Ensure integration tests use `[Trait("Category", "Integration")]`
+- Add integration-host tests for API startup using `WebApplicationFactory<Program>`
+- Validate host-level behaviors through real middleware and exception pipeline (auth, idempotency, ProblemDetails exception mapping)
+- Verify resilience wiring confidence in startup/DI through host-level tests while keeping policy timing semantics in unit tests
 
 ### Deliverables
 - Unit test project with passing tests
-- Early confidence in validation and external integration behavior
+- Integration-host API tests that execute startup and middleware pipeline in-memory
+- Resilience strategy covered at two layers: unit policy behavior and host-level startup wiring confidence
+- Early confidence in validation, external integration behavior, and runtime request pipeline
 
 ---
 

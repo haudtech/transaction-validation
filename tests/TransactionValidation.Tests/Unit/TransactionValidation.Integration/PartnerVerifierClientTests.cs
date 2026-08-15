@@ -66,18 +66,41 @@ public sealed class PartnerVerifierClientTests
         capturedRequestUri!.Query.Should().Contain("forceTimeout=true");
     }
 
+    [Fact]
+    public async Task VerifyAsync_WhenCancellationRequested_PropagatesTaskCanceledException()
+    {
+        var handler = new StubHttpMessageHandler(async (_, cancellationToken) =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
+        var sut = new PartnerVerifierClient(httpClient);
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
+
+        var action = async () => await sut.VerifyAsync("partner-123", cts.Token);
+
+        await action.Should().ThrowAsync<TaskCanceledException>();
+    }
+
     private sealed class StubHttpMessageHandler : HttpMessageHandler
     {
-        private readonly Func<HttpRequestMessage, HttpResponseMessage> _responseFactory;
+        private readonly Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> _responseFactory;
 
         public StubHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
+        {
+            _responseFactory = (request, _) => Task.FromResult(responseFactory(request));
+        }
+
+        public StubHttpMessageHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> responseFactory)
         {
             _responseFactory = responseFactory;
         }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            return Task.FromResult(_responseFactory(request));
+            return _responseFactory(request, cancellationToken);
         }
     }
 }

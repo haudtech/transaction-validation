@@ -19,7 +19,7 @@ Technology stack
 | Configuration | `appsettings*.json`, environment variables, `DotNetEnv` |
 | Containerization | Docker, Docker Compose |
 | Architecture | Multi-project solution (`Api`, `Configuration`, `Core`, `Integration`, `Messaging`, `Mock`, `Tests`) |
-| Testing | xUnit, Moq, FluentAssertions |
+| Testing | xUnit, Moq, FluentAssertions, ASP.NET Core integration-host tests (`WebApplicationFactory<Program>`) |
 | Quality gates | Split CI workflows for unit and integration tests with explicit category filters |
 
 ## Architecture Overview (Sequence)
