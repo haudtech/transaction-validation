@@ -10,6 +10,8 @@ Technology stack
 | API | ASP.NET Core Web API |
 | API documentation | Swagger / OpenAPI (`Swashbuckle.AspNetCore`) |
 | Validation | FluentValidation |
+| Security | API key authentication (`X-API-Key` middleware) |
+| Idempotency | `Idempotency-Key` support with in-memory TTL dedupe fallback (`partnerId|transactionReference`) |
 | Resilience | `Microsoft.Extensions.Http.Resilience` (Polly-based pipelines) |
 | Messaging | RabbitMQ (`RabbitMQ.Client`) |
 | Observability | Serilog, OpenTelemetry, optional Azure Monitor exporter |
