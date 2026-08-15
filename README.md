@@ -97,6 +97,8 @@ Repository entrypoint for implementation, workflow, and architecture documentati
 
 Start here: [docs/README.md](docs/README.md)
 
+Latest integration test summary report: [TestResults/integration/integration-tests-summary.md](TestResults/integration/integration-tests-summary.md)
+
 The detailed documentation map, contribution workflow, and topic navigation live in the docs index so the project README stays focused on the codebase and the primary entrypoint.
 
 ## License
