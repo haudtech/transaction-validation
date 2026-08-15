@@ -19,7 +19,7 @@ Technology stack
 | Configuration | `appsettings*.json`, environment variables, `DotNetEnv` |
 | Containerization | Docker, Docker Compose |
 | Architecture | Multi-project solution (`Api`, `Configuration`, `Core`, `Integration`, `Messaging`, `Mock`, `Tests`) |
-| Testing | xUnit, Moq, FluentAssertions |
+| Testing | xUnit, Moq, FluentAssertions, ASP.NET Core integration-host tests (`WebApplicationFactory<Program>`) |
 | Quality gates | Split CI workflows for unit and integration tests with explicit category filters |
 
 ## Architecture Overview (Sequence)
@@ -96,6 +96,8 @@ Repository entrypoint for implementation, workflow, and architecture documentati
 ## Documentation
 
 Start here: [docs/README.md](docs/README.md)
+
+Latest integration test summary report: [TestResults/integration/integration-tests-summary.md](TestResults/integration/integration-tests-summary.md)
 
 The detailed documentation map, contribution workflow, and topic navigation live in the docs index so the project README stays focused on the codebase and the primary entrypoint.
 

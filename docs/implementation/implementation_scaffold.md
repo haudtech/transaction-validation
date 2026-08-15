@@ -248,6 +248,7 @@ dotnet add package FluentAssertions
 
 Current centrally-managed versions in this repository:
 - `Microsoft.AspNetCore.OpenApi` = `8.0.0`
+- `Microsoft.AspNetCore.Mvc.Testing` = `8.0.0`
 - `Serilog.AspNetCore` = `9.0.0`
 - `Serilog.Sinks.Console` = `6.0.0`
 - `Microsoft.NET.Test.Sdk` = `17.11.1`
@@ -266,6 +267,15 @@ The test project should be separated into `Unit/` and `Integration/` folders.
 - Unit test files should mirror `src/` structure under `tests/TransactionValidation.Tests/Unit/`.
 - Integration tests should be under `tests/TransactionValidation.Tests/Integration/`.
 - Integration tests should use a category trait: `[Trait("Category", "Integration")]`.
+- Resilience policy behavior (retry/timeout/circuit-breaker decisions) should be covered primarily with unit tests.
+- API integration-host tests should use `WebApplicationFactory<Program>` to execute the real startup pipeline in-memory.
+- For deterministic host tests, override selected dependencies (for example `IPartnerVerifier`, `IMessagePublisher`) in test host DI while keeping middleware and exception handler wiring intact.
+- Use integration-host tests to validate startup wiring confidence (middleware order, exception pipeline, DI composition), not policy timing internals.
+
+Integration-host coverage should include:
+- auth middleware behavior (`401` for missing/invalid API key)
+- idempotency behavior (`409` on duplicate key conflicts)
+- exception handler mappings to RFC 7807 (`400/404/409/401/500`)
 
 Execution policy:
 - Main CI (`ci.yml`) runs unit tests by default using filter: `Category!=Integration`.
@@ -690,7 +700,15 @@ if (app.Environment.IsDevelopment())
 
 app.MapControllers();
 app.Run();
+
+public partial class Program
+{
+}
 ```
+
+Notes for integration-host testing:
+- Keep the `partial Program` type in top-level `Program.cs` so tests can anchor `WebApplicationFactory<Program>`.
+- This does not change runtime behavior; it enables host-level integration tests without launching a real external process.
 
 ---
 
@@ -1084,52 +1102,6 @@ public sealed class ApiKeyMiddleware
         }
 
         await _next(context);
-    }
-}
-```
-
-### File: `src/TransactionValidation.Api/Middleware/GlobalExceptionHandlerMiddleware.cs`
-
-```csharp
-using System.Net;
-using System.Text.Json;
-using TransactionValidation.Core.Models;
-
-namespace TransactionValidation.Api.Middleware;
-
-public sealed class GlobalExceptionHandlerMiddleware
-{
-    private readonly RequestDelegate _next;
-
-    public GlobalExceptionHandlerMiddleware(RequestDelegate next)
-    {
-        _next = next;
-    }
-
-    public async Task InvokeAsync(HttpContext context)
-    {
-        try
-        {
-            await _next(context);
-        }
-        catch (TimeoutException ex)
-        {
-            context.Response.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
-            await context.Response.WriteAsJsonAsync(new ErrorResponse
-            {
-                Code = "TimeoutError",
-                Message = ex.Message
-            });
-        }
-        catch (Exception ex)
-        {
-            context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-            await context.Response.WriteAsJsonAsync(new ErrorResponse
-            {
-                Code = "InternalServerError",
-                Message = "An unexpected error occurred."
-            });
-        }
     }
 }
 ```
