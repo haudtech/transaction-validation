@@ -10,6 +10,9 @@ using Xunit;
 
 namespace TransactionValidation.Tests.Integration.TransactionValidation.Api;
 
+/// <summary>
+/// Verifies host-level ProblemDetails mappings for domain and infrastructure exception paths.
+/// </summary>
 public sealed class ApiExceptionMappingHostTests
 {
     [Trait("Category", "Integration")]

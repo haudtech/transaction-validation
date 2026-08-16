@@ -6,6 +6,9 @@ using TransactionValidation.Core.Validation;
 
 namespace TransactionValidation.Core.Validation.Tests;
 
+/// <summary>
+/// Validates request-level FluentValidation rules including ISO-4217 currency checks.
+/// </summary>
 public class PartnerTransactionRequestValidatorTests
 {
     private readonly PartnerTransactionRequestValidator validator = new();

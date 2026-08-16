@@ -7,6 +7,9 @@ using Xunit;
 
 namespace TransactionValidation.Tests.Unit.TransactionValidation.Messaging;
 
+/// <summary>
+/// Verifies RabbitMQ publisher behavior, compatibility invocation, and confirm handling.
+/// </summary>
 public sealed class RabbitMqMessagePublisherTests
 {
     [Fact]
@@ -72,11 +75,17 @@ public sealed class RabbitMqMessagePublisherTests
         };
     }
 
+    /// <summary>
+    /// Provides a value-task-returning method used to validate compatibility invocation helpers.
+    /// </summary>
     private sealed class ValueTaskResultTarget
     {
         public ValueTask<ValueTaskResult> GetAsync() => new(new ValueTaskResult { DeliveryTag = 42UL });
     }
 
+    /// <summary>
+    /// Represents a lightweight result payload returned by the compatibility test target.
+    /// </summary>
     private sealed class ValueTaskResult
     {
         public ulong DeliveryTag { get; set; }

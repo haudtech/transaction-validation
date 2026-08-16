@@ -7,6 +7,9 @@ using MicrosoftOptions = Microsoft.Extensions.Options.Options;
 
 namespace TransactionValidation.Configuration.Tests;
 
+/// <summary>
+/// Verifies API key middleware authorization behavior for missing and valid headers.
+/// </summary>
 public class ApiKeyMiddlewareTests
 {
     [Fact]

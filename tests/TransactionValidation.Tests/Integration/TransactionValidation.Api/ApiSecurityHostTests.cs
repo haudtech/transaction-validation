@@ -7,6 +7,9 @@ using Xunit;
 
 namespace TransactionValidation.Tests.Integration.TransactionValidation.Api;
 
+/// <summary>
+/// Verifies API key middleware behavior at host level for transaction submission requests.
+/// </summary>
 public sealed class ApiSecurityHostTests
 {
     [Trait("Category", "Integration")]
