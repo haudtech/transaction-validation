@@ -275,7 +275,7 @@ The test project should be separated into `Unit/` and `Integration/` folders.
 Integration-host coverage should include:
 - auth middleware behavior (`401` for missing/invalid API key)
 - idempotency behavior (`202` replay for duplicate same-payload and `409` for key reuse with different payload)
-- exception handler mappings to RFC 7807 (`400/404/409/401/500`)
+- exception handler mappings to RFC 7807 (`400/401/404/408/409/503/500`)
 
 Execution policy:
 - Main CI (`ci.yml`) runs unit tests by default using filter: `Category!=Integration&Category!=E2E`.
@@ -658,12 +658,12 @@ public sealed class ApiExceptionHandler : IExceptionHandler
 
     ### Exception handling best practices
 
-    Design and implement domain-specific exception types that map cleanly to HTTP status codes (for example `NotFoundException` → 404, `BadRequestException` → 400, `ConflictException` → 409). This keeps controller code thin and preserves a single centralized mapping layer.
+    Design and implement domain-specific exception types that map cleanly to HTTP status codes (for example `NotFoundException` -> 404, `BadRequestException` -> 400, `ConflictException` -> 409, `UpstreamTimeoutException` -> 408, `UpstreamServiceUnavailableException` -> 503). This keeps controller code thin and preserves a single centralized mapping layer.
 
     In .NET 8, prefer the built-in `IExceptionHandler` contract over a custom middleware `try/catch` pipeline. The handler should inspect the exception type, choose the appropriate HTTP status code, and write a standardized RFC 7807 `ProblemDetails` response body.
 
     Example guidance:
-    - Define simple, sealed domain exception types in `TransactionValidation.Core.Exceptions` (for example `NotFoundException`, `BadRequestException`, `ConflictException`).
+    - Define simple, sealed domain exception types in `TransactionValidation.Core.Exceptions` (for example `NotFoundException`, `BadRequestException`, `ConflictException`, `UpstreamTimeoutException`, `UpstreamServiceUnavailableException`).
     - Implement an `IExceptionHandler` in `TransactionValidation.Configuration/Middleware` that:
       - switches on the exception type and chooses the correct `StatusCode`
       - writes a `ProblemDetails` object with `type`, `title`, `status`, `detail`, and optional `instance`/extension values

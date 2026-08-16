@@ -103,7 +103,7 @@ sequenceDiagram
             MQ->>Consumer: Deliver message
             Consumer-->>MQ: Ack after consume
         else Rejected
-            API-->>Client: ProblemDetails response
+            API-->>Client: ProblemDetails (404 / 408 / 503)
         end
     end
 ```
@@ -127,7 +127,7 @@ Deployment modes:
 - Security: API key middleware guards external entrypoints.
 - Reliability: outbound verification uses resilience policies; queue publishing expects broker confirm semantics.
 - Idempotency: duplicate same-payload requests replay the cached accepted response; same-key different-payload requests fail with conflict.
-- Error handling: domain exceptions are mapped to RFC 7807 ProblemDetails through centralized exception handling.
+- Error handling: domain exceptions are mapped to RFC 7807 ProblemDetails through centralized exception handling, including upstream `404 Not Found`, `408 Request Timeout`, and `503 Service Unavailable` categories.
 - Observability: structured logging and OpenTelemetry pipeline with optional Azure Monitor export.
 
 ## 7. Phase Alignment (Overview)

@@ -32,4 +32,28 @@ public class ApiExceptionHandlerTests
         result.Should().BeTrue();
         context.Response.StatusCode.Should().Be(StatusCodes.Status404NotFound);
     }
+
+    [Fact]
+    public async Task TryHandleAsync_WhenUpstreamTimeoutException_Maps408ProblemDetails()
+    {
+        var handler = new ApiExceptionHandler();
+        var context = new DefaultHttpContext();
+
+        var result = await handler.TryHandleAsync(context, new UpstreamTimeoutException("partner verification timed out"), CancellationToken.None);
+
+        result.Should().BeTrue();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status408RequestTimeout);
+    }
+
+    [Fact]
+    public async Task TryHandleAsync_WhenUpstreamServiceUnavailableException_Maps503ProblemDetails()
+    {
+        var handler = new ApiExceptionHandler();
+        var context = new DefaultHttpContext();
+
+        var result = await handler.TryHandleAsync(context, new UpstreamServiceUnavailableException("partner verification unavailable"), CancellationToken.None);
+
+        result.Should().BeTrue();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+    }
 }

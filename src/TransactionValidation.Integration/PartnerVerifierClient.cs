@@ -1,5 +1,6 @@
 using TransactionValidation.Core.Exceptions;
 using TransactionValidation.Core.Interfaces;
+using System.Net;
 
 namespace TransactionValidation.Integration;
 
@@ -25,12 +26,40 @@ public sealed class PartnerVerifierClient : IPartnerVerifier
             requestPath += $"?forceTimeout={forceTimeout.Value.ToString().ToLowerInvariant()}";
         }
 
-        var response = await _httpClient.GetAsync(requestPath, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            throw new NotFoundException($"Partner '{partnerId}' could not be verified.");
-        }
+            var response = await _httpClient.GetAsync(requestPath, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                return true;
+            }
 
-        return true;
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                throw new NotFoundException($"Partner '{partnerId}' could not be verified.");
+            }
+
+            if (response.StatusCode == HttpStatusCode.RequestTimeout)
+            {
+                throw new UpstreamTimeoutException("Partner verification request timed out.");
+            }
+
+            if (response.StatusCode == HttpStatusCode.ServiceUnavailable
+                || response.StatusCode >= HttpStatusCode.InternalServerError)
+            {
+                throw new UpstreamServiceUnavailableException("Partner verification service is unavailable.");
+            }
+
+            throw new UpstreamServiceUnavailableException(
+                $"Partner verification returned unexpected status code {(int)response.StatusCode} ({response.StatusCode}).");
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new UpstreamTimeoutException("Partner verification request timed out.");
+        }
+        catch (HttpRequestException)
+        {
+            throw new UpstreamServiceUnavailableException("Partner verification service is unavailable.");
+        }
     }
 }

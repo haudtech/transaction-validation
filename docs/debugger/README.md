@@ -37,7 +37,7 @@ The fix was grounded in the repo itself:
   - [src/TransactionValidation.Core/Interfaces/IMessagePublisher.cs](../../src/TransactionValidation.Core/Interfaces/IMessagePublisher.cs)
   - [src/TransactionValidation.Core/Interfaces/IPartnerVerifier.cs](../../src/TransactionValidation.Core/Interfaces/IPartnerVerifier.cs)
   - [src/TransactionValidation.Core/Models/TransactionEnvelope.cs](../../src/TransactionValidation.Core/Models/TransactionEnvelope.cs)
-- The broader engineering guidance is recorded in [docs/implementation/principle_rules.md](../implementation/principle_rules.md)
+- The broader engineering guidance is recorded in [docs/implementation/shared_engineering_principles.md](../implementation/shared_engineering_principles.md)
 
 The repo-level verification workflow that proves the workspace is healthy is:
 
@@ -157,7 +157,7 @@ This is the same pattern engineers should follow whenever IntelliSense or debugg
 
 For the wider engineering standards in this repository, see:
 
-- [docs/implementation/principle_rules.md](../implementation/principle_rules.md)
+- [docs/implementation/shared_engineering_principles.md](../implementation/shared_engineering_principles.md)
 - [README.md](../../README.md)
 
 ## Short takeaway

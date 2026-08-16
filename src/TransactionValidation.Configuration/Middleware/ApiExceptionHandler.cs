@@ -40,6 +40,20 @@ public sealed class ApiExceptionHandler : IExceptionHandler
                 Detail = unauthorized.Message,
                 Type = "https://httpstatuses.com/401"
             },
+            UpstreamTimeoutException upstreamTimeout => new ProblemDetails
+            {
+                Status = StatusCodes.Status408RequestTimeout,
+                Title = "Request Timeout",
+                Detail = upstreamTimeout.Message,
+                Type = "https://httpstatuses.com/408"
+            },
+            UpstreamServiceUnavailableException upstreamUnavailable => new ProblemDetails
+            {
+                Status = StatusCodes.Status503ServiceUnavailable,
+                Title = "Service Unavailable",
+                Detail = upstreamUnavailable.Message,
+                Type = "https://httpstatuses.com/503"
+            },
             _ => new ProblemDetails
             {
                 Status = StatusCodes.Status500InternalServerError,
