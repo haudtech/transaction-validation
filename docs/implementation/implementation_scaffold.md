@@ -10,7 +10,7 @@ For actual implementation, follow the ordered phase plan in `docs/implementation
 The goal is to build a .NET 8 Web API that:
 - Accepts `POST /api/v1/partner/transactions`
 - Validates payload
-- Enforces API idempotency with `Idempotency-Key` (fallback to `partnerId|transactionReference`) and TTL dedupe
+- Enforces API idempotency with `Idempotency-Key` (fallback to `partnerId|transactionReference`), TTL dedupe, and cached accepted replay for duplicate requests
 - Verifies `partnerId` against a mock partner verifier
 - Publishes the verified transaction to a local RabbitMQ queue
 - Uses .NET 8 resilience handlers (`Microsoft.Extensions.Http.Resilience`) for retries and timeouts
@@ -274,11 +274,11 @@ The test project should be separated into `Unit/` and `Integration/` folders.
 
 Integration-host coverage should include:
 - auth middleware behavior (`401` for missing/invalid API key)
-- idempotency behavior (`409` on duplicate key conflicts)
+- idempotency behavior (`202` replay for duplicate same-payload and `409` for key reuse with different payload)
 - exception handler mappings to RFC 7807 (`400/404/409/401/500`)
 
 Execution policy:
-- Main CI (`ci.yml`) runs unit tests by default using filter: `Category!=Integration`.
+- Main CI (`ci.yml`) runs unit tests by default using filter: `Category!=Integration&Category!=E2E`.
 - Integration CI (`integration.yml`) runs integration tests using filter: `Category=Integration`.
 
 ---
@@ -998,6 +998,16 @@ public sealed class PartnerTransactionsController : ControllerBase
 
         if (acquireResult == IdempotencyAcquireResult.Duplicate)
         {
+            if (_idempotencyStore.TryGetCachedResponse(idempotencyKey, requestFingerprint, DateTimeOffset.UtcNow, out var cachedResponse))
+            {
+                return Accepted(new
+                {
+                    messageId = cachedResponse.MessageId,
+                    correlationId = cachedResponse.CorrelationId,
+                    status = cachedResponse.Status.ToString().ToLowerInvariant()
+                });
+            }
+
             throw new ConflictException("Duplicate transaction detected within the idempotency window.");
         }
 
@@ -1021,7 +1031,19 @@ public sealed class PartnerTransactionsController : ControllerBase
 
             await _messagePublisher.PublishAsync(envelope, cancellationToken);
 
-            return Accepted(new { envelope.MessageId, envelope.CorrelationId, status = "accepted" });
+            var acceptedResponse = new IdempotencyCachedResponse(
+                envelope.MessageId,
+                envelope.CorrelationId,
+                IdempotencyCachedResponseStatus.Accepted);
+
+            _idempotencyStore.StoreCachedResponse(idempotencyKey, requestFingerprint, DateTimeOffset.UtcNow, acceptedResponse);
+
+            return Accepted(new
+            {
+                messageId = acceptedResponse.MessageId,
+                correlationId = acceptedResponse.CorrelationId,
+                status = acceptedResponse.Status.ToString().ToLowerInvariant()
+            });
         }
         catch
         {
@@ -1062,7 +1084,7 @@ public sealed class PartnerTransactionsController : ControllerBase
 
 - Idempotency window is configured via `Idempotency:WindowMinutes` (clamped to 10-15 for local safety).
 - The in-memory store hashes/encodes cache keys before lookup and storage.
-- Duplicate same-key same-payload requests return conflict (`409`).
+- Duplicate same-key same-payload requests replay cached `202 Accepted` (or fallback to `409` if cache is unavailable).
 - Same-key different-payload replays return conflict (`409`) with explicit mismatch semantics.
 - On verification/publish failure after acquisition, the key is released so a retry can proceed.
 

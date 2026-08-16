@@ -161,7 +161,7 @@ Build the API entrypoint and controller for the partner transaction workflow.
   - Validate request via FluentValidation / model validation
   - Enforce idempotency with in-memory TTL store (10-15 min window)
   - Use `Idempotency-Key` header when present, otherwise fallback to `partnerId|transactionReference`
-  - Detect same key with different payload using request fingerprint and return conflict
+  - Replay same `202 Accepted` response for same key+same payload and return conflict for same key+different payload
   - Verify partner via `IPartnerVerifier`
   - Publish queue message via `IMessagePublisher`
   - Return `202 Accepted` on success
@@ -170,7 +170,7 @@ Build the API entrypoint and controller for the partner transaction workflow.
 
 ### Deliverables
 - API controller and startup configured with shared services
-- API-level idempotency semantics for duplicate and payload-mismatch protection
+- API-level idempotency semantics for duplicate replay and payload-mismatch protection
 - Minimal, well-structured API project implementation
 
 ---

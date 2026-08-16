@@ -35,7 +35,7 @@ jobs:
       - name: Test (unit only)
         run: |
           # Run only unit tests; integration tests are skipped by default (marked with Trait/Category)
-          dotnet test tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj --configuration Release --verbosity normal --filter "Category!=Integration"
+          dotnet test tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj --configuration Release --verbosity normal --filter "Category!=Integration&Category!=E2E"
 
       - name: Verify formatting
         run: dotnet format TransactionValidation.sln --verify-no-changes --verbosity diagnostic

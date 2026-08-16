@@ -12,6 +12,7 @@ COPY ["src/TransactionValidation.Integration/TransactionValidation.Integration.c
 COPY ["src/TransactionValidation.Messaging/TransactionValidation.Messaging.csproj", "src/TransactionValidation.Messaging/"]
 COPY ["src/TransactionValidation.Mock/TransactionValidation.Mock.csproj", "src/TransactionValidation.Mock/"]
 COPY ["tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj", "tests/TransactionValidation.Tests/"]
+COPY ["tools/TestReportGenerator/TestReportGenerator.csproj", "tools/TestReportGenerator/"]
 
 RUN dotnet restore "TransactionValidation.sln"
 

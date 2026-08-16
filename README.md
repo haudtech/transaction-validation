@@ -11,7 +11,7 @@ Technology stack
 | API documentation | Swagger / OpenAPI (`Swashbuckle.AspNetCore`) |
 | Validation | FluentValidation |
 | Security | API key authentication (`X-API-Key` middleware) |
-| Idempotency | `Idempotency-Key` support with in-memory TTL dedupe fallback (`partnerId|transactionReference`) |
+| Idempotency | `Idempotency-Key` support with in-memory TTL dedupe, cached `202 Accepted` replay for same key+payload, and conflict on key reuse with different payload (`partnerId|transactionReference` fallback) |
 | Error handling | ASP.NET Core `IExceptionHandler` + RFC 7807 `ProblemDetails` mapping |
 | Resilience | `Microsoft.Extensions.Http.Resilience` (Polly-based pipelines) |
 | Messaging | RabbitMQ (`RabbitMQ.Client`) |

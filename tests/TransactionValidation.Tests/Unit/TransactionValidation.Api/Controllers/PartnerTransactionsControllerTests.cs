@@ -54,6 +54,8 @@ public sealed class PartnerTransactionsControllerTests
         idempotencyStore
             .Setup(x => x.TryAcquire("partner-123|ref-001", It.IsAny<string>(), It.IsAny<DateTimeOffset>()))
             .Returns(IdempotencyAcquireResult.Acquired);
+        idempotencyStore
+            .Setup(x => x.StoreCachedResponse("partner-123|ref-001", It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<IdempotencyCachedResponse>()));
 
         var sut = CreateSut(new PartnerTransactionRequestValidator(), partnerVerifier.Object, publisher.Object, idempotencyStore.Object);
 
@@ -81,6 +83,8 @@ public sealed class PartnerTransactionsControllerTests
         idempotencyStore
             .Setup(x => x.TryAcquire("partner-123|ref-001", It.IsAny<string>(), It.IsAny<DateTimeOffset>()))
             .Returns(IdempotencyAcquireResult.Acquired);
+        idempotencyStore
+            .Setup(x => x.StoreCachedResponse("partner-123|ref-001", It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<IdempotencyCachedResponse>()));
 
         var sut = CreateSut(new PartnerTransactionRequestValidator(), partnerVerifier.Object, publisher.Object, idempotencyStore.Object);
 
@@ -91,14 +95,53 @@ public sealed class PartnerTransactionsControllerTests
     }
 
     [Fact]
-    public async Task CreateAsync_WhenDuplicateRequest_ThrowsConflictExceptionWithoutProcessing()
+    public async Task CreateAsync_WhenDuplicateRequestWithCachedResponse_ReturnsAcceptedWithoutProcessing()
     {
         var partnerVerifier = new Mock<IPartnerVerifier>(MockBehavior.Strict);
         var publisher = new Mock<IMessagePublisher>(MockBehavior.Strict);
         var idempotencyStore = new Mock<IIdempotencyStore>();
+        var cachedResponse = new IdempotencyCachedResponse("msg-123", "corr-123", IdempotencyCachedResponseStatus.Accepted);
+
         idempotencyStore
             .Setup(x => x.TryAcquire("partner-123|ref-001", It.IsAny<string>(), It.IsAny<DateTimeOffset>()))
             .Returns(IdempotencyAcquireResult.Duplicate);
+        idempotencyStore
+            .Setup(x => x.TryGetCachedResponse("partner-123|ref-001", It.IsAny<string>(), It.IsAny<DateTimeOffset>(), out cachedResponse))
+            .Returns(true);
+
+        var sut = CreateSut(new PartnerTransactionRequestValidator(), partnerVerifier.Object, publisher.Object, idempotencyStore.Object);
+
+        var result = await sut.CreateAsync(CreateValidRequest(), CancellationToken.None);
+
+        var accepted = result.Should().BeOfType<AcceptedResult>().Subject;
+        accepted.StatusCode.Should().Be(StatusCodes.Status202Accepted);
+
+        accepted.Value.Should().BeEquivalentTo(new
+        {
+            messageId = "msg-123",
+            correlationId = "corr-123",
+            status = "accepted"
+        });
+
+        partnerVerifier.Verify(x => x.VerifyAsync(It.IsAny<string>(), It.IsAny<CancellationToken>(), It.IsAny<bool?>()), Times.Never);
+        publisher.Verify(x => x.PublishAsync(It.IsAny<TransactionEnvelope>(), It.IsAny<CancellationToken>()), Times.Never);
+        idempotencyStore.Verify(x => x.Release(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateAsync_WhenDuplicateRequestWithoutCachedResponse_ThrowsConflictExceptionWithoutProcessing()
+    {
+        var partnerVerifier = new Mock<IPartnerVerifier>(MockBehavior.Strict);
+        var publisher = new Mock<IMessagePublisher>(MockBehavior.Strict);
+        var idempotencyStore = new Mock<IIdempotencyStore>();
+        var ignoredResponse = new IdempotencyCachedResponse("msg-ignored", "corr-ignored", IdempotencyCachedResponseStatus.Accepted);
+
+        idempotencyStore
+            .Setup(x => x.TryAcquire("partner-123|ref-001", It.IsAny<string>(), It.IsAny<DateTimeOffset>()))
+            .Returns(IdempotencyAcquireResult.Duplicate);
+        idempotencyStore
+            .Setup(x => x.TryGetCachedResponse("partner-123|ref-001", It.IsAny<string>(), It.IsAny<DateTimeOffset>(), out ignoredResponse))
+            .Returns(false);
 
         var sut = CreateSut(new PartnerTransactionRequestValidator(), partnerVerifier.Object, publisher.Object, idempotencyStore.Object);
 
@@ -158,6 +201,8 @@ public sealed class PartnerTransactionsControllerTests
         idempotencyStore
             .Setup(x => x.TryAcquire("partner-123|ref-001", It.IsAny<string>(), It.IsAny<DateTimeOffset>()))
             .Returns(IdempotencyAcquireResult.Acquired);
+        idempotencyStore
+            .Setup(x => x.StoreCachedResponse("partner-123|ref-001", It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<IdempotencyCachedResponse>()));
 
         var sut = CreateSut(new PartnerTransactionRequestValidator(), partnerVerifier.Object, publisher.Object, idempotencyStore.Object);
 
@@ -176,6 +221,14 @@ public sealed class PartnerTransactionsControllerTests
             "partner-123|ref-001",
             It.Is<string>(fingerprint => fingerprint.Length == 64),
             It.IsAny<DateTimeOffset>()), Times.Once);
+        idempotencyStore.Verify(x => x.StoreCachedResponse(
+            "partner-123|ref-001",
+            It.Is<string>(fingerprint => fingerprint.Length == 64),
+            It.IsAny<DateTimeOffset>(),
+            It.Is<IdempotencyCachedResponse>(cached =>
+                cached.Status == IdempotencyCachedResponseStatus.Accepted
+                && !string.IsNullOrWhiteSpace(cached.MessageId)
+                && !string.IsNullOrWhiteSpace(cached.CorrelationId))), Times.Once);
         idempotencyStore.Verify(x => x.Release(It.IsAny<string>()), Times.Never);
     }
 
@@ -196,6 +249,8 @@ public sealed class PartnerTransactionsControllerTests
         idempotencyStore
             .Setup(x => x.TryAcquire("partner-123|idemp-001", It.IsAny<string>(), It.IsAny<DateTimeOffset>()))
             .Returns(IdempotencyAcquireResult.Acquired);
+        idempotencyStore
+            .Setup(x => x.StoreCachedResponse("partner-123|idemp-001", It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<IdempotencyCachedResponse>()));
 
         var sut = CreateSut(
             new PartnerTransactionRequestValidator(),
@@ -211,6 +266,11 @@ public sealed class PartnerTransactionsControllerTests
             "partner-123|idemp-001",
             It.Is<string>(fingerprint => fingerprint.Length == 64),
             It.IsAny<DateTimeOffset>()), Times.Once);
+        idempotencyStore.Verify(x => x.StoreCachedResponse(
+            "partner-123|idemp-001",
+            It.Is<string>(fingerprint => fingerprint.Length == 64),
+            It.IsAny<DateTimeOffset>(),
+            It.IsAny<IdempotencyCachedResponse>()), Times.Once);
     }
 
     private static PartnerTransactionsController CreateSut(

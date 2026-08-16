@@ -11,8 +11,8 @@ public sealed class ApiIdempotencyHostTests
 {
     [Trait("Category", "Integration")]
     [Trait("Feature", "Idempotency")]
-    [Fact(DisplayName = "API host returns 409 on second request when same Idempotency-Key is reused")]
-    public async Task PostTransactions_WhenIdempotencyKeyReused_ReturnsConflictOnSecondRequest()
+    [Fact(DisplayName = "API host replays 202 response on second request when same Idempotency-Key is reused")]
+    public async Task PostTransactions_WhenIdempotencyKeyReused_ReturnsSameAcceptedResponseOnSecondRequest()
     {
         using var factory = new ApiHostTestFactory();
         using var client = factory.CreateClient();
@@ -23,9 +23,22 @@ public sealed class ApiIdempotencyHostTests
 
         var firstResponse = await client.PostAsJsonAsync("/api/v1/partner/transactions", payload);
         var secondResponse = await client.PostAsJsonAsync("/api/v1/partner/transactions", payload);
+        var firstBody = await firstResponse.Content.ReadFromJsonAsync<AcceptedResponseDto>();
+        var secondBody = await secondResponse.Content.ReadFromJsonAsync<AcceptedResponseDto>();
 
         Assert.Equal(HttpStatusCode.Accepted, firstResponse.StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, secondResponse.StatusCode);
-        Assert.Equal("application/problem+json", secondResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(HttpStatusCode.Accepted, secondResponse.StatusCode);
+        Assert.Equal(firstBody?.MessageId, secondBody?.MessageId);
+        Assert.Equal(firstBody?.CorrelationId, secondBody?.CorrelationId);
+        Assert.Equal("accepted", secondBody?.Status);
+    }
+
+    private sealed class AcceptedResponseDto
+    {
+        public string MessageId { get; set; } = string.Empty;
+
+        public string CorrelationId { get; set; } = string.Empty;
+
+        public string Status { get; set; } = string.Empty;
     }
 }

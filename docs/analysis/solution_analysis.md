@@ -84,8 +84,9 @@ When to choose Azure Queues/Service Bus:
 0. Client includes the API key header: `X-API-Key: <secret>`.
    - Middleware validates the value before request processing.
    - If missing or invalid, return `401 Unauthorized` immediately.
-0.5. Check in-memory dedupe cache using `partnerId|transactionReference` (for example, `P-1001|TXN-99823`).
-   - If the key exists and has not expired, return the same accepted response without reprocessing.
+0.5. Check the idempotency store using the resolved idempotency key and request fingerprint.
+  - If the same key and payload combination exists and has not expired, return the cached accepted response without reprocessing.
+  - If the same key is reused with a different payload, return a conflict.
    - If the key is new or expired, continue.
    - Use a short TTL (e.g. 10–15 minutes) so retry windows are covered but memory does not grow indefinitely.
 1. Client POSTs JSON to `POST /api/v1/partner/transactions`.
@@ -102,7 +103,7 @@ When to choose Azure Queues/Service Bus:
    - For RabbitMQ: publish as persistent message, use publisher confirms and retry on transient connectivity errors.
    - Wait for publisher confirmation (ACK) from RabbitMQ before returning success.
    - If RabbitMQ NACKs or confirm times out, retry according to policy; if publish still fails, return an error.
-   - This is an at-least-once delivery model; duplicate messages may occur, so downstream consumers should be idempotent on `transactionReference`.
+    - The API layer prevents duplicate same-payload submissions by replaying the cached accepted response; downstream consumers should still remain idempotent in case of broker redelivery.
 7. Return `202 Accepted` to client after broker confirmation.
 
 Sequence diagram (mermaid):
@@ -217,7 +218,7 @@ Created for reference and discussion. See the implementation plan above and indi
 
 The assignment is a BFF — which implies additional responsibilities compared to an internal service. The list below supplements the earlier plan with items I strongly recommend including in the implementation or at least documenting as trade-offs.
 
-- Idempotency: enforce idempotency using `transactionReference` or a separate idempotency key to prevent duplicate processing. Implement an in-memory dedupe store with TTL first for the demo, with a later upgrade path to durable storage. Example: use a `ConcurrentDictionary<string, DateTimeOffset>` keyed by `partnerId|transactionReference` and remove entries after 10–15 minutes.
+- Idempotency: enforce idempotency using the resolved idempotency key plus a request fingerprint so same-payload retries replay the cached accepted response and key reuse with a different payload fails fast. Implement an in-memory TTL store first for the demo, with a later upgrade path to durable storage.
 - DLQ & retry handling: configure a dead-letter queue for messages that repeatedly fail downstream, and implement publisher retry with exponential backoff. Consider a local durable fallback (file/DB) when the broker is unavailable.
 - Publisher guarantees: publish persistent messages and use publisher confirms for RabbitMQ to ensure messages are accepted by the broker before returning success.
 - HTTP semantics: return `202 Accepted` for async acceptance; use `400` for validation errors, `422` for business rule rejects (if desired), and `503` for transient partner verification failures when appropriate.

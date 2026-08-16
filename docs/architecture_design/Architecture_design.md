@@ -10,7 +10,7 @@ This design is aligned to:
 
 ## 1. Purpose and Scope
 
-The system accepts partner transaction requests, validates and deduplicates them, verifies partner identity through an external verification endpoint, and publishes accepted transactions to a queue for downstream processing.
+The system accepts partner transaction requests, validates them, applies idempotency checks with cached replay for duplicates, verifies partner identity through an external verification endpoint, and publishes accepted transactions to a queue for downstream processing.
 
 Core capabilities:
 
@@ -84,20 +84,27 @@ sequenceDiagram
 
     Client->>API: Submit transaction request
     API->>API: Authenticate, validate, idempotency check
-    API->>Verify: Verify partner
-    Verify->>Mock: Verification request
-    Mock-->>Verify: Verification response
-    Verify-->>API: Verified or failed
 
-    alt Verified and accepted
-        API->>Publish: Publish envelope
-        Publish->>MQ: Persistent message with confirm
-        MQ-->>Publish: Confirm
-        API-->>Client: Accepted
-        MQ->>Consumer: Deliver message
-        Consumer-->>MQ: Ack after consume
-    else Rejected
-        API-->>Client: ProblemDetails response
+    alt Cached duplicate with same payload
+        API-->>Client: Accepted replay response
+    else Key reused with different payload
+        API-->>Client: ProblemDetails conflict response
+    else Fresh request
+        API->>Verify: Verify partner
+        Verify->>Mock: Verification request
+        Mock-->>Verify: Verification response
+        Verify-->>API: Verified or failed
+
+        alt Verified and accepted
+            API->>Publish: Publish envelope
+            Publish->>MQ: Persistent message with confirm
+            MQ-->>Publish: Confirm
+            API-->>Client: Accepted
+            MQ->>Consumer: Deliver message
+            Consumer-->>MQ: Ack after consume
+        else Rejected
+            API-->>Client: ProblemDetails response
+        end
     end
 ```
 
@@ -119,6 +126,7 @@ Deployment modes:
 
 - Security: API key middleware guards external entrypoints.
 - Reliability: outbound verification uses resilience policies; queue publishing expects broker confirm semantics.
+- Idempotency: duplicate same-payload requests replay the cached accepted response; same-key different-payload requests fail with conflict.
 - Error handling: domain exceptions are mapped to RFC 7807 ProblemDetails through centralized exception handling.
 - Observability: structured logging and OpenTelemetry pipeline with optional Azure Monitor export.
 
