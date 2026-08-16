@@ -1,0 +1,109 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"--nologo",
+				"-m:1",
+				"${workspaceFolder}/TransactionValidation.sln"
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "build"
+		},
+		{
+			"label": "test:integration",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"--nologo",
+				"-m:1",
+				"${workspaceFolder}/tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj",
+				"--filter",
+				"Category=Integration"
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		},
+		{
+			"label": "test:unit",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"--nologo",
+				"-m:1",
+				"${workspaceFolder}/tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj",
+				"--filter",
+				"Category!=Integration"
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		},
+		{
+			"label": "test:integration:trx:run",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"--nologo",
+				"-m:1",
+				"${workspaceFolder}/tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj",
+				"--filter",
+				"Category=Integration",
+				"--results-directory",
+				"${workspaceFolder}/TestResults/integration",
+				"--logger",
+				"trx;LogFileName=integration-tests.trx"
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		},
+		{
+			"label": "test:integration:trx:report",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"run",
+				"--project",
+				"${workspaceFolder}/tools/TestReportGenerator/TestReportGenerator.csproj",
+				"--",
+				"${workspaceFolder}/TestResults/integration/integration-tests.trx",
+				"${workspaceFolder}/TestResults/integration/integration-tests-summary.md"
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		},
+		{
+			"label": "test:integration:trx",
+			"type": "shell",
+			"command": "echo",
+			"args": [
+				"Running sequenced tasks: test run then report generation"
+			],
+			"dependsOn": [
+				"test:integration:trx:run",
+				"test:integration:trx:report"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		}
+	]
+}

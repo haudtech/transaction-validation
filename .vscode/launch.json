@@ -1,0 +1,69 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "TransactionValidation.Api",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/TransactionValidation.Api/bin/Debug/net8.0/TransactionValidation.Api.dll",
+      "cwd": "${workspaceFolder}/src/TransactionValidation.Api",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5080"
+      },
+      "justMyCode": true,
+      "console": "internalConsole"
+    },
+    {
+      "name": "TransactionValidation.Mock",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/TransactionValidation.Mock/bin/Debug/net8.0/TransactionValidation.Mock.dll",
+      "cwd": "${workspaceFolder}/src/TransactionValidation.Mock",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5081"
+      },
+      "justMyCode": true,
+      "console": "internalConsole"
+    },
+    {
+      "name": "Open API Swagger",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5080/swagger",
+      "webRoot": "${workspaceFolder}"
+    },
+    {
+      "name": "Open Mock Endpoint",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5081",
+      "webRoot": "${workspaceFolder}"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug Full Flow (API + Mock)",
+      "configurations": [
+        "TransactionValidation.Api",
+        "TransactionValidation.Mock"
+      ],
+      "stopAll": true
+    },
+    {
+      "name": "Debug Full Flow + Browser",
+      "configurations": [
+        "TransactionValidation.Api",
+        "TransactionValidation.Mock",
+        "Open API Swagger",
+        "Open Mock Endpoint"
+      ],
+      "stopAll": true
+    }
+  ]
+}
