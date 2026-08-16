@@ -59,7 +59,9 @@ var results = doc
             ? TestTraits.Empty
             : traitMap.TryGetValue((definition.ClassName, definition.MethodName), out var mapped)
                 ? mapped
-                : TestTraits.Empty;
+                : traitMap.TryGetValue((definition.ClassName, string.Empty), out var classMapped)
+                    ? classMapped
+                    : TestTraits.Empty;
 
         return new TestResultRow(
             testId,
@@ -265,6 +267,13 @@ static Dictionary<(string ClassName, string MethodName), TestTraits> BuildTraitM
                 map[(fullClassName, methodName)] = new TestTraits(
                     category ?? string.Empty,
                     feature ?? string.Empty);
+
+                if (!map.ContainsKey((fullClassName, string.Empty)))
+                {
+                    map[(fullClassName, string.Empty)] = new TestTraits(
+                        category ?? string.Empty,
+                        feature ?? string.Empty);
+                }
             }
 
             pendingTraits = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

@@ -11,7 +11,7 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
     private readonly TimeSpan _ttl;
     private int _cleanupCounter;
 
-    private readonly record struct IdempotencyEntry(DateTimeOffset ExpiresAt, string RequestFingerprint);
+    private readonly record struct IdempotencyEntry(DateTimeOffset ExpiresAt, string RequestFingerprint, IdempotencyCachedResponse? CachedResponse);
 
     public InMemoryIdempotencyStore(TimeSpan ttl)
     {
@@ -57,9 +57,95 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
                     : IdempotencyAcquireResult.KeyReusedWithDifferentPayload;
             }
 
-            if (_entries.TryAdd(encodedKey, new IdempotencyEntry(expiresAt, normalizedFingerprint)))
+            if (_entries.TryAdd(encodedKey, new IdempotencyEntry(expiresAt, normalizedFingerprint, null)))
             {
                 return IdempotencyAcquireResult.Acquired;
+            }
+        }
+    }
+
+    public bool TryGetCachedResponse(string key, string requestFingerprint, DateTimeOffset nowUtc, out IdempotencyCachedResponse cachedResponse)
+    {
+        cachedResponse = null!;
+
+        if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(requestFingerprint))
+        {
+            return false;
+        }
+
+        var encodedKey = EncodeKey(key);
+        var normalizedFingerprint = requestFingerprint.Trim();
+
+        if (!_entries.TryGetValue(encodedKey, out var existingEntry))
+        {
+            return false;
+        }
+
+        if (existingEntry.ExpiresAt <= nowUtc)
+        {
+            _entries.TryRemove(new KeyValuePair<string, IdempotencyEntry>(encodedKey, existingEntry));
+            return false;
+        }
+
+        if (!string.Equals(existingEntry.RequestFingerprint, normalizedFingerprint, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (existingEntry.CachedResponse is null)
+        {
+            return false;
+        }
+
+        cachedResponse = existingEntry.CachedResponse;
+        return true;
+    }
+
+    public void StoreCachedResponse(string key, string requestFingerprint, DateTimeOffset nowUtc, IdempotencyCachedResponse cachedResponse)
+    {
+        if (string.IsNullOrWhiteSpace(key)
+            || string.IsNullOrWhiteSpace(requestFingerprint)
+            || cachedResponse is null)
+        {
+            return;
+        }
+
+        var encodedKey = EncodeKey(key);
+        var normalizedFingerprint = requestFingerprint.Trim();
+        var expiresAt = nowUtc.Add(_ttl);
+
+        while (true)
+        {
+            if (_entries.TryGetValue(encodedKey, out var existingEntry))
+            {
+                if (existingEntry.ExpiresAt <= nowUtc)
+                {
+                    _entries.TryRemove(new KeyValuePair<string, IdempotencyEntry>(encodedKey, existingEntry));
+                    continue;
+                }
+
+                if (!string.Equals(existingEntry.RequestFingerprint, normalizedFingerprint, StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                var updatedEntry = existingEntry with
+                {
+                    ExpiresAt = expiresAt,
+                    CachedResponse = cachedResponse
+                };
+
+                if (_entries.TryUpdate(encodedKey, updatedEntry, existingEntry))
+                {
+                    return;
+                }
+
+                continue;
+            }
+
+            if (_entries.TryAdd(encodedKey, new IdempotencyEntry(expiresAt, normalizedFingerprint, cachedResponse)))
+            {
+                return;
             }
         }
     }

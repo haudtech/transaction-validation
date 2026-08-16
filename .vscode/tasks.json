@@ -1,0 +1,171 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"--nologo",
+				"-m:1",
+				"${workspaceFolder}/TransactionValidation.sln"
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "build"
+		},
+		{
+			"label": "test:integration",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"--nologo",
+				"-m:1",
+				"${workspaceFolder}/tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj",
+				"--filter",
+				"Category=Integration"
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		},
+		{
+			"label": "test:unit",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"--nologo",
+				"-m:1",
+				"${workspaceFolder}/tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj",
+				"--filter",
+				"Category!=Integration&Category!=E2E"
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		},
+		{
+			"label": "test:integration:trx:run",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"--nologo",
+				"-m:1",
+				"${workspaceFolder}/tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj",
+				"--filter",
+				"Category=Integration",
+				"--results-directory",
+				"${workspaceFolder}/TestResults/integration",
+				"--logger",
+				"trx;LogFileName=integration-tests.trx"
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		},
+		{
+			"label": "test:integration:trx:report",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"run",
+				"--project",
+				"${workspaceFolder}/tools/TestReportGenerator/TestReportGenerator.csproj",
+				"--",
+				"${workspaceFolder}/TestResults/integration/integration-tests.trx",
+				"${workspaceFolder}/TestResults/integration/integration-tests-summary.md"
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		},
+		{
+			"label": "test:integration:trx",
+			"type": "shell",
+			"command": "echo",
+			"args": [
+				"Running sequenced tasks: test run then report generation"
+			],
+			"dependsOn": [
+				"test:integration:trx:run",
+				"test:integration:trx:report"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		},
+		{
+			"label": "test:e2e:up",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"compose",
+				"up",
+				"-d",
+				"--build"
+			],
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "test:e2e:run",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"--nologo",
+				"-m:1",
+				"${workspaceFolder}/tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj",
+				"--filter",
+				"Category=E2E",
+				"--results-directory",
+				"${workspaceFolder}/TestResults/e2e",
+				"--logger",
+				"trx;LogFileName=e2e-tests.trx"
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		},
+		{
+			"label": "test:e2e:down",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"compose",
+				"down",
+				"-v"
+			],
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "test:e2e",
+			"type": "shell",
+			"command": "echo",
+			"args": [
+				"Running sequenced E2E tasks: up -> run -> down"
+			],
+			"dependsOn": [
+				"test:e2e:up",
+				"test:e2e:run",
+				"test:e2e:down"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": [],
+			"group": "test"
+		}
+	]
+}

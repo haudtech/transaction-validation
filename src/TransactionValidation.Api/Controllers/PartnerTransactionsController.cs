@@ -63,6 +63,16 @@ public sealed class PartnerTransactionsController : ControllerBase
 
         if (acquireResult == IdempotencyAcquireResult.Duplicate)
         {
+            if (_idempotencyStore.TryGetCachedResponse(idempotencyKey, requestFingerprint, DateTimeOffset.UtcNow, out var cachedResponse))
+            {
+                return Accepted(new
+                {
+                    messageId = cachedResponse.MessageId,
+                    correlationId = cachedResponse.CorrelationId,
+                    status = cachedResponse.Status.ToString().ToLowerInvariant()
+                });
+            }
+
             throw new ConflictException("Duplicate transaction detected within the idempotency window.");
         }
 
@@ -90,11 +100,18 @@ public sealed class PartnerTransactionsController : ControllerBase
 
             await _messagePublisher.PublishAsync(envelope, cancellationToken);
 
+            var acceptedResponse = new IdempotencyCachedResponse(
+                envelope.MessageId,
+                envelope.CorrelationId,
+                IdempotencyCachedResponseStatus.Accepted);
+
+            _idempotencyStore.StoreCachedResponse(idempotencyKey, requestFingerprint, DateTimeOffset.UtcNow, acceptedResponse);
+
             return Accepted(new
             {
-                messageId = envelope.MessageId,
-                correlationId = envelope.CorrelationId,
-                status = "accepted"
+                messageId = acceptedResponse.MessageId,
+                correlationId = acceptedResponse.CorrelationId,
+                status = acceptedResponse.Status.ToString().ToLowerInvariant()
             });
         }
         catch

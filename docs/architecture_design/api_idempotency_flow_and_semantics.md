@@ -9,7 +9,7 @@ This document describes the idempotency mechanism for:
 
 It explains request-to-response behavior for:
 - happy path
-- duplicate replay
+- duplicate replay with cached accepted response
 - same key with different payload
 - validation/security/integration failure paths
 
@@ -58,10 +58,17 @@ sequenceDiagram
             API->>Verifier: VerifyAsync(partnerId)
             API->>Publisher: PublishAsync(envelope)
             Publisher-->>API: success
+            API->>Store: StoreCachedResponse(key,fingerprint,accepted)
             API-->>Client: 202 Accepted
         else Duplicate
             Store-->>API: Duplicate
-            API-->>Client: 409 ProblemDetails (duplicate)
+            API->>Store: TryGetCachedResponse(key,fingerprint)
+            alt Cached response found
+                Store-->>API: cached accepted payload
+                API-->>Client: 202 Accepted (replayed)
+            else No cached response
+                API-->>Client: 409 ProblemDetails (duplicate)
+            end
         else KeyReusedWithDifferentPayload
             Store-->>API: KeyReusedWithDifferentPayload
             API-->>Client: 409 ProblemDetails (payload mismatch)
@@ -102,6 +109,15 @@ Then:
 
 In the in-memory store, the logical key is hashed (SHA-256 hex) before dictionary usage.
 This avoids storing raw key material in cache.
+
+### 4) Cached response payload
+
+For successful acquired requests, the controller stores a cached accepted response containing:
+- `messageId`
+- `correlationId`
+- `status` (`IdempotencyCachedResponseStatus.Accepted`)
+
+On duplicate requests with the same fingerprint, this cached response is replayed as `202 Accepted` when present.
 
 ---
 
@@ -148,14 +164,14 @@ TTL cleanup is performed periodically (every 128 acquire calls) plus lazy expira
   - `202 Accepted`
   - payload includes `messageId`, `correlationId`, `status`
 
-### Conflict: duplicate replay
+### Duplicate replay (same key, same payload)
 
 - Condition:
   - same key reused within TTL
   - same fingerprint
 - Response:
-  - `409 Conflict` via ProblemDetails
-  - message: duplicate transaction detected
+  - Preferred path: `202 Accepted` with cached payload replay (`messageId`, `correlationId`, `status`)
+  - Fallback path (cache missing): `409 Conflict` via ProblemDetails with duplicate message
 
 ### Conflict: key reused with different payload
 
@@ -213,8 +229,9 @@ Effect:
 - avoids long false locks for failed attempts
 
 Current trade-off:
-- this favors retryability over strict replay locking of failures.
-- for production-grade behavior, consider storing final operation status and replaying same response for same key.
+- this favors retryability while replaying successful accepted responses for duplicate requests.
+- failures after acquire still release the key; failed outcomes are not cached/replayed.
+- for production-grade behavior, consider storing and replaying failure outcomes where policy requires exactly-once response semantics.
 
 ---
 
@@ -226,8 +243,9 @@ Current trade-off:
 4. Store acquires key (`Acquired`) and stores fingerprint with TTL.
 5. Partner verification succeeds.
 6. Envelope is published and confirmed.
-7. API returns `202 Accepted`.
-8. Any immediate retried request with same key+payload returns `409 Duplicate` until TTL expires.
+7. API stores accepted response in idempotency cache.
+8. API returns `202 Accepted`.
+9. Any immediate retried request with same key+payload returns the same `202 Accepted` payload from cache until TTL expires.
 
 ---
 
@@ -235,7 +253,7 @@ Current trade-off:
 
 | Case | Example | Outcome |
 |---|---|---|
-| Same key, same payload, within TTL | Retry due to client timeout | `409 Duplicate` |
+| Same key, same payload, within TTL | Retry due to client timeout | `202 Accepted` replay from cache (or `409 Duplicate` if cache missing) |
 | Same key, different payload, within TTL | Client mutates amount/currency/timestamp | `409 Conflict` (payload mismatch) |
 | No `Idempotency-Key` header | Fallback to `partnerId|transactionReference` | Normal idempotency behavior |
 | Same transactionReference under different partnerId | Multi-tenant collisions | isolated by partner scope |
@@ -272,7 +290,7 @@ Recommended next hardening:
 - add key length limits and character-policy validation on `Idempotency-Key`
 - return explicit ProblemDetails error codes for duplicate vs mismatch
 - persist idempotency state in durable storage (Redis/DB) for multi-instance deployments
-- optionally store/replay final response for strict idempotency semantics
+- cache and replay additional response classes as needed for stricter idempotency policies
 
 ---
 

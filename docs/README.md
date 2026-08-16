@@ -17,6 +17,7 @@ This folder is the central entry point for the project’s technical and enginee
 - Implementation phases: [implementation/implementation_phases.md](implementation/implementation_phases.md)
 - Checklist and tracking: [implementation/implementation_checklist.md](implementation/implementation_checklist.md)
 - Scaffold and conventions: [implementation/implementation_scaffold.md](implementation/implementation_scaffold.md)
+- E2E smoke matrix (runtime confidence layer): [test/e2e_smoke_matrix.md](test/e2e_smoke_matrix.md)
 - Repo-specific architecture rules: [implementation/repo_architecture_rules.md](implementation/repo_architecture_rules.md)
 - Shared engineering principles: [implementation/shared_engineering_principles.md](implementation/shared_engineering_principles.md)
 - Prerequisites: [implementation/Prerequisites/README.md](implementation/Prerequisites/README.md)
