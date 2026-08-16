@@ -165,7 +165,7 @@ Build the API entrypoint and controller for the partner transaction workflow.
   - Verify partner via `IPartnerVerifier`
   - Publish queue message via `IMessagePublisher`
   - Return `202 Accepted` on success
-- Ensure the controller returns structured error responses for validation and partner verification failures
+- Ensure the controller returns structured error responses for validation and partner verification failures (including upstream `404`, `408`, and `503` mappings)
 - Add Swagger/OpenAPI support for local discovery
 
 ### Deliverables

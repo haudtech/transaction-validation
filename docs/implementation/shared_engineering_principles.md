@@ -48,6 +48,20 @@ SHOULD:
 
 ---
 
+## 2.1 Code documentation strictness for new members
+
+MUST:
+- Every newly added class must include a concise XML `<summary>` that explains its responsibility.
+- Every newly added method (public, internal, private, and test methods) must include a concise XML `<summary>` that explains behavior intent.
+- Helper/nested types and helper methods must also include `<summary>` documentation when introduced.
+
+SHOULD:
+- Keep summaries purpose-focused and short.
+- Describe expected behavior and boundary/intent, not line-by-line implementation detail.
+- For test methods, describe the scenario and expected outcome in the summary.
+
+---
+
 ## 3. Dependency injection and service registration
 
 MUST:

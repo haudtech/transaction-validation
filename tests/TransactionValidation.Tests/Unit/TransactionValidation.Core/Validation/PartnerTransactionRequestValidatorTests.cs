@@ -30,7 +30,17 @@ public class PartnerTransactionRequestValidatorTests
         result.IsValid.Should().BeFalse();
         result.Errors.Should().ContainSingle(e =>
             e.PropertyName == nameof(PartnerTransactionRequest.Currency)
-            && e.ErrorMessage == "currency must be a supported ISO code.");
+            && e.ErrorMessage == "currency must be a valid ISO-4217 code.");
+    }
+
+    [Fact]
+    public void Validate_WhenCurrencyIsLowercaseIso_IsValid()
+    {
+        var request = CreateValidRequest(currency: "usd");
+
+        var result = validator.Validate(request);
+
+        result.IsValid.Should().BeTrue();
     }
 
     [Fact]

@@ -48,6 +48,30 @@ public sealed class PartnerVerifierClientTests
     }
 
     [Fact]
+    public async Task VerifyAsync_WhenMockEndpointReturnsRequestTimeout_ThrowsUpstreamTimeoutException()
+    {
+        var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.RequestTimeout));
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
+        var sut = new PartnerVerifierClient(httpClient);
+
+        var action = async () => await sut.VerifyAsync("partner-timeout", CancellationToken.None);
+
+        await action.Should().ThrowAsync<UpstreamTimeoutException>();
+    }
+
+    [Fact]
+    public async Task VerifyAsync_WhenMockEndpointReturnsServiceUnavailable_ThrowsUpstreamServiceUnavailableException()
+    {
+        var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
+        var sut = new PartnerVerifierClient(httpClient);
+
+        var action = async () => await sut.VerifyAsync("partner-unavailable", CancellationToken.None);
+
+        await action.Should().ThrowAsync<UpstreamServiceUnavailableException>();
+    }
+
+    [Fact]
     public async Task VerifyAsync_WhenForceTimeoutProvided_AppendsForceTimeoutQuery()
     {
         Uri? capturedRequestUri = null;
@@ -82,6 +106,30 @@ public sealed class PartnerVerifierClientTests
         var action = async () => await sut.VerifyAsync("partner-123", cts.Token);
 
         await action.Should().ThrowAsync<TaskCanceledException>();
+    }
+
+    [Fact]
+    public async Task VerifyAsync_WhenRequestTimesOutWithoutExternalCancellation_ThrowsUpstreamTimeoutException()
+    {
+        var handler = new StubHttpMessageHandler((_, _) => throw new TaskCanceledException("request timed out"));
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
+        var sut = new PartnerVerifierClient(httpClient);
+
+        var action = async () => await sut.VerifyAsync("partner-timeout", CancellationToken.None);
+
+        await action.Should().ThrowAsync<UpstreamTimeoutException>();
+    }
+
+    [Fact]
+    public async Task VerifyAsync_WhenHttpRequestExceptionThrown_ThrowsUpstreamServiceUnavailableException()
+    {
+        var handler = new StubHttpMessageHandler((_, _) => throw new HttpRequestException("connection failed"));
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
+        var sut = new PartnerVerifierClient(httpClient);
+
+        var action = async () => await sut.VerifyAsync("partner-unavailable", CancellationToken.None);
+
+        await action.Should().ThrowAsync<UpstreamServiceUnavailableException>();
     }
 
     private sealed class StubHttpMessageHandler : HttpMessageHandler

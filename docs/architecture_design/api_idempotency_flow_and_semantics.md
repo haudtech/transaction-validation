@@ -201,7 +201,9 @@ TTL cleanup is performed periodically (every 128 acquire calls) plus lazy expira
 - Condition:
   - partner verify returns non-success and client throws domain exception
 - Response:
-  - `404 Not Found` via ProblemDetails
+  - `404 Not Found` via ProblemDetails when partner is unknown
+  - `408 Request Timeout` via ProblemDetails for upstream timeout category
+  - `503 Service Unavailable` via ProblemDetails for upstream unavailability category
 
 ### Publish confirm failure
 

@@ -38,7 +38,7 @@ public sealed class PartnerTransactionsControllerTests
         var action = async () => await sut.CreateAsync(request, CancellationToken.None);
 
         await action.Should().ThrowAsync<BadRequestException>()
-            .WithMessage("*currency must be a supported ISO code.*");
+            .WithMessage("*currency must be a valid ISO-4217 code.*");
     }
 
     [Fact]

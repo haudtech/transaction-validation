@@ -13,6 +13,9 @@ This folder is the central entry point for the project’s technical and enginee
 
 ## By topic
 
+### Analysis and rationale
+- Resilience retry and timeout guide: [analysis/resilience_retry_timeout_guide.md](analysis/resilience_retry_timeout_guide.md)
+
 ### Implementation and delivery
 - Implementation phases: [implementation/implementation_phases.md](implementation/implementation_phases.md)
 - Checklist and tracking: [implementation/implementation_checklist.md](implementation/implementation_checklist.md)
@@ -28,7 +31,7 @@ This folder is the central entry point for the project’s technical and enginee
 
 ### Architecture and diagrams
 - Use case diagram: [diagram/use_case_diagram.md](diagram/use_case_diagram.md)
-- Sequence diagram: [diagram/use_case_sequence_diagram.md](diagram/use_case_sequence_diagram.md)
+- Sequence diagram: [diagram/sequence_diagram.md](diagram/sequence_diagram.md)
 
 ### CI and workflow guidance
 - Workflow docs index: [workflow_actions/github/README.md](workflow_actions/github/README.md)

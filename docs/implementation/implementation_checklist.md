@@ -89,7 +89,7 @@ This checklist reflects the current repository state and marks only the work tha
 - [x] Cover core resilience behavior with unit tests first (retry, timeout, circuit-breaker semantics)
 - [x] Add API integration-host tests using `WebApplicationFactory<Program>` to execute startup pipeline in-memory
 - [x] Use integration-host tests to validate resilience wiring confidence (startup/DI/middleware pipeline), not timing internals
-- [x] Cover host-level scenarios for middleware and exception mapping (401 auth, idempotency replay semantics, 400/404/409/401/500 ProblemDetails mappings)
+- [x] Cover host-level scenarios for middleware and exception mapping (401 auth, idempotency replay semantics, 400/401/404/408/409/503/500 ProblemDetails mappings)
 - [x] Achieve green tests for modified components
 - [x] Ensure CI policy: unit tests in `ci.yml` (`Category!=Integration&Category!=E2E`) and integration tests in `integration.yml` (`Category=Integration`)
 - [x] Commit tests and CI config

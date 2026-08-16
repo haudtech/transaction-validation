@@ -51,6 +51,57 @@
 			"group": "test"
 		},
 		{
+			"label": "test:coverage:unit",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"--nologo",
+				"-m:1",
+				"${workspaceFolder}/tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj",
+				"--filter",
+				"\"Category!=Integration&Category!=E2E\"",
+				"--collect",
+				"XPlat Code Coverage",
+				"--results-directory",
+				"${workspaceFolder}/TestResults/coverage"
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		},
+		{
+			"label": "test:coverage:report",
+			"type": "shell",
+			"command": "/bin/zsh",
+			"args": [
+				"-lc",
+				"dotnet tool restore && dotnet tool run reportgenerator -reports:\"${workspaceFolder}/TestResults/coverage/**/coverage.cobertura.xml\" -targetdir:\"${workspaceFolder}/TestResults/coverage/report\" -reporttypes:\"Html;MarkdownSummary;TextSummary\""
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		},
+		{
+			"label": "test:coverage",
+			"type": "shell",
+			"command": "echo",
+			"args": [
+				"Running sequenced coverage tasks: collect -> report"
+			],
+			"dependsOn": [
+				"test:coverage:unit",
+				"test:coverage:report"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		},
+		{
 			"label": "test:integration:trx:run",
 			"type": "shell",
 			"command": "dotnet",
@@ -64,7 +115,7 @@
 				"--results-directory",
 				"${workspaceFolder}/TestResults/integration",
 				"--logger",
-				"trx;LogFileName=integration-tests.trx"
+				"trx\\;LogFileName=integration-tests.trx"
 			],
 			"problemMatcher": [
 				"$msCompile"
@@ -132,7 +183,7 @@
 				"--results-directory",
 				"${workspaceFolder}/TestResults/e2e",
 				"--logger",
-				"trx;LogFileName=e2e-tests.trx"
+				"trx\\;LogFileName=e2e-tests.trx"
 			],
 			"problemMatcher": [
 				"$msCompile"

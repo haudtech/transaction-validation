@@ -12,6 +12,13 @@ Use this diagram to understand the three idempotency outcomes:
 
 It also captures the failure cleanup behavior: if verification or publishing fails after acquisition, the idempotency key is released so a later retry can proceed.
 
+Upstream status semantics in this flow:
+
+- partner not found -> `404 Not Found`
+- upstream timeout -> `408 Request Timeout`
+- upstream unavailable -> `503 Service Unavailable`
+- publish confirm conflict -> `409 Conflict`
+
 ```mermaid
 sequenceDiagram
    autonumber
@@ -63,10 +70,14 @@ sequenceDiagram
             Publisher-->>API: Published
             API->>Cache: StoreCachedResponse(key, fingerprint, accepted response)
             API-->>P: 202 Accepted
-         else Verification or publish failed
-            Verifier-->>API: Failure
+         else Verification failed
+            Verifier-->>API: NotFound / Timeout / ServiceUnavailable
             API->>Cache: Release(key)
-            API-->>P: ProblemDetails error response
+            API-->>P: 404 / 408 / 503 ProblemDetails
+         else Publish failed
+            Publisher-->>API: ConflictException
+            API->>Cache: Release(key)
+            API-->>P: 409 ProblemDetails
          end
       end
    end
