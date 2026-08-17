@@ -7,8 +7,8 @@ This document describes the prerequisites for building, running, and testing the
 - The solution and all projects are targeted at `net8.0`.
 - Verify with:
   ```bash
-dotnet --version
-```
+  dotnet --version
+  ```
 
 ## 2. dotnet CLI
 - Ensure the `dotnet` command is available in your PATH.
@@ -47,6 +47,7 @@ The implementation uses these NuGet packages across projects:
 - `ApplicationInsights:ConnectionString` is optional and only required for Azure monitoring.
 
 ## 8. Recommended CLI Commands
+
 ```bash
 cd /Users/tech/dev/net/TransactionValidation
 dotnet restore
@@ -54,8 +55,9 @@ dotnet build
 ```
 
 ## 9. Notes
+
 - The workspace currently uses a multi-project `.sln` layout with shared configuration, core, integration, messaging, and mock projects.
-- Follow the ordered implementation phases in `docs/implementation/implementation_phases.md` when generating code.
+- Follow the ordered implementation phases in [implementation_phases.md](../implementation_phases.md) when generating code.
 
 ## 10. Phase-to-prerequisite readiness map
 
