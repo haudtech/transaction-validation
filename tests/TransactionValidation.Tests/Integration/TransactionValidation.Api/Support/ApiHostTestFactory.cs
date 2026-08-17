@@ -9,6 +9,9 @@ using TransactionValidation.Core.Interfaces;
 
 namespace TransactionValidation.Tests.Integration.TransactionValidation.Api.Support;
 
+/// <summary>
+/// Configures an in-memory API host with replaceable verifier and publisher doubles for integration tests.
+/// </summary>
 internal sealed class ApiHostTestFactory : WebApplicationFactory<Program>
 {
     public const string ApiKey = "integration-test-api-key";

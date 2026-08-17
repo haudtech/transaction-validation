@@ -11,6 +11,9 @@ using Xunit;
 
 namespace TransactionValidation.Tests.Unit.TransactionValidation.Configuration;
 
+/// <summary>
+/// Ensures effective partner-verifier timeout values are derived safely from configuration guardrails.
+/// </summary>
 public sealed class PartnerVerificationTimeoutGuardrailTests
 {
     [Fact]

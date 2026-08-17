@@ -1,5 +1,9 @@
 namespace TransactionValidation.Core.Models;
 
+/// <summary>
+/// Internal queue message payload produced after a request passes validation and partner verification.
+/// It wraps the original transaction with correlation metadata and verification status for downstream processing.
+/// </summary>
 public sealed class TransactionEnvelope
 {
     public required string MessageId { get; init; }

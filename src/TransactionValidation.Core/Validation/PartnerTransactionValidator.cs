@@ -2,6 +2,10 @@ using TransactionValidation.Core.Models;
 
 namespace TransactionValidation.Core.Validation;
 
+/// <summary>
+/// Manual validation helper for transaction payloads that returns field-level errors for the BFF request contract.
+/// It complements the FluentValidation rules used at runtime and matches the design's validation guidance.
+/// </summary>
 public static class PartnerTransactionValidator
 {
     private static readonly HashSet<string> ValidCurrencies =
@@ -14,6 +18,11 @@ public static class PartnerTransactionValidator
         "AUD"
     ];
 
+    /// <summary>
+    /// Validates the request and returns structured field-level errors for invalid payloads.
+    /// </summary>
+    /// <param name="request">The transaction request to validate.</param>
+    /// <returns>A list of field errors; empty when the request is valid.</returns>
     public static List<FieldError> Validate(PartnerTransactionRequest request)
     {
         var errors = new List<FieldError>();

@@ -1,5 +1,8 @@
 namespace TransactionValidation.Mock.Options;
 
+/// <summary>
+/// Configuration for the local RabbitMQ consumer used to observe queued transaction envelopes during smoke testing and development.
+/// </summary>
 public sealed class RabbitMqConsumerOptions
 {
     public const string SectionName = "RabbitMqConsumer";

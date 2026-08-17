@@ -6,7 +6,8 @@ using TransactionValidation.Core.Models;
 namespace TransactionValidation.Messaging;
 
 /// <summary>
-/// Publishes transaction envelopes to RabbitMQ after ensuring queue declaration and broker confirmation.
+/// Serializes and publishes transaction envelopes to RabbitMQ after declaring the queue and waiting for broker confirmation.
+/// This class implements the accepted-message publication step of the API-to-queue workflow in the design docs.
 /// </summary>
 public sealed class RabbitMqMessagePublisher : IMessagePublisher
 {
@@ -15,11 +16,11 @@ public sealed class RabbitMqMessagePublisher : IMessagePublisher
     private readonly IRabbitMqClientAdapter _rabbitMqClientAdapter;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="RabbitMqMessagePublisher"/> class.
+    /// Initializes the publisher with the RabbitMQ target queue and adapter used for broker communication.
     /// </summary>
-    /// <param name="queueName">Target queue name used for publication.</param>
-    /// <param name="durable">Whether the target queue should be durable.</param>
-    /// <param name="rabbitMqClientAdapter">RabbitMQ adapter used for queue declaration and publish operations.</param>
+    /// <param name="queueName">Queue name to publish accepted transaction envelopes to.</param>
+    /// <param name="durable">Whether the target queue must be durable.</param>
+    /// <param name="rabbitMqClientAdapter">Adapter that performs the actual queue and publish operations.</param>
     public RabbitMqMessagePublisher(string queueName, bool durable, IRabbitMqClientAdapter rabbitMqClientAdapter)
     {
         _queueName = queueName;
@@ -28,10 +29,10 @@ public sealed class RabbitMqMessagePublisher : IMessagePublisher
     }
 
     /// <summary>
-    /// Serializes and publishes the transaction envelope as a persistent RabbitMQ message.
+    /// Serializes the transaction envelope and publishes it to RabbitMQ only after the queue is declared and confirmed by the broker.
     /// </summary>
-    /// <param name="envelope">Transaction envelope to publish.</param>
-    /// <param name="cancellationToken">Cancellation token for async queue and publish operations.</param>
+    /// <param name="envelope">The internal message containing the accepted transaction and correlation metadata.</param>
+    /// <param name="cancellationToken">Token used to cancel the publish operation.</param>
     /// <exception cref="ConflictException">Thrown when broker publish confirmation is not received.</exception>
     public async Task PublishAsync(TransactionEnvelope envelope, CancellationToken cancellationToken = default)
     {

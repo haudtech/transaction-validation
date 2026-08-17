@@ -5,6 +5,10 @@ using System.Threading;
 
 namespace TransactionValidation.Api.Idempotency;
 
+/// <summary>
+/// In-memory implementation of the idempotency contract used to prevent duplicate partner submissions within a short TTL.
+/// It aligns with the recommendation in the design docs to replay cached accepted responses for identical requests while rejecting key reuse with different payloads.
+/// </summary>
 public sealed class InMemoryIdempotencyStore : IIdempotencyStore
 {
     private readonly ConcurrentDictionary<string, IdempotencyEntry> _entries = new(StringComparer.Ordinal);
@@ -13,6 +17,10 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
 
     private readonly record struct IdempotencyEntry(DateTimeOffset ExpiresAt, string RequestFingerprint, IdempotencyCachedResponse? CachedResponse);
 
+    /// <summary>
+    /// Initializes the in-memory store with a TTL that limits how long duplicate requests are suppressed.
+    /// </summary>
+    /// <param name="ttl">Lifetime of the cached idempotency entry.</param>
     public InMemoryIdempotencyStore(TimeSpan ttl)
     {
         if (ttl <= TimeSpan.Zero)
@@ -23,6 +31,13 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
         _ttl = ttl;
     }
 
+    /// <summary>
+    /// Claims or rejects a request key based on the current fingerprint and TTL window.
+    /// </summary>
+    /// <param name="key">The logical idempotency key for the transaction.</param>
+    /// <param name="requestFingerprint">The canonical payload hash that distinguishes identical from conflicting requests.</param>
+    /// <param name="nowUtc">Current UTC timestamp used to evaluate expiry.</param>
+    /// <returns>The acquisition outcome for the request.</returns>
     public IdempotencyAcquireResult TryAcquire(string key, string requestFingerprint, DateTimeOffset nowUtc)
     {
         if (string.IsNullOrWhiteSpace(key))
@@ -64,6 +79,9 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
         }
     }
 
+    /// <summary>
+    /// Returns the cached accepted response when the same request is replayed before the idempotency window expires.
+    /// </summary>
     public bool TryGetCachedResponse(string key, string requestFingerprint, DateTimeOffset nowUtc, out IdempotencyCachedResponse cachedResponse)
     {
         cachedResponse = null!;
@@ -101,6 +119,9 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
         return true;
     }
 
+    /// <summary>
+    /// Persists the accepted response and refreshes the expiry window for the matching request fingerprint.
+    /// </summary>
     public void StoreCachedResponse(string key, string requestFingerprint, DateTimeOffset nowUtc, IdempotencyCachedResponse cachedResponse)
     {
         if (string.IsNullOrWhiteSpace(key)

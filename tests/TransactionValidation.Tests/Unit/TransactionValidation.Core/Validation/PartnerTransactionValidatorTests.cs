@@ -6,6 +6,9 @@ using TransactionValidation.Core.Validation;
 
 namespace TransactionValidation.Core.Validation.Tests;
 
+/// <summary>
+/// Verifies field-level validation results produced by the core transaction validator.
+/// </summary>
 public class PartnerTransactionValidatorTests
 {
     [Fact]

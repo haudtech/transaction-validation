@@ -6,6 +6,9 @@ using Xunit;
 
 namespace TransactionValidation.Tests.Integration;
 
+/// <summary>
+/// Validates deterministic and statistical behaviors of the mock partner verification controller.
+/// </summary>
 public class MockPartnerVerificationControllerTests
 {
     [Trait("Category", "Integration")]

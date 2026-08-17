@@ -1,5 +1,9 @@
 namespace TransactionValidation.Configuration.Options;
 
+/// <summary>
+/// RabbitMQ connection and queue options for the BFF publisher.
+/// These values are used to connect to the local broker described in the architecture and Docker guidance.
+/// </summary>
 public sealed class RabbitMqOptions
 {
     public const string SectionName = "RabbitMq";

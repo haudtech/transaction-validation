@@ -6,6 +6,9 @@ using Xunit;
 
 namespace TransactionValidation.Configuration.Tests;
 
+/// <summary>
+/// Verifies domain exception to ProblemDetails status-code mappings.
+/// </summary>
 public class ApiExceptionHandlerTests
 {
     [Fact]

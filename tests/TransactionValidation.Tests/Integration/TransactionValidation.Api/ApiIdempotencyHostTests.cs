@@ -7,6 +7,9 @@ using Xunit;
 
 namespace TransactionValidation.Tests.Integration.TransactionValidation.Api;
 
+/// <summary>
+/// Validates replay-first idempotency behavior through the in-memory API host pipeline.
+/// </summary>
 public sealed class ApiIdempotencyHostTests
 {
     [Trait("Category", "Integration")]
@@ -33,6 +36,9 @@ public sealed class ApiIdempotencyHostTests
         Assert.Equal("accepted", secondBody?.Status);
     }
 
+    /// <summary>
+    /// Represents the accepted response payload returned by the transaction endpoint.
+    /// </summary>
     private sealed class AcceptedResponseDto
     {
         public string MessageId { get; set; } = string.Empty;

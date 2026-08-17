@@ -15,6 +15,9 @@ using Xunit;
 
 namespace TransactionValidation.Tests.Unit.TransactionValidation.Api.Controllers;
 
+/// <summary>
+/// Verifies controller-level validation, idempotency, verification, and publish orchestration paths.
+/// </summary>
 public sealed class PartnerTransactionsControllerTests
 {
     [Fact]

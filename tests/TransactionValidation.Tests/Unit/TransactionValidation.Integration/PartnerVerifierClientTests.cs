@@ -9,6 +9,9 @@ using Xunit;
 
 namespace TransactionValidation.Tests.Unit.TransactionValidation.Integration;
 
+/// <summary>
+/// Validates partner verifier request behavior and status-to-exception mapping semantics.
+/// </summary>
 public sealed class PartnerVerifierClientTests
 {
     [Fact]
@@ -132,6 +135,9 @@ public sealed class PartnerVerifierClientTests
         await action.Should().ThrowAsync<UpstreamServiceUnavailableException>();
     }
 
+    /// <summary>
+    /// Provides deterministic HTTP responses and exception simulation for verifier tests.
+    /// </summary>
     private sealed class StubHttpMessageHandler : HttpMessageHandler
     {
         private readonly Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> _responseFactory;

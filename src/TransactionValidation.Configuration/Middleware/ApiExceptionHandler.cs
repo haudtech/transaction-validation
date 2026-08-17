@@ -6,8 +6,19 @@ using TransactionValidation.Core.Exceptions;
 
 namespace TransactionValidation.Configuration.Middleware;
 
+/// <summary>
+/// Converts domain and upstream exceptions into RFC 7807 ProblemDetails responses so clients receive consistent 400/401/404/408/409/500/503 payloads.
+/// This central exception mapping supports the API contract and error-handling guidance in the design documentation.
+/// </summary>
 public sealed class ApiExceptionHandler : IExceptionHandler
 {
+    /// <summary>
+    /// Converts an exception into a structured ProblemDetails response that matches the documented API error semantics.
+    /// </summary>
+    /// <param name="httpContext">The active HTTP request context.</param>
+    /// <param name="exception">The exception raised by the application or upstream dependency.</param>
+    /// <param name="cancellationToken">Token that can cancel the response write.</param>
+    /// <returns>True when the exception was handled and a response was written.</returns>
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
         var problem = exception switch
