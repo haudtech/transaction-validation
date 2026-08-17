@@ -18,6 +18,10 @@ using TransactionValidation.Messaging;
 
 namespace TransactionValidation.Configuration.Extensions;
 
+/// <summary>
+/// Registers the common API infrastructure for the TransactionValidation BFF: options, validation, exception handling, partner verification HTTP client resiliency, RabbitMQ wiring, and OpenTelemetry configuration.
+/// This matches the component responsibilities described in docs/analysis/solution_analysis.md and docs/architecture_design/Architecture_design.md.
+/// </summary>
 public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddTransactionValidationCommonServices(this IServiceCollection services, IConfiguration configuration)

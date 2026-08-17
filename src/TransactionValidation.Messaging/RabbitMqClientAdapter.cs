@@ -7,7 +7,8 @@ using RabbitMQ.Client;
 namespace TransactionValidation.Messaging;
 
 /// <summary>
-/// RabbitMQ client adapter that publishes through compatibility helpers to support multiple RabbitMQ.Client API versions.
+/// RabbitMQ client adapter that creates connections, declares durable queues, and publishes messages with compatibility wrappers for different client API versions.
+/// This is the concrete implementation behind the queue publishing flow described in the architecture design.
 /// </summary>
 public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter
 {

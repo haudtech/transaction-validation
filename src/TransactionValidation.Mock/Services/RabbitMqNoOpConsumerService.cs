@@ -10,6 +10,10 @@ using TransactionValidation.Mock.Options;
 
 namespace TransactionValidation.Mock.Services;
 
+/// <summary>
+/// Background service that polls RabbitMQ for transaction messages and logs their receipt without altering business data.
+/// This supports the local queue-consumer scenario described in the architecture and testing guidance.
+/// </summary>
 public sealed class RabbitMqNoOpConsumerService : BackgroundService
 {
     private readonly RabbitMqConsumerOptions _options;

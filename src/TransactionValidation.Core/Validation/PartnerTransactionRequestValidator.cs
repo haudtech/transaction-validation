@@ -4,6 +4,10 @@ using TransactionValidation.Core.Models;
 
 namespace TransactionValidation.Core.Validation;
 
+/// <summary>
+/// FluentValidation rules for partner-transaction requests.
+/// These checks enforce the required fields and ISO currency/amount validation described in docs/analysis/solution_analysis.md.
+/// </summary>
 public sealed class PartnerTransactionRequestValidator : AbstractValidator<PartnerTransactionRequest>
 {
     public PartnerTransactionRequestValidator()

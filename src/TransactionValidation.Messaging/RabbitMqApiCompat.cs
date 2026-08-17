@@ -7,6 +7,7 @@ namespace TransactionValidation.Messaging;
 
 /// <summary>
 /// Provides reflection-based compatibility helpers for RabbitMQ client APIs that differ across library versions.
+/// This allows the BFF to work consistently with different RabbitMQ.Client API shapes while preserving the broker-confirm contract.
 /// </summary>
 public static class RabbitMqApiCompat
 {

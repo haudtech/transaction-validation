@@ -1,5 +1,9 @@
 namespace TransactionValidation.Configuration.Options;
 
+/// <summary>
+/// Settings for the upstream partner verification client, including base URL, retries, timeout budget, and circuit-breaker thresholds.
+/// This directly reflects the resilience strategy described in docs/analysis/solution_analysis.md.
+/// </summary>
 public sealed class PartnerVerificationOptions
 {
     public const string SectionName = "PartnerVerification";

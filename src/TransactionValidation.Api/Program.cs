@@ -45,6 +45,11 @@ app.MapGet("/", () => Results.Ok("TransactionValidation API"));
 
 app.Run();
 
+/// <summary>
+/// ASP.NET Core entry point for the TransactionValidation BFF.
+/// The application wires together configuration, middleware, API key enforcement, Swagger, and the API dependency graph described in the architecture and solution analysis docs.
+/// See also: docs/analysis/solution_analysis.md and docs/architecture_design/Architecture_design.md.
+/// </summary>
 public partial class Program
 {
 }

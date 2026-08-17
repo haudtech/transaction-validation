@@ -4,6 +4,10 @@ using DotNetEnv;
 
 namespace TransactionValidation.Configuration.Extensions;
 
+/// <summary>
+/// Loads the application configuration in the precedence order described by the design docs: appsettings, environment-specific appsettings, dot-env files, environment variables, and command-line arguments.
+/// This keeps runtime settings consistent across local development and container-based execution.
+/// </summary>
 public static class ConfigurationBuilderExtensions
 {
     public static IConfigurationBuilder AddTransactionValidationConfiguration(

@@ -4,6 +4,10 @@ using System.Net;
 
 namespace TransactionValidation.Integration;
 
+/// <summary>
+/// Calls the mock partner verification endpoint and translates HTTP outcomes into the BFF's domain exceptions.
+/// It provides the upstream verification step required by the architecture and resilience recommendations.
+/// </summary>
 public sealed class PartnerVerifierClient : IPartnerVerifier
 {
     private readonly HttpClient _httpClient;

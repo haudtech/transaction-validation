@@ -5,6 +5,10 @@ using System.Threading;
 
 namespace TransactionValidation.Api.Idempotency;
 
+/// <summary>
+/// In-memory implementation of the idempotency contract used to prevent duplicate partner submissions within a short TTL.
+/// It aligns with the recommendation in the design docs to replay cached accepted responses for identical requests while rejecting key reuse with different payloads.
+/// </summary>
 public sealed class InMemoryIdempotencyStore : IIdempotencyStore
 {
     private readonly ConcurrentDictionary<string, IdempotencyEntry> _entries = new(StringComparer.Ordinal);

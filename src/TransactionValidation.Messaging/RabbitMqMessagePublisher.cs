@@ -6,7 +6,8 @@ using TransactionValidation.Core.Models;
 namespace TransactionValidation.Messaging;
 
 /// <summary>
-/// Publishes transaction envelopes to RabbitMQ after ensuring queue declaration and broker confirmation.
+/// Serializes and publishes transaction envelopes to RabbitMQ after declaring the queue and waiting for broker confirmation.
+/// This class implements the accepted-message publication step of the API-to-queue workflow in the design docs.
 /// </summary>
 public sealed class RabbitMqMessagePublisher : IMessagePublisher
 {

@@ -13,6 +13,10 @@ namespace TransactionValidation.Api.Controllers;
 
 [ApiController]
 [Route("api/v1/partner/transactions")]
+/// <summary>
+/// Accepts partner transaction submissions, validates them, enforces idempotency, verifies the partner, and publishes an accepted envelope to RabbitMQ.
+/// This controller implements the request flow described in docs/analysis/solution_analysis.md and the system context in docs/architecture_design/Architecture_design.md.
+/// </summary>
 public sealed class PartnerTransactionsController : ControllerBase
 {
     private readonly IValidator<PartnerTransactionRequest> _validator;
