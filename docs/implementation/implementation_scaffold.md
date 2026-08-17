@@ -64,7 +64,7 @@ src/
     Models/PartnerTransactionRequest.cs
     Models/TransactionEnvelope.cs
     Models/ErrorResponse.cs
-    Validation/PartnerTransactionValidator.cs
+    Validation/PartnerTransactionRequestValidator.cs
     Interfaces/IPartnerVerifier.cs
     Interfaces/IMessagePublisher.cs
   TransactionValidation.Integration/

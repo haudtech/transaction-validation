@@ -65,13 +65,12 @@ Implement core models, interfaces, and validation contracts.
 - Create `src/TransactionValidation.Core/Models/ErrorResponse.cs`
 - Create `src/TransactionValidation.Core/Interfaces/IPartnerVerifier.cs`
 - Create `src/TransactionValidation.Core/Interfaces/IMessagePublisher.cs`
-- Create `src/TransactionValidation.Core/Validation/PartnerTransactionValidator.cs`
 - Create `src/TransactionValidation.Core/Validation/PartnerTransactionRequestValidator.cs`
 - Ensure `PartnerTransactionRequestValidator` is compatible with FluentValidation and message validation semantics
 
 ### Deliverables
 - Core domain types for the partner transaction request and queue envelope
-- Validation logic in both manual and FluentValidation form
+- Validation logic implemented via `PartnerTransactionRequestValidator`
 - Interfaces that drive the service abstractions
 
 ---
