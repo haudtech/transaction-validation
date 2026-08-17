@@ -94,34 +94,25 @@ dotnet build
 dotnet test -v normal
 ```
 
-Unit test coverage
-```bash
-dotnet test --nologo -m:1 tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj \
-	--filter "Category!=Integration&Category!=E2E" \
-	--collect "XPlat Code Coverage" \
-	--results-directory TestResults/coverage
-```
+### Main verification tasks
 
-Coverage artifacts are written under `TestResults/coverage/<test-run-guid>/` (for example `coverage.cobertura.xml`).
+The main task entrypoints are:
 
-Coverage report formats (HTML and Markdown)
-```bash
-dotnet tool restore
-dotnet tool run reportgenerator \
-	-reports:"TestResults/coverage/**/coverage.cobertura.xml" \
-	-targetdir:"TestResults/coverage/report" \
-	-reporttypes:"Html;MarkdownSummary;TextSummary"
-```
+- `test:coverage` — collects unit coverage and generates HTML/Markdown/Text reports
+- `test:integration:trx` — runs integration tests and generates the TRX-based summary report
+- `test:e2e` — brings up Docker services, runs the E2E suite, and tears the environment down
 
-Generated report outputs:
-- `TestResults/coverage/report/index.html`
-- `TestResults/coverage/report/Summary.md`
-- `TestResults/coverage/report/Summary.txt`
+These are the primary quality gates exposed in VS Code and can be run from the task runner or via the command palette.
 
-VS Code tasks:
-- `test:coverage:unit` collects coverage XML
-- `test:coverage:report` converts XML to HTML/Markdown/Text
-- `test:coverage` runs both tasks in sequence
+How to run tasks from VS Code:
+
+1. Open the Command Palette with `Ctrl+Shift+P`.
+2. Run `Tasks: Run Task`.
+3. Pick one of the labels from `.vscode/tasks.json`, such as `test:coverage`, `test:integration:trx`, or `test:e2e`.
+4. If a task has `dependsOn`, VS Code runs the dependent tasks in sequence automatically.
+   - Example: `test:coverage` runs `test:coverage:unit` and then `test:coverage:report`.
+   - Example: `test:integration:trx` runs `test:integration:trx:run` and then `test:integration:trx:report`.
+   - Example: `test:e2e` runs `test:e2e:up`, then `test:e2e:run`, then `test:e2e:down`.
 
 Docker compose run
 ```bash
