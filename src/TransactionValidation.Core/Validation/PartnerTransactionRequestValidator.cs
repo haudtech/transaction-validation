@@ -10,6 +10,9 @@ namespace TransactionValidation.Core.Validation;
 /// </summary>
 public sealed class PartnerTransactionRequestValidator : AbstractValidator<PartnerTransactionRequest>
 {
+    /// <summary>
+    /// Initializes the validation rules for partner transaction payloads.
+    /// </summary>
     public PartnerTransactionRequestValidator()
     {
         RuleFor(x => x.PartnerId)
@@ -47,6 +50,11 @@ public sealed class PartnerTransactionRequestValidator : AbstractValidator<Partn
     /// - Codes for representation of currencies and funds:
     ///   https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml
     /// </remarks>
+    /// <summary>
+    /// Checks whether the supplied currency matches a known ISO-4217 code after trimming and uppercasing.
+    /// </summary>
+    /// <param name="currency">The candidate currency code.</param>
+    /// <returns>True when the value is a valid ISO-4217 code; otherwise false.</returns>
     private static bool IsIso4217CurrencyCode(string? currency)
     {
         if (string.IsNullOrWhiteSpace(currency))

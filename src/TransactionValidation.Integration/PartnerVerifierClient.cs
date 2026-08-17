@@ -12,11 +12,22 @@ public sealed class PartnerVerifierClient : IPartnerVerifier
 {
     private readonly HttpClient _httpClient;
 
+    /// <summary>
+    /// Initializes the client with the configured HTTP client for the mocked verification service.
+    /// </summary>
+    /// <param name="httpClient">The outbound HTTP client used to reach the partner verification endpoint.</param>
     public PartnerVerifierClient(HttpClient httpClient)
     {
         _httpClient = httpClient;
     }
 
+    /// <summary>
+    /// Calls the partner verification endpoint and maps HTTP and timeout outcomes to the correct domain exceptions.
+    /// </summary>
+    /// <param name="partnerId">The partner identifier being verified.</param>
+    /// <param name="cancellationToken">Token that can cancel the outbound request.</param>
+    /// <param name="forceTimeout">Optional override used during tests to force the timeout path.</param>
+    /// <returns>True when the partner verification endpoint accepts the request; otherwise throws a domain exception.</returns>
     public async Task<bool> VerifyAsync(string partnerId, CancellationToken cancellationToken = default, bool? forceTimeout = null)
     {
         if (string.IsNullOrWhiteSpace(partnerId))

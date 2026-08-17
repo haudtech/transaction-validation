@@ -19,6 +19,11 @@ public sealed class RabbitMqNoOpConsumerService : BackgroundService
     private readonly RabbitMqConsumerOptions _options;
     private readonly ILogger<RabbitMqNoOpConsumerService> _logger;
 
+    /// <summary>
+    /// Initializes the background consumer with the configured RabbitMQ connection settings and logger.
+    /// </summary>
+    /// <param name="options">Queue consumer configuration values.</param>
+    /// <param name="logger">Logger used for consumption diagnostics.</param>
     public RabbitMqNoOpConsumerService(
         IOptions<RabbitMqConsumerOptions> options,
         ILogger<RabbitMqNoOpConsumerService> logger)
@@ -27,6 +32,10 @@ public sealed class RabbitMqNoOpConsumerService : BackgroundService
         _logger = logger;
     }
 
+    /// <summary>
+    /// Runs the background polling loop and retries on transient failures while the host is alive.
+    /// </summary>
+    /// <param name="stoppingToken">Token used to terminate the consumer during host shutdown.</param>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation(
@@ -53,6 +62,10 @@ public sealed class RabbitMqNoOpConsumerService : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Opens a RabbitMQ connection and repeatedly polls the queue for messages until cancellation is requested.
+    /// </summary>
+    /// <param name="stoppingToken">Token that can interrupt the consume loop.</param>
     private async Task ConsumeLoopAsync(CancellationToken stoppingToken)
     {
         var connection = await RabbitMqApiCompat.CreateConnectionAsync(
@@ -99,6 +112,11 @@ public sealed class RabbitMqNoOpConsumerService : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Declares the configured queue if it is not already present on the broker.
+    /// </summary>
+    /// <param name="channel">Current RabbitMQ channel.</param>
+    /// <param name="cancellationToken">Token used by async broker calls.</param>
     private async Task DeclareQueueIfNeededAsync(object channel, CancellationToken cancellationToken)
     {
         var declared = await RabbitMqApiCompat.TryInvokeAsync(
@@ -145,6 +163,12 @@ public sealed class RabbitMqNoOpConsumerService : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Attempts to fetch a single message from the queue using the most compatible API signature available on the client library.
+    /// </summary>
+    /// <param name="channel">Current RabbitMQ channel.</param>
+    /// <param name="cancellationToken">Token used by async broker calls.</param>
+    /// <returns>The delivery result returned by the broker, if one exists.</returns>
     private async Task<object?> BasicGetAsync(object channel, CancellationToken cancellationToken)
     {
         var asyncResult = await RabbitMqApiCompat.TryInvokeWithResultAsync(channel, "BasicGetAsync", _options.QueueName, _options.AutoAck, cancellationToken);
@@ -168,6 +192,11 @@ public sealed class RabbitMqNoOpConsumerService : BackgroundService
         throw new InvalidOperationException("Unable to read messages using the available RabbitMQ client API.");
     }
 
+    /// <summary>
+    /// Extracts the broker delivery tag from either a BasicGetResult or a reflection-accessible object.
+    /// </summary>
+    /// <param name="delivery">The broker delivery result.</param>
+    /// <returns>The delivery tag when it can be resolved; otherwise null.</returns>
     private static ulong? GetDeliveryTag(object? delivery)
     {
         if (delivery is null)
@@ -196,6 +225,12 @@ public sealed class RabbitMqNoOpConsumerService : BackgroundService
         };
     }
 
+    /// <summary>
+    /// Acknowledges the consumed message after it has been processed by the mock consumer.
+    /// </summary>
+    /// <param name="channel">Current RabbitMQ channel.</param>
+    /// <param name="deliveryTag">Broker-generated delivery tag for the consumed message.</param>
+    /// <param name="cancellationToken">Token used by async broker calls.</param>
     private async Task AckAsync(object channel, ulong deliveryTag, CancellationToken cancellationToken)
     {
         var acked = await RabbitMqApiCompat.TryInvokeAsync(channel, "BasicAckAsync", deliveryTag, false, cancellationToken);

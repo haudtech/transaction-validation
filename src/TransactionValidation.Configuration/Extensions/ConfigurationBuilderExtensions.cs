@@ -10,6 +10,13 @@ namespace TransactionValidation.Configuration.Extensions;
 /// </summary>
 public static class ConfigurationBuilderExtensions
 {
+    /// <summary>
+    /// Configures the application using the standard layered precedence defined by the design docs: local settings, environment-specific settings, dot-env files, environment variables, and command-line arguments.
+    /// </summary>
+    /// <param name="configuration">The configuration builder being initialized.</param>
+    /// <param name="hostEnvironment">The hosting environment used to resolve the active environment name.</param>
+    /// <param name="args">Command-line arguments to append to the configuration pipeline.</param>
+    /// <returns>The same configuration builder instance with the TransactionValidation settings loaded.</returns>
     public static IConfigurationBuilder AddTransactionValidationConfiguration(
         this IConfigurationBuilder configuration,
         IHostEnvironment hostEnvironment,
@@ -28,6 +35,11 @@ public static class ConfigurationBuilderExtensions
         return configuration;
     }
 
+    /// <summary>
+    /// Resolves the active environment from the standard ASP.NET variable or the legacy EVN override.
+    /// </summary>
+    /// <param name="fallbackEnvironmentName">The environment name supplied by the host when no override is set.</param>
+    /// <returns>The effective runtime environment name.</returns>
     private static string ResolveEnvironmentName(string fallbackEnvironmentName)
     {
         var evn = Environment.GetEnvironmentVariable("EVN");
@@ -45,6 +57,12 @@ public static class ConfigurationBuilderExtensions
         return fallbackEnvironmentName;
     }
 
+    /// <summary>
+    /// Loads a local .env file if it exists in the app root or parent directories so local configuration can be injected without committing secrets.
+    /// </summary>
+    /// <param name="configuration">The builder being populated.</param>
+    /// <param name="contentRootPath">Application root used to search for environment files.</param>
+    /// <returns>The same configuration builder instance.</returns>
     private static IConfigurationBuilder AddDotEnvIfExists(this IConfigurationBuilder configuration, string contentRootPath)
     {
         foreach (var envFile in EnumerateDotEnvCandidates(contentRootPath))
@@ -60,6 +78,11 @@ public static class ConfigurationBuilderExtensions
         return configuration;
     }
 
+    /// <summary>
+    /// Enumerates likely .env file locations starting from the application root and walking upward a few directories.
+    /// </summary>
+    /// <param name="contentRootPath">The content root to search from.</param>
+    /// <returns>A list of candidate .env paths ordered from nearest to farthest ancestor.</returns>
     private static IEnumerable<string> EnumerateDotEnvCandidates(string contentRootPath)
     {
         var current = new DirectoryInfo(contentRootPath);

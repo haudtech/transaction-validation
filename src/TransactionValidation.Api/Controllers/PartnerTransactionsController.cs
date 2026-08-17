@@ -11,12 +11,12 @@ using TransactionValidation.Core.Models;
 
 namespace TransactionValidation.Api.Controllers;
 
-[ApiController]
-[Route("api/v1/partner/transactions")]
 /// <summary>
 /// Accepts partner transaction submissions, validates them, enforces idempotency, verifies the partner, and publishes an accepted envelope to RabbitMQ.
 /// This controller implements the request flow described in docs/analysis/solution_analysis.md and the system context in docs/architecture_design/Architecture_design.md.
 /// </summary>
+[ApiController]
+[Route("api/v1/partner/transactions")]
 public sealed class PartnerTransactionsController : ControllerBase
 {
     private readonly IValidator<PartnerTransactionRequest> _validator;
@@ -36,6 +36,12 @@ public sealed class PartnerTransactionsController : ControllerBase
         _idempotencyStore = idempotencyStore;
     }
 
+    /// <summary>
+    /// Validates a partner transaction request, enforces idempotency, verifies the partner, and publishes the accepted envelope to RabbitMQ.
+    /// </summary>
+    /// <param name="request">Inbound partner transaction payload from the client.</param>
+    /// <param name="cancellationToken">Token used to stop processing during shutdown or client cancellation.</param>
+    /// <returns>An accepted response carrying the broker message identifier and correlation identifier.</returns>
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status202Accepted)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -125,6 +131,11 @@ public sealed class PartnerTransactionsController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Builds the idempotency key from the partner identifier and either a caller-supplied idempotency header or the transaction reference.
+    /// </summary>
+    /// <param name="request">The request being evaluated for duplicate suppression.</param>
+    /// <returns>A stable key that identifies the same logical transaction across retries.</returns>
     private string BuildIdempotencyKey(PartnerTransactionRequest request)
     {
         var partnerId = request.PartnerId.Trim();
@@ -138,6 +149,11 @@ public sealed class PartnerTransactionsController : ControllerBase
         return $"{partnerId}|{request.TransactionReference.Trim()}";
     }
 
+    /// <summary>
+    /// Creates a canonical hash of the request body so the same payload can be recognized across retries while different payloads with the same idempotency key are rejected.
+    /// </summary>
+    /// <param name="request">The transaction payload to fingerprint.</param>
+    /// <returns>A stable SHA-256 fingerprint used for duplicate detection.</returns>
     private static string BuildRequestFingerprint(PartnerTransactionRequest request)
     {
         var canonical = string.Join(

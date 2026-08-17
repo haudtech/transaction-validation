@@ -12,6 +12,13 @@ namespace TransactionValidation.Configuration.Middleware;
 /// </summary>
 public sealed class ApiExceptionHandler : IExceptionHandler
 {
+    /// <summary>
+    /// Converts an exception into a structured ProblemDetails response that matches the documented API error semantics.
+    /// </summary>
+    /// <param name="httpContext">The active HTTP request context.</param>
+    /// <param name="exception">The exception raised by the application or upstream dependency.</param>
+    /// <param name="cancellationToken">Token that can cancel the response write.</param>
+    /// <returns>True when the exception was handled and a response was written.</returns>
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
         var problem = exception switch

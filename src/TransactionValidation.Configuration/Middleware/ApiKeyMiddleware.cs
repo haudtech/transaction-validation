@@ -12,11 +12,20 @@ public sealed class ApiKeyMiddleware
 {
     private readonly RequestDelegate _next;
 
+    /// <summary>
+    /// Initializes the middleware with the next delegate in the ASP.NET Core pipeline.
+    /// </summary>
+    /// <param name="next">The next middleware component.</param>
     public ApiKeyMiddleware(RequestDelegate next)
     {
         _next = next;
     }
 
+    /// <summary>
+    /// Validates the configured API-key header before allowing the request to reach the controller pipeline.
+    /// </summary>
+    /// <param name="context">The active HTTP request.</param>
+    /// <param name="options">The configured API key settings.</param>
     public async Task InvokeAsync(HttpContext context, IOptions<ApiKeyOptions> options)
     {
         var apiKeyOptions = options.Value;

@@ -6,6 +6,10 @@ namespace TransactionValidation.Core.Exceptions;
 /// </summary>
 public sealed class UpstreamServiceUnavailableException : Exception
 {
+    /// <summary>
+    /// Creates an upstream dependency failure exception used for 503 responses from the partner verification or queueing layer.
+    /// </summary>
+    /// <param name="message">The upstream-error message to expose to the client.</param>
     public UpstreamServiceUnavailableException(string message) : base(message)
     {
     }

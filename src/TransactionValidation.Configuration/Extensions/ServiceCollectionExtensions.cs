@@ -24,6 +24,12 @@ namespace TransactionValidation.Configuration.Extensions;
 /// </summary>
 public static class ServiceCollectionExtensions
 {
+    /// <summary>
+    /// Registers the shared BFF services required for validation, API security, partner verification, RabbitMQ publishing, and observability.
+    /// </summary>
+    /// <param name="services">The DI container being configured.</param>
+    /// <param name="configuration">The runtime configuration source.</param>
+    /// <returns>The updated service collection.</returns>
     public static IServiceCollection AddTransactionValidationCommonServices(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<ApiKeyOptions>(configuration.GetSection(ApiKeyOptions.SectionName));
@@ -139,6 +145,11 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>
+    /// Adds the common middleware pipeline used across the application, including centralized exception handling and API-key validation.
+    /// </summary>
+    /// <param name="app">The application builder.</param>
+    /// <returns>The same app builder so middleware can be chained fluently.</returns>
     public static IApplicationBuilder UseTransactionValidationCommon(this IApplicationBuilder app)
     {
         app.UseExceptionHandler();
