@@ -146,11 +146,13 @@ Acceptance: `PublishAsync` performs exactly one exchange publish and zero queue 
 
 New file: `src/TransactionValidation.Messaging/RabbitMqTopologyInitializer.cs`
 
-- [ ] Implement an `IHostedService` that calls `DeclareExchangeAsync` once at startup.
-- [ ] Make failure non-fatal but logged as an error, so the API still starts when the broker is briefly unavailable; the first publish will retry declaration.
-- [ ] Register it in [ServiceCollectionExtensions.cs](../../src/TransactionValidation.Configuration/Extensions/ServiceCollectionExtensions.cs).
+- [x] Implement an `IHostedService` that calls `DeclareExchangeAsync` once at startup.
+- [x] Make failure non-fatal but logged as an error, so the API still starts when the broker is briefly unavailable; the first publish will retry declaration.
+- [x] Register it in [ServiceCollectionExtensions.cs](../../src/TransactionValidation.Configuration/Extensions/ServiceCollectionExtensions.cs).
 
 Rationale: exchange declaration is idempotent and belongs at startup, not on the request path.
+
+Acceptance: Messaging builds successfully and the non-Docker unit suite passes (`38` tests); Docker-dependent exchange verification remains pending.
 
 ---
 

@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -96,6 +97,17 @@ public static class ServiceCollectionExtensions
         {
             var options = sp.GetRequiredService<RabbitMqOptions>();
             return new PartnerTransactionRoutingKeyResolver(options.RoutingKeyPrefix);
+        });
+
+        services.AddHostedService(sp =>
+        {
+            var options = sp.GetRequiredService<RabbitMqOptions>();
+            return new RabbitMqTopologyInitializer(
+                options.ExchangeName,
+                options.ExchangeType,
+                options.Durable,
+                sp.GetRequiredService<IRabbitMqClientAdapter>(),
+                sp.GetRequiredService<ILogger<RabbitMqTopologyInitializer>>());
         });
 
         services.AddSingleton<IMessagePublisher>(sp =>
