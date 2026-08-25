@@ -64,26 +64,26 @@ Target files:
 
 ### 2.1 Contract
 
-- [ ] Add `DeclareExchangeAsync(string exchangeName, string exchangeType, bool durable, CancellationToken)`.
-- [ ] Add `PublishPersistentWithConfirmAsync(string exchangeName, string routingKey, string payload, IReadOnlyDictionary<string, object> headers, CancellationToken)`.
-- [ ] Keep `DeclareDurableQueueAsync` — the Mock consumer and tests still need queue declaration.
-- [ ] Remove the old queue-based publish overload only after Phase 4 compiles.
+- [x] Add `DeclareExchangeAsync(string exchangeName, string exchangeType, bool durable, CancellationToken)`.
+- [x] Add `PublishPersistentWithConfirmAsync(string exchangeName, string routingKey, string payload, IReadOnlyDictionary<string, object> headers, CancellationToken)`.
+- [x] Keep `DeclareDurableQueueAsync` — the Mock consumer and tests still need queue declaration.
+- [x] Retain the old queue-based publish overload until the publisher migration is complete in Phase 5.
 
 ### 2.2 Implementation
 
-- [ ] Implement `DeclareExchangeAsync` using the reflection compat layer, mirroring the existing `QueueDeclareAsync` fallback ladder in [RabbitMqApiCompat.cs](../../src/TransactionValidation.Messaging/RabbitMqApiCompat.cs).
-- [ ] Update the publish path to pass `exchangeName` and `routingKey` instead of `string.Empty` and the queue name.
-- [ ] Set `mandatory: true` on publish so unroutable messages are returned rather than dropped.
-- [ ] Apply `headers` to the basic-properties instance before publishing.
-- [ ] Replace the hardcoded `TimeSpan.FromSeconds(5)` confirm timeout with the configured value.
+- [x] Implement `DeclareExchangeAsync` using the reflection compat layer, mirroring the existing `QueueDeclareAsync` fallback ladder in [RabbitMqApiCompat.cs](../../src/TransactionValidation.Messaging/RabbitMqApiCompat.cs).
+- [x] Update the exchange-aware publish path to pass `exchangeName` and `routingKey`.
+- [x] Set `mandatory: true` on publish so unroutable messages are returned rather than dropped.
+- [x] Apply `headers` to the basic-properties instance before publishing.
+- [x] Replace the hardcoded `TimeSpan.FromSeconds(5)` confirm timeout with the configured value.
 
 ### 2.3 Confirm-path correctness
 
 These are existing defects in the confirm logic that this phase must fix, since the same lines are being edited.
 
-- [ ] Check the return value of the `ConfirmSelect` / `ConfirmSelectAsync` invocation. If neither variant resolves, throw instead of continuing — otherwise confirm mode is silently never enabled.
-- [ ] Replace the terminal `return true` with a thrown exception when no `WaitForConfirms` variant is found. Reporting success without a broker ack turns the publish into fire-and-forget on a client-version change.
-- [ ] Replace `as bool? ?? true` with explicit handling: a non-boolean confirm result should fail, not default to confirmed.
+- [x] Check the return value of the `ConfirmSelect` / `ConfirmSelectAsync` invocation. If neither variant resolves, throw instead of continuing — otherwise confirm mode is silently never enabled.
+- [x] Replace the terminal `return true` with a thrown exception when no `WaitForConfirms` variant is found. Reporting success without a broker ack turns the publish into fire-and-forget on a client-version change.
+- [x] Replace `as bool? ?? true` with explicit handling: a non-boolean confirm result should fail, not default to confirmed.
 
 Acceptance: a forced reflection miss produces a hard failure, not a false success.
 

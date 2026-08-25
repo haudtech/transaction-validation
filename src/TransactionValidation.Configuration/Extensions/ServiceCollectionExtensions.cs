@@ -84,7 +84,12 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IRabbitMqClientAdapter>(sp =>
         {
             var options = sp.GetRequiredService<RabbitMqOptions>();
-            return new RabbitMqClientAdapter(options.HostName, options.Port, options.UserName, options.Password);
+            return new RabbitMqClientAdapter(
+                options.HostName,
+                options.Port,
+                options.UserName,
+                options.Password,
+                options.PublishConfirmTimeoutSeconds);
         });
 
         services.AddSingleton<IMessagePublisher>(sp =>
