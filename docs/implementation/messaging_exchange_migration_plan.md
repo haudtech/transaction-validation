@@ -110,13 +110,13 @@ Acceptance: the adapter now reuses one connection/channel for sequential operati
 
 New file: `src/TransactionValidation.Messaging/IMessageRoutingKeyResolver.cs`
 
-- [ ] Define `IMessageRoutingKeyResolver` with `string Resolve(TransactionEnvelope envelope)`.
-- [ ] Implement `PartnerTransactionRoutingKeyResolver` returning `{prefix}.accepted` when `PartnerVerified` is true, otherwise `{prefix}.unverified`.
-- [ ] Register the resolver as a singleton.
+- [x] Define `IMessageRoutingKeyResolver` with `string Resolve(TransactionEnvelope envelope)`.
+- [x] Implement `PartnerTransactionRoutingKeyResolver` returning `{prefix}.accepted` when `PartnerVerified` is true, otherwise `{prefix}.unverified`.
+- [x] Register the resolver as a singleton.
 
 Constraint: the resolver lives in Messaging, not Core and not Api. Controllers must never construct routing keys.
 
-Acceptance: unit tests cover both outcomes and confirm the configured prefix is honored.
+Acceptance: unit tests cover both outcomes and confirm the configured prefix is honored (`38` unit tests passed).
 
 ---
 

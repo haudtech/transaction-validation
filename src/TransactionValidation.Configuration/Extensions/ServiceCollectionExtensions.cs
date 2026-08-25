@@ -92,6 +92,12 @@ public static class ServiceCollectionExtensions
                 options.PublishConfirmTimeoutSeconds);
         });
 
+        services.AddSingleton<IMessageRoutingKeyResolver>(sp =>
+        {
+            var options = sp.GetRequiredService<RabbitMqOptions>();
+            return new PartnerTransactionRoutingKeyResolver(options.RoutingKeyPrefix);
+        });
+
         services.AddSingleton<IMessagePublisher>(sp =>
         {
             var options = sp.GetRequiredService<RabbitMqOptions>();
