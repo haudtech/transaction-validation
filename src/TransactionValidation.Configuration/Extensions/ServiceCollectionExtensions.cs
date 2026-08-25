@@ -102,7 +102,8 @@ public static class ServiceCollectionExtensions
         {
             var options = sp.GetRequiredService<RabbitMqOptions>();
             var rabbitMqClientAdapter = sp.GetRequiredService<IRabbitMqClientAdapter>();
-            return new RabbitMqMessagePublisher(options.QueueName, options.Durable, rabbitMqClientAdapter);
+            var routingKeyResolver = sp.GetRequiredService<IMessageRoutingKeyResolver>();
+            return new RabbitMqMessagePublisher(options.ExchangeName, rabbitMqClientAdapter, routingKeyResolver);
         });
 
         var telemetryOptions = configuration.GetSection(OpenTelemetryOptions.SectionName).Get<OpenTelemetryOptions>() ?? new OpenTelemetryOptions();

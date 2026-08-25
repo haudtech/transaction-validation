@@ -124,10 +124,10 @@ Acceptance: unit tests cover both outcomes and confirm the configured prefix is 
 
 Target file: [../../src/TransactionValidation.Messaging/RabbitMqMessagePublisher.cs](../../src/TransactionValidation.Messaging/RabbitMqMessagePublisher.cs)
 
-- [ ] Replace the `_queueName` field with `_exchangeName` and inject `IMessageRoutingKeyResolver`.
-- [ ] Remove the per-publish `DeclareDurableQueueAsync` call.
-- [ ] Build the header dictionary: `message-type`, `message-version`, `correlation-id`, `message-id`.
-- [ ] Resolve the routing key, publish once, and keep the existing `ConflictException` on an unconfirmed publish.
+- [x] Replace the `_queueName` field with `_exchangeName` and inject `IMessageRoutingKeyResolver`.
+- [x] Remove the per-publish `DeclareDurableQueueAsync` call.
+- [x] Build the header dictionary: `message-type`, `message-version`, `correlation-id`, `message-id`.
+- [x] Resolve the routing key, publish once, and keep the existing `ConflictException` on an unconfirmed publish.
 
 Header values:
 
@@ -138,7 +138,7 @@ Header values:
 | `correlation-id` | `envelope.CorrelationId` |
 | `message-id` | `envelope.MessageId` |
 
-Acceptance: `PublishAsync` performs exactly one broker publish and zero queue declarations.
+Acceptance: `PublishAsync` performs exactly one exchange publish and zero queue declarations; unit and integration suites pass (`38` and `11` tests respectively).
 
 ---
 
