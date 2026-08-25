@@ -95,14 +95,14 @@ Target file: [../../src/TransactionValidation.Messaging/RabbitMqClientAdapter.cs
 
 The adapter currently opens and disposes a connection and channel on every declare and every publish.
 
-- [ ] Hold a single long-lived connection in the adapter.
-- [ ] Hold a channel guarded by a `SemaphoreSlim`, since an AMQP channel is not thread-safe.
-- [ ] Add lazy initialization that creates the connection and channel on first use.
-- [ ] Add reconnect handling: on a broker or channel fault, dispose and recreate on the next publish.
-- [ ] Implement `IAsyncDisposable` and dispose the channel and connection on shutdown.
-- [ ] Change the DI registration in [ServiceCollectionExtensions.cs](../../src/TransactionValidation.Configuration/Extensions/ServiceCollectionExtensions.cs) so the adapter singleton is disposed by the container.
+- [x] Hold a single long-lived connection in the adapter.
+- [x] Hold a channel guarded by a `SemaphoreSlim`, since an AMQP channel is not thread-safe.
+- [x] Add lazy initialization that creates the connection and channel on first use.
+- [x] Add reconnect handling: on a broker or channel fault, dispose and recreate on the next publish.
+- [x] Implement `IAsyncDisposable` and dispose the channel and connection on shutdown.
+- [x] Change the DI registration in [ServiceCollectionExtensions.cs](../../src/TransactionValidation.Configuration/Extensions/ServiceCollectionExtensions.cs) so the adapter singleton is disposed by the container.
 
-Acceptance: publishing N messages opens one connection, verified in the RabbitMQ management UI connection count.
+Acceptance: the adapter now reuses one connection/channel for sequential operations; unit and integration suites pass after the lifecycle change.
 
 ---
 

@@ -10,13 +10,17 @@ namespace TransactionValidation.Messaging;
 /// RabbitMQ client adapter that creates connections, declares durable queues, and publishes messages with compatibility wrappers for different client API versions.
 /// This is the concrete implementation behind the queue publishing flow described in the architecture design.
 /// </summary>
-public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter
+public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter, IAsyncDisposable
 {
     private readonly string _hostName;
     private readonly int _port;
     private readonly string _userName;
     private readonly string _password;
     private readonly TimeSpan _publishConfirmTimeout;
+    private readonly SemaphoreSlim _operationLock = new(1, 1);
+    private object? _connection;
+    private object? _channel;
+    private bool _disposed;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RabbitMqClientAdapter"/> class.
@@ -35,6 +39,63 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter
         _publishConfirmTimeout = TimeSpan.FromSeconds(Math.Max(1, publishConfirmTimeoutSeconds));
     }
 
+    private async Task<object> GetChannelAsync(CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (_connection is null)
+        {
+            _connection = await RabbitMqApiCompat.CreateConnectionAsync(
+                _hostName,
+                _port,
+                _userName,
+                _password,
+                cancellationToken);
+        }
+
+        _channel ??= await RabbitMqApiCompat.CreateChannelAsync(_connection, cancellationToken);
+        return _channel;
+    }
+
+    private async Task ResetResourcesAsync()
+    {
+        var channel = _channel;
+        var connection = _connection;
+        _channel = null;
+        _connection = null;
+
+        await RabbitMqApiCompat.DisposeAsync(channel);
+        await RabbitMqApiCompat.DisposeAsync(connection);
+    }
+
+    /// <summary>
+    /// Releases the shared RabbitMQ channel and connection owned by the adapter.
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        await _operationLock.WaitAsync();
+        try
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            await ResetResourcesAsync();
+        }
+        finally
+        {
+            _operationLock.Release();
+            _operationLock.Dispose();
+        }
+    }
+
     /// <summary>
     /// Declares a queue with durable/non-durable semantics using a compatible API path.
     /// </summary>
@@ -43,12 +104,10 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter
     /// <param name="cancellationToken">Cancellation token used by async API variants when supported.</param>
     public async Task DeclareDurableQueueAsync(string queueName, bool durable, CancellationToken cancellationToken = default)
     {
-        var connection = await RabbitMqApiCompat.CreateConnectionAsync(_hostName, _port, _userName, _password, cancellationToken);
+        await _operationLock.WaitAsync(cancellationToken);
         try
         {
-            var channel = await RabbitMqApiCompat.CreateChannelAsync(connection, cancellationToken);
-            try
-            {
+            var channel = await GetChannelAsync(cancellationToken);
                 var declared = await RabbitMqApiCompat.TryInvokeAsync(
                     channel,
                     "QueueDeclareAsync",
@@ -105,15 +164,15 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter
                 {
                     await RabbitMqApiCompat.InvokeRequiredAsync(channel, "QueueDeclare", queueName, durable, false, false, null);
                 }
-            }
-            finally
-            {
-                await RabbitMqApiCompat.DisposeAsync(channel);
-            }
+        }
+        catch
+        {
+            await ResetResourcesAsync();
+            throw;
         }
         finally
         {
-            await RabbitMqApiCompat.DisposeAsync(connection);
+            _operationLock.Release();
         }
     }
 
@@ -126,12 +185,10 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter
     /// <param name="cancellationToken">Cancellation token used by async broker calls.</param>
     public async Task DeclareExchangeAsync(string exchangeName, string exchangeType, bool durable, CancellationToken cancellationToken = default)
     {
-        var connection = await RabbitMqApiCompat.CreateConnectionAsync(_hostName, _port, _userName, _password, cancellationToken);
+        await _operationLock.WaitAsync(cancellationToken);
         try
         {
-            var channel = await RabbitMqApiCompat.CreateChannelAsync(connection, cancellationToken);
-            try
-            {
+            var channel = await GetChannelAsync(cancellationToken);
                 var declared = await RabbitMqApiCompat.TryInvokeAsync(
                     channel,
                     "ExchangeDeclareAsync",
@@ -169,15 +226,15 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter
                         false,
                         null);
                 }
-            }
-            finally
-            {
-                await RabbitMqApiCompat.DisposeAsync(channel);
-            }
+        }
+        catch
+        {
+            await ResetResourcesAsync();
+            throw;
         }
         finally
         {
-            await RabbitMqApiCompat.DisposeAsync(connection);
+            _operationLock.Release();
         }
     }
 
@@ -214,12 +271,10 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter
         IReadOnlyDictionary<string, object> headers,
         CancellationToken cancellationToken = default)
     {
-        var connection = await RabbitMqApiCompat.CreateConnectionAsync(_hostName, _port, _userName, _password, cancellationToken);
+        await _operationLock.WaitAsync(cancellationToken);
         try
         {
-            var channel = await RabbitMqApiCompat.CreateChannelAsync(connection, cancellationToken);
-            try
-            {
+            var channel = await GetChannelAsync(cancellationToken);
                 var confirmEnabled = await RabbitMqApiCompat.TryInvokeAsync(channel, "ConfirmSelectAsync", cancellationToken)
                     || await RabbitMqApiCompat.TryInvokeAsync(channel, "ConfirmSelect");
                 if (!confirmEnabled)
@@ -306,15 +361,15 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter
                 }
 
                 throw new InvalidOperationException("RabbitMQ publisher confirmation is not available in the current client API.");
-            }
-            finally
-            {
-                await RabbitMqApiCompat.DisposeAsync(channel);
-            }
+        }
+        catch
+        {
+            await ResetResourcesAsync();
+            throw;
         }
         finally
         {
-            await RabbitMqApiCompat.DisposeAsync(connection);
+            _operationLock.Release();
         }
     }
 }
