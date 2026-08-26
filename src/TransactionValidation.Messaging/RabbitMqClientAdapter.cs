@@ -1,23 +1,18 @@
 using System.Text;
-using System.Reflection;
 using RabbitMQ.Client;
 
 namespace TransactionValidation.Messaging;
 
 /// <summary>
-/// RabbitMQ client adapter that creates connections, declares durable queues, and publishes messages with compatibility wrappers for different client API versions.
+/// RabbitMQ.Client 7.0.0 adapter that creates connections, declares durable queues and exchanges, and publishes persistent messages with broker confirmation.
 /// This is the concrete implementation behind the queue publishing flow described in the architecture design.
 /// </summary>
 public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter, IAsyncDisposable
 {
-    private readonly string _hostName;
-    private readonly int _port;
-    private readonly string _userName;
-    private readonly string _password;
-    private readonly TimeSpan _publishConfirmTimeout;
+    private readonly ConnectionFactory _connectionFactory;
     private readonly SemaphoreSlim _operationLock = new(1, 1);
-    private object? _connection;
-    private object? _channel;
+    private IConnection? _connection;
+    private IChannel? _channel;
     private bool _disposed;
 
     /// <summary>
@@ -27,31 +22,30 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter, IAsyncDispos
     /// <param name="port">RabbitMQ broker port.</param>
     /// <param name="userName">RabbitMQ username.</param>
     /// <param name="password">RabbitMQ password.</param>
-    /// <param name="publishConfirmTimeoutSeconds">Maximum wait time for a synchronous broker confirmation.</param>
+    /// <param name="publishConfirmTimeoutSeconds">Retained for configuration compatibility; RabbitMQ.Client 7 awaits confirmation as part of <c>BasicPublishAsync</c>.</param>
     public RabbitMqClientAdapter(string hostName, int port, string userName, string password, int publishConfirmTimeoutSeconds = 5)
     {
-        _hostName = hostName;
-        _port = port;
-        _userName = userName;
-        _password = password;
-        _publishConfirmTimeout = TimeSpan.FromSeconds(Math.Max(1, publishConfirmTimeoutSeconds));
+        _connectionFactory = new ConnectionFactory
+        {
+            HostName = hostName,
+            Port = port,
+            UserName = userName,
+            Password = password
+        };
     }
 
-    private async Task<object> GetChannelAsync(CancellationToken cancellationToken)
+    private async Task<IChannel> GetChannelAsync(CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         if (_connection is null)
         {
-            _connection = await RabbitMqApiCompat.CreateConnectionAsync(
-                _hostName,
-                _port,
-                _userName,
-                _password,
-                cancellationToken);
+            _connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
         }
 
-        _channel ??= await RabbitMqApiCompat.CreateChannelAsync(_connection, cancellationToken);
+        _channel ??= await _connection.CreateChannelAsync(
+            new CreateChannelOptions(true, true, null, null),
+            cancellationToken);
         return _channel;
     }
 
@@ -62,8 +56,15 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter, IAsyncDispos
         _channel = null;
         _connection = null;
 
-        await RabbitMqApiCompat.DisposeAsync(channel);
-        await RabbitMqApiCompat.DisposeAsync(connection);
+        if (channel is not null)
+        {
+            await channel.DisposeAsync();
+        }
+
+        if (connection is not null)
+        {
+            await connection.DisposeAsync();
+        }
     }
 
     /// <summary>
@@ -106,62 +107,15 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter, IAsyncDispos
         try
         {
             var channel = await GetChannelAsync(cancellationToken);
-                var declared = await RabbitMqApiCompat.TryInvokeAsync(
-                    channel,
-                    "QueueDeclareAsync",
-                    queueName,
-                    durable,
-                    false,
-                    false,
-                    null,
-                    false,
-                    false,
-                    cancellationToken);
-
-                if (!declared)
-                {
-                    declared = await RabbitMqApiCompat.TryInvokeAsync(
-                        channel,
-                        "QueueDeclareAsync",
-                        queueName,
-                        durable,
-                        false,
-                        false,
-                        null,
-                        false,
-                    cancellationToken);
-                }
-
-                if (!declared)
-                {
-                    declared = await RabbitMqApiCompat.TryInvokeAsync(
-                        channel,
-                        "QueueDeclareAsync",
-                        queueName,
-                        durable,
-                        false,
-                        false,
-                        null);
-                }
-
-                if (!declared)
-                {
-                    declared = await RabbitMqApiCompat.TryInvokeAsync(
-                        channel,
-                        "QueueDeclareAsync",
-                        queueName,
-                        durable,
-                        false,
-                        false,
-                        null,
-                        false,
-                        cancellationToken);
-                }
-
-                if (!declared)
-                {
-                    await RabbitMqApiCompat.InvokeRequiredAsync(channel, "QueueDeclare", queueName, durable, false, false, null);
-                }
+            await channel.QueueDeclareAsync(
+                queueName,
+                durable,
+                exclusive: false,
+                autoDelete: false,
+                arguments: null,
+                passive: false,
+                noWait: false,
+                cancellationToken);
         }
         catch
         {
@@ -192,44 +146,15 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter, IAsyncDispos
         try
         {
             var channel = await GetChannelAsync(cancellationToken);
-            var brokerArguments = new Dictionary<string, object>(arguments);
-                var declared = await RabbitMqApiCompat.TryInvokeAsync(
-                    channel,
-                    "ExchangeDeclareAsync",
-                    exchangeName,
-                    exchangeType,
-                    durable,
-                    false,
-                    brokerArguments,
-                    false,
-                    false,
-                    cancellationToken);
-
-                if (!declared)
-                {
-                    declared = await RabbitMqApiCompat.TryInvokeAsync(
-                        channel,
-                        "ExchangeDeclareAsync",
-                        exchangeName,
-                        exchangeType,
-                        durable,
-                        false,
-                        brokerArguments,
-                        false,
-                        false);
-                }
-
-                if (!declared)
-                {
-                    await RabbitMqApiCompat.InvokeRequiredAsync(
-                        channel,
-                        "ExchangeDeclare",
-                        exchangeName,
-                        exchangeType,
-                        durable,
-                        false,
-                        brokerArguments);
-                }
+            await channel.ExchangeDeclareAsync(
+                exchangeName,
+                exchangeType,
+                durable,
+                autoDelete: false,
+                arguments: arguments.ToDictionary(entry => entry.Key, entry => (object?)entry.Value),
+                passive: false,
+                noWait: false,
+                cancellationToken);
         }
         catch
         {
@@ -243,7 +168,7 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter, IAsyncDispos
     }
 
     /// <summary>
-    /// Binds a queue to an exchange using the compatible RabbitMQ client API.
+    /// Binds a queue to an exchange using RabbitMQ.Client 7.
     /// </summary>
     /// <param name="queueName">Queue to bind.</param>
     /// <param name="exchangeName">Exchange to bind from.</param>
@@ -255,7 +180,13 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter, IAsyncDispos
         try
         {
             var channel = await GetChannelAsync(cancellationToken);
-            await RabbitMqApiCompat.BindQueueAsync(channel, queueName, exchangeName, routingKey, cancellationToken);
+            await channel.QueueBindAsync(
+                queueName,
+                exchangeName,
+                routingKey,
+                arguments: null,
+                noWait: false,
+                cancellationToken);
         }
         catch
         {
@@ -269,12 +200,12 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter, IAsyncDispos
     }
 
     /// <summary>
-    /// Publishes a UTF-8 payload as a persistent message and waits for broker publish confirmation when available.
+    /// Publishes a UTF-8 payload as a persistent message and waits for RabbitMQ.Client 7 broker confirmation.
     /// </summary>
     /// <param name="queueName">Target queue name.</param>
     /// <param name="payload">Serialized message payload.</param>
     /// <param name="cancellationToken">Cancellation token used by async API variants when supported.</param>
-    /// <returns><see langword="true"/> when publish confirmation succeeds or is not supported; otherwise <see langword="false"/>.</returns>
+    /// <returns><see langword="true"/> when the confirmation-enabled publish completes successfully.</returns>
     public async Task<bool> PublishPersistentWithConfirmAsync(string queueName, string payload, CancellationToken cancellationToken = default)
     {
         return await PublishPersistentWithConfirmAsync(
@@ -286,14 +217,14 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter, IAsyncDispos
     }
 
     /// <summary>
-    /// Publishes a persistent UTF-8 payload to an exchange and waits for broker confirmation.
+    /// Publishes a persistent UTF-8 payload to an exchange and waits for RabbitMQ.Client 7 broker confirmation.
     /// </summary>
     /// <param name="exchangeName">Exchange name, or empty for the legacy default exchange.</param>
     /// <param name="routingKey">Broker routing key.</param>
     /// <param name="payload">Serialized message payload.</param>
     /// <param name="headers">Message headers.</param>
-    /// <param name="cancellationToken">Cancellation token used by async API variants when supported.</param>
-    /// <returns><see langword="true"/> when the broker confirms the publish; otherwise <see langword="false"/>.</returns>
+    /// <param name="cancellationToken">Cancellation token for the RabbitMQ.Client 7 publish operation.</param>
+    /// <returns><see langword="true"/> when the broker confirms the publish.</returns>
     public async Task<bool> PublishPersistentWithConfirmAsync(
         string exchangeName,
         string routingKey,
@@ -305,98 +236,24 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter, IAsyncDispos
         try
         {
             var channel = await GetChannelAsync(cancellationToken);
-                var confirmEnabled = channel is IChannel
-                    || await RabbitMqApiCompat.TryInvokeAsync(channel, "ConfirmSelectAsync", cancellationToken)
-                    || await RabbitMqApiCompat.TryInvokeAsync(channel, "ConfirmSelect");
-                if (!confirmEnabled)
-                {
-                    throw new InvalidOperationException("RabbitMQ publisher confirms are not available in the current client API.");
-                }
+            var properties = new BasicProperties
+            {
+                Persistent = true,
+                Headers = headers.Count > 0
+                    ? headers.ToDictionary(entry => entry.Key, entry => (object?)entry.Value)
+                    : null
+            };
 
-                object? properties = null;
-                var basicPropertiesCreated = await RabbitMqApiCompat.TryInvokeWithResultAsync(channel, "CreateBasicProperties");
-                if (basicPropertiesCreated.found)
-                {
-                    properties = basicPropertiesCreated.result;
-                }
+            var body = Encoding.UTF8.GetBytes(payload);
+            await channel.BasicPublishAsync(
+                exchangeName,
+                routingKey,
+                mandatory: true,
+                properties,
+                body,
+                cancellationToken);
 
-                // RabbitMQ.Client v7 generic BasicPublishAsync<TProperties> requires a non-null TProperties value.
-                // If channel-specific creation API is unavailable, fall back to a concrete basic properties instance.
-                properties ??= new BasicProperties();
-
-                var persistentProperty = properties.GetType().GetProperty("Persistent", BindingFlags.Public | BindingFlags.Instance);
-                if (persistentProperty?.CanWrite == true)
-                {
-                    persistentProperty.SetValue(properties, true);
-                }
-
-                var headersProperty = properties.GetType().GetProperty("Headers", BindingFlags.Public | BindingFlags.Instance);
-                if (headersProperty?.CanWrite == true && headers.Count > 0)
-                {
-                    headersProperty.SetValue(properties, new Dictionary<string, object>(headers));
-                }
-
-                var body = Encoding.UTF8.GetBytes(payload);
-                ReadOnlyMemory<byte> bodyMemory = body;
-
-                var publishedAsync = await RabbitMqApiCompat.TryInvokeAsync(
-                    channel,
-                    "BasicPublishAsync",
-                    exchangeName,
-                    routingKey,
-                    true,
-                    properties,
-                    bodyMemory,
-                    cancellationToken);
-
-                if (!publishedAsync)
-                {
-                    publishedAsync = await RabbitMqApiCompat.TryInvokeAsync(
-                        channel,
-                        "BasicPublishAsync",
-                        exchangeName,
-                        routingKey,
-                        true,
-                        properties,
-                        bodyMemory,
-                        cancellationToken);
-                }
-
-                if (!publishedAsync)
-                {
-                    publishedAsync = await RabbitMqApiCompat.TryInvokeAsync(
-                        channel,
-                        "BasicPublishAsync",
-                        exchangeName,
-                        routingKey,
-                        true,
-                        properties,
-                        bodyMemory);
-                }
-
-                if (!publishedAsync)
-                {
-                    await RabbitMqApiCompat.InvokeRequiredAsync(channel, "BasicPublish", exchangeName, routingKey, properties, body);
-                }
-
-                if (channel is IChannel)
-                {
-                    return true;
-                }
-
-                var confirmAsync = await RabbitMqApiCompat.TryInvokeWithResultAsync(channel, "WaitForConfirmsAsync", cancellationToken);
-                if (confirmAsync.found)
-                {
-                    return confirmAsync.result is bool confirmed && confirmed;
-                }
-
-                var confirmSync = await RabbitMqApiCompat.TryInvokeWithResultAsync(channel, "WaitForConfirms", _publishConfirmTimeout);
-                if (confirmSync.found)
-                {
-                    return confirmSync.result is bool confirmed && confirmed;
-                }
-
-                throw new InvalidOperationException("RabbitMQ publisher confirmation is not available in the current client API.");
+            return true;
         }
         catch
         {

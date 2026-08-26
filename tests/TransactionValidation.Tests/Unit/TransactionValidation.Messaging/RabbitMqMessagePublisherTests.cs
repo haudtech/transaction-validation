@@ -13,19 +13,6 @@ namespace TransactionValidation.Tests.Unit.TransactionValidation.Messaging;
 public sealed class RabbitMqMessagePublisherTests
 {
     [Fact]
-    public async Task TryInvokeWithResultAsync_WhenMethodReturnsValueTask_UsesResultValue()
-    {
-        var target = new ValueTaskResultTarget();
-
-        var result = await RabbitMqApiCompat.TryInvokeWithResultAsync(target, nameof(ValueTaskResultTarget.GetAsync));
-
-        result.found.Should().BeTrue();
-        result.result.Should().NotBeNull();
-        result.result.Should().BeOfType<ValueTaskResult>();
-        ((ValueTaskResult)result.result!).DeliveryTag.Should().Be(42UL);
-    }
-
-    [Fact]
     public async Task PublishAsync_WhenPublisherConfirms_PublishesToExchangeWithRoutingAndHeaders()
     {
         var adapterMock = new Mock<IRabbitMqClientAdapter>();
@@ -102,19 +89,4 @@ public sealed class RabbitMqMessagePublisherTests
         };
     }
 
-    /// <summary>
-    /// Provides a value-task-returning method used to validate compatibility invocation helpers.
-    /// </summary>
-    private sealed class ValueTaskResultTarget
-    {
-        public ValueTask<ValueTaskResult> GetAsync() => new(new ValueTaskResult { DeliveryTag = 42UL });
-    }
-
-    /// <summary>
-    /// Represents a lightweight result payload returned by the compatibility test target.
-    /// </summary>
-    private sealed class ValueTaskResult
-    {
-        public ulong DeliveryTag { get; set; }
-    }
 }

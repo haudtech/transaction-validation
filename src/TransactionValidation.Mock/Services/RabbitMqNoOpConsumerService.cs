@@ -1,4 +1,3 @@
-using System.Reflection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -66,47 +65,37 @@ public sealed class RabbitMqNoOpConsumerService : BackgroundService
     /// <param name="stoppingToken">Token that can interrupt the consume loop.</param>
     private async Task ConsumeLoopAsync(CancellationToken stoppingToken)
     {
-        var connection = await RabbitMqApiCompat.CreateConnectionAsync(
-            _options.HostName,
-            _options.Port,
-            _options.UserName,
-            _options.Password,
+        var factory = new ConnectionFactory
+        {
+            HostName = _options.HostName,
+            Port = _options.Port,
+            UserName = _options.UserName,
+            Password = _options.Password
+        };
+        await using var connection = await factory.CreateConnectionAsync(stoppingToken);
+        await using var channel = await connection.CreateChannelAsync(
+            new CreateChannelOptions(false, false, null, null),
             stoppingToken);
-        try
+        await DeclareQueueIfNeededAsync(channel, stoppingToken);
+
+        while (!stoppingToken.IsCancellationRequested)
         {
-            var channel = await RabbitMqApiCompat.CreateChannelAsync(connection, stoppingToken);
-            try
+            var delivery = await channel.BasicGetAsync(_options.QueueName, _options.AutoAck, stoppingToken);
+
+            if (delivery is null)
             {
-                await DeclareQueueIfNeededAsync(channel, stoppingToken);
-
-                while (!stoppingToken.IsCancellationRequested)
-                {
-                    var delivery = await BasicGetAsync(channel, stoppingToken);
-
-                    if (delivery is null)
-                    {
-                        await Task.Delay(TimeSpan.FromMilliseconds(Math.Max(100, _options.PollIntervalMilliseconds)), stoppingToken);
-                        continue;
-                    }
-
-                    var deliveryTag = GetDeliveryTag(delivery);
-
-                    _logger.LogInformation("Consumed message from queue {QueueName}. DeliveryTag={DeliveryTag}", _options.QueueName, deliveryTag);
-
-                    if (!_options.AutoAck && deliveryTag.HasValue)
-                    {
-                        await AckAsync(channel, deliveryTag.Value, stoppingToken);
-                    }
-                }
+                await Task.Delay(TimeSpan.FromMilliseconds(Math.Max(100, _options.PollIntervalMilliseconds)), stoppingToken);
+                continue;
             }
-            finally
+
+            var deliveryTag = delivery.DeliveryTag;
+
+            _logger.LogInformation("Consumed message from queue {QueueName}. DeliveryTag={DeliveryTag}", _options.QueueName, deliveryTag);
+
+            if (!_options.AutoAck)
             {
-                await RabbitMqApiCompat.DisposeAsync(channel);
+                await channel.BasicAckAsync(deliveryTag, multiple: false, stoppingToken);
             }
-        }
-        finally
-        {
-            await RabbitMqApiCompat.DisposeAsync(connection);
         }
     }
 
@@ -115,270 +104,68 @@ public sealed class RabbitMqNoOpConsumerService : BackgroundService
     /// </summary>
     /// <param name="channel">Current RabbitMQ channel.</param>
     /// <param name="cancellationToken">Token used by async broker calls.</param>
-    private async Task DeclareQueueIfNeededAsync(object channel, CancellationToken cancellationToken)
+    private async Task DeclareQueueIfNeededAsync(IChannel channel, CancellationToken cancellationToken)
     {
-        var exchangeDeclared = await RabbitMqApiCompat.TryInvokeAsync(
-            channel,
-            "ExchangeDeclareAsync",
+        await channel.ExchangeDeclareAsync(
             _options.AlternateExchangeName,
             "fanout",
             _options.Durable,
-            false,
-            new Dictionary<string, object>(),
-            false,
-            false,
+            autoDelete: false,
+            arguments: null,
+            passive: false,
+            noWait: false,
             cancellationToken);
-
-        if (!exchangeDeclared)
-        {
-            exchangeDeclared = await RabbitMqApiCompat.TryInvokeAsync(
-                channel,
-                "ExchangeDeclareAsync",
-                _options.AlternateExchangeName,
-                "fanout",
-                _options.Durable,
-                false,
-                new Dictionary<string, object>(),
-                false,
-                false);
-        }
-
-        if (!exchangeDeclared)
-        {
-            await RabbitMqApiCompat.InvokeRequiredAsync(
-                channel,
-                "ExchangeDeclare",
-                _options.AlternateExchangeName,
-                "fanout",
-                _options.Durable,
-                false,
-                new Dictionary<string, object>());
-        }
 
         // Declare the unrouted queue that receives messages that don't match any binding pattern
-        var unroutedQueueDeclared = await RabbitMqApiCompat.TryInvokeAsync(
-            channel,
-            "QueueDeclareAsync",
+        await channel.QueueDeclareAsync(
             _options.UnroutedQueueName,
             _options.Durable,
-            false,
-            false,
-            null,
-            false,
-            false,
+            exclusive: false,
+            autoDelete: false,
+            arguments: null,
+            passive: false,
+            noWait: false,
             cancellationToken);
 
-        if (!unroutedQueueDeclared)
-        {
-            unroutedQueueDeclared = await RabbitMqApiCompat.TryInvokeAsync(
-                channel,
-                "QueueDeclareAsync",
-                _options.UnroutedQueueName,
-                _options.Durable,
-                false,
-                false,
-                null,
-                false,
-                false);
-        }
-
-        if (!unroutedQueueDeclared)
-        {
-            await RabbitMqApiCompat.InvokeRequiredAsync(
-                channel,
-                "QueueDeclare",
-                _options.UnroutedQueueName,
-                _options.Durable,
-                false,
-                false,
-                null);
-        }
-
         // Bind the unrouted queue to the alternate exchange with empty routing key (fanout receives all messages)
-        await RabbitMqApiCompat.BindQueueAsync(
-            channel,
+        await channel.QueueBindAsync(
             _options.UnroutedQueueName,
             _options.AlternateExchangeName,
             string.Empty,
+            arguments: null,
+            noWait: false,
             cancellationToken);
 
-        exchangeDeclared = await RabbitMqApiCompat.TryInvokeAsync(
-            channel,
-            "ExchangeDeclareAsync",
+        await channel.ExchangeDeclareAsync(
             _options.ExchangeName,
             "topic",
             _options.Durable,
-            false,
-            new Dictionary<string, object?>
+            autoDelete: false,
+            arguments: new Dictionary<string, object?>
             {
                 ["alternate-exchange"] = _options.AlternateExchangeName
             },
-            false,
-            false,
+            passive: false,
+            noWait: false,
             cancellationToken);
 
-        if (!exchangeDeclared)
-        {
-            exchangeDeclared = await RabbitMqApiCompat.TryInvokeAsync(
-                channel,
-                "ExchangeDeclareAsync",
-                _options.ExchangeName,
-                "topic",
-                _options.Durable,
-                false,
-                new Dictionary<string, object?>
-                {
-                    ["alternate-exchange"] = _options.AlternateExchangeName
-                },
-                false,
-                false);
-        }
-
-        if (!exchangeDeclared)
-        {
-            await RabbitMqApiCompat.InvokeRequiredAsync(
-                channel,
-                "ExchangeDeclare",
-                _options.ExchangeName,
-                "topic",
-                _options.Durable,
-                false,
-                new Dictionary<string, object?>
-                {
-                    ["alternate-exchange"] = _options.AlternateExchangeName
-                });
-        }
-
-        var declared = await RabbitMqApiCompat.TryInvokeAsync(
-            channel,
-            "QueueDeclareAsync",
+        await channel.QueueDeclareAsync(
             _options.QueueName,
             _options.Durable,
-            false,
-            false,
-            null,
-            false,
-            false,
+            exclusive: false,
+            autoDelete: false,
+            arguments: null,
+            passive: false,
+            noWait: false,
             cancellationToken);
 
-        if (!declared)
-        {
-            declared = await RabbitMqApiCompat.TryInvokeAsync(
-                channel,
-                "QueueDeclareAsync",
-                _options.QueueName,
-                _options.Durable,
-                false,
-                false,
-                null,
-                false,
-            cancellationToken);
-        }
-
-        if (!declared)
-        {
-            declared = await RabbitMqApiCompat.TryInvokeAsync(
-                channel,
-                "QueueDeclareAsync",
-                _options.QueueName,
-                _options.Durable,
-                false,
-                false,
-                null);
-        }
-
-        if (!declared)
-        {
-            await RabbitMqApiCompat.InvokeRequiredAsync(channel, "QueueDeclare", _options.QueueName, _options.Durable, false, false, null);
-        }
-
-        await RabbitMqApiCompat.BindQueueAsync(
-            channel,
+        await channel.QueueBindAsync(
             _options.QueueName,
             _options.ExchangeName,
             _options.BindingPattern,
+            arguments: null,
+            noWait: false,
             cancellationToken);
     }
 
-    /// <summary>
-    /// Attempts to fetch a single message from the queue using the most compatible API signature available on the client library.
-    /// </summary>
-    /// <param name="channel">Current RabbitMQ channel.</param>
-    /// <param name="cancellationToken">Token used by async broker calls.</param>
-    /// <returns>The delivery result returned by the broker, if one exists.</returns>
-    private async Task<object?> BasicGetAsync(object channel, CancellationToken cancellationToken)
-    {
-        var asyncResult = await RabbitMqApiCompat.TryInvokeWithResultAsync(channel, "BasicGetAsync", _options.QueueName, _options.AutoAck, cancellationToken);
-        if (asyncResult.found)
-        {
-            return asyncResult.result;
-        }
-
-        asyncResult = await RabbitMqApiCompat.TryInvokeWithResultAsync(channel, "BasicGetAsync", _options.QueueName, _options.AutoAck);
-        if (asyncResult.found)
-        {
-            return asyncResult.result;
-        }
-
-        var syncResult = await RabbitMqApiCompat.TryInvokeWithResultAsync(channel, "BasicGet", _options.QueueName, _options.AutoAck);
-        if (syncResult.found)
-        {
-            return syncResult.result;
-        }
-
-        throw new InvalidOperationException("Unable to read messages using the available RabbitMQ client API.");
-    }
-
-    /// <summary>
-    /// Extracts the broker delivery tag from either a BasicGetResult or a reflection-accessible object.
-    /// </summary>
-    /// <param name="delivery">The broker delivery result.</param>
-    /// <returns>The delivery tag when it can be resolved; otherwise null.</returns>
-    private static ulong? GetDeliveryTag(object? delivery)
-    {
-        if (delivery is null)
-        {
-            return null;
-        }
-
-        if (delivery is BasicGetResult result)
-        {
-            return result.DeliveryTag;
-        }
-
-        var property = delivery.GetType().GetProperty("DeliveryTag", BindingFlags.Instance | BindingFlags.Public);
-        if (property is null)
-        {
-            return null;
-        }
-
-        var value = property.GetValue(delivery);
-        return value switch
-        {
-            ulong tag => tag,
-            long longTag => (ulong)longTag,
-            int intTag => (ulong)intTag,
-            _ => null,
-        };
-    }
-
-    /// <summary>
-    /// Acknowledges the consumed message after it has been processed by the mock consumer.
-    /// </summary>
-    /// <param name="channel">Current RabbitMQ channel.</param>
-    /// <param name="deliveryTag">Broker-generated delivery tag for the consumed message.</param>
-    /// <param name="cancellationToken">Token used by async broker calls.</param>
-    private async Task AckAsync(object channel, ulong deliveryTag, CancellationToken cancellationToken)
-    {
-        var acked = await RabbitMqApiCompat.TryInvokeAsync(channel, "BasicAckAsync", deliveryTag, false, cancellationToken);
-        if (!acked)
-        {
-            acked = await RabbitMqApiCompat.TryInvokeAsync(channel, "BasicAckAsync", deliveryTag, false);
-        }
-
-        if (!acked)
-        {
-            await RabbitMqApiCompat.InvokeRequiredAsync(channel, "BasicAck", deliveryTag, false);
-        }
-    }
 }
