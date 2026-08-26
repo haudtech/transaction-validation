@@ -106,6 +106,8 @@ public static class ServiceCollectionExtensions
                 options.ExchangeName,
                 options.ExchangeType,
                 options.Durable,
+                options.AlternateExchangeName,
+                options.UnroutedQueueName,
                 sp.GetRequiredService<IRabbitMqClientAdapter>(),
                 sp.GetRequiredService<ILogger<RabbitMqTopologyInitializer>>());
         });

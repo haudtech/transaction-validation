@@ -1,5 +1,3 @@
-#nullable enable
-
 using TransactionValidation.Core.Models;
 
 namespace TransactionValidation.Tests.Integration.TransactionValidation.Api.Support;

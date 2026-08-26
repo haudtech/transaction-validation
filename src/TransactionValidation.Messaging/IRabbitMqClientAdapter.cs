@@ -8,7 +8,9 @@ public interface IRabbitMqClientAdapter
 {
     Task DeclareDurableQueueAsync(string queueName, bool durable, CancellationToken cancellationToken = default);
 
-    Task DeclareExchangeAsync(string exchangeName, string exchangeType, bool durable, CancellationToken cancellationToken = default);
+    Task DeclareExchangeAsync(string exchangeName, string exchangeType, bool durable, IReadOnlyDictionary<string, object> arguments, CancellationToken cancellationToken = default);
+
+    Task BindQueueAsync(string queueName, string exchangeName, string routingKey, CancellationToken cancellationToken = default);
 
     Task<bool> PublishPersistentWithConfirmAsync(string queueName, string payload, CancellationToken cancellationToken = default);
 

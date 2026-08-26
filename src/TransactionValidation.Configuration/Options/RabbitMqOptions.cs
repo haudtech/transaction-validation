@@ -24,6 +24,10 @@ public sealed class RabbitMqOptions
 
     public string RoutingKeyPrefix { get; init; } = "partner.transaction";
 
+    public string AlternateExchangeName { get; init; } = "partner.transactions.unrouted";
+
+    public string UnroutedQueueName { get; init; } = "partner-transactions.unrouted";
+
     public int PublishConfirmTimeoutSeconds { get; init; } = 5;
 
     public bool Durable { get; init; } = true;

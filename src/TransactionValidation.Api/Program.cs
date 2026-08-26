@@ -8,10 +8,7 @@ using TransactionValidation.Configuration.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Host.ConfigureAppConfiguration((hostingContext, config) =>
-{
-    config.AddTransactionValidationConfiguration(hostingContext.HostingEnvironment, args);
-});
+builder.Configuration.AddTransactionValidationConfiguration(builder.Environment, args);
 
 builder.Host.UseSerilog((context, services, loggerConfiguration) =>
     loggerConfiguration

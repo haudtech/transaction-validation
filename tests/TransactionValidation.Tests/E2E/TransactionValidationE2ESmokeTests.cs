@@ -1,5 +1,3 @@
-#nullable enable
-
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc;
@@ -235,6 +233,7 @@ public sealed class E2ETestFixture : IAsyncLifetime
             Timeout = TimeSpan.FromSeconds(30)
         };
 
+        await WaitForMockReadinessAsync();
         await WaitForApiReadinessAsync();
     }
 
@@ -274,6 +273,34 @@ public sealed class E2ETestFixture : IAsyncLifetime
         throw new Xunit.Sdk.XunitException(
             $"API was not reachable within startup timeout at '{Client.BaseAddress}'. " +
             "Ensure docker compose services are up and E2E_API_HOST/E2E_API_KEY are correct.");
+    }
+
+    private static async Task WaitForMockReadinessAsync()
+    {
+        var mockHost = ResolveSetting("E2E_MOCK_HOST") ?? "http://localhost:5002";
+        using var client = new HttpClient { BaseAddress = new Uri(mockHost, UriKind.Absolute), Timeout = TimeSpan.FromSeconds(5) };
+        var timeoutAt = DateTimeOffset.UtcNow.AddMinutes(2);
+
+        while (DateTimeOffset.UtcNow < timeoutAt)
+        {
+            try
+            {
+                using var response = await client.GetAsync("/");
+                if ((int)response.StatusCode >= 100)
+                {
+                    return;
+                }
+            }
+            catch
+            {
+                // Ignore transient startup failures and continue polling.
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(2));
+        }
+
+        throw new Xunit.Sdk.XunitException(
+            $"Mock verification service was not reachable within startup timeout at '{mockHost}'.");
     }
 
     private static string? ResolveSetting(string key)

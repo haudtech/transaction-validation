@@ -26,7 +26,7 @@
 				"-m:1",
 				"${workspaceFolder}/tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj",
 				"--filter",
-				"Category=Integration"
+				"\"Category=Integration\""
 			],
 			"problemMatcher": [
 				"$msCompile"
@@ -43,7 +43,7 @@
 				"-m:1",
 				"${workspaceFolder}/tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj",
 				"--filter",
-				"Category!=Integration&Category!=E2E"
+			"\"Category!=Integration&Category!=E2E\""
 			],
 			"problemMatcher": [
 				"$msCompile"
@@ -166,6 +166,11 @@
 				"-d",
 				"--build"
 			],
+			"options": {
+				"env": {
+					"API_HOST_PORT": "5001"
+				}
+			},
 			"problemMatcher": [],
 			"group": "test"
 		},
@@ -185,6 +190,11 @@
 				"--logger",
 				"trx\\;LogFileName=e2e-tests.trx"
 			],
+			"options": {
+				"env": {
+					"API_HOST_PORT": "5001"
+				}
+			},
 			"problemMatcher": [
 				"$msCompile"
 			],

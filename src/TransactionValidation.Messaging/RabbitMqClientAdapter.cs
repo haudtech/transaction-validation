@@ -1,5 +1,3 @@
-#nullable enable
-
 using System.Text;
 using System.Reflection;
 using RabbitMQ.Client;
@@ -183,12 +181,18 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter, IAsyncDispos
     /// <param name="exchangeType">Exchange type, such as <c>topic</c>.</param>
     /// <param name="durable">Whether the exchange should survive broker restarts.</param>
     /// <param name="cancellationToken">Cancellation token used by async broker calls.</param>
-    public async Task DeclareExchangeAsync(string exchangeName, string exchangeType, bool durable, CancellationToken cancellationToken = default)
+    public async Task DeclareExchangeAsync(
+        string exchangeName,
+        string exchangeType,
+        bool durable,
+        IReadOnlyDictionary<string, object> arguments,
+        CancellationToken cancellationToken = default)
     {
         await _operationLock.WaitAsync(cancellationToken);
         try
         {
             var channel = await GetChannelAsync(cancellationToken);
+            var brokerArguments = new Dictionary<string, object>(arguments);
                 var declared = await RabbitMqApiCompat.TryInvokeAsync(
                     channel,
                     "ExchangeDeclareAsync",
@@ -196,7 +200,7 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter, IAsyncDispos
                     exchangeType,
                     durable,
                     false,
-                    null,
+                    brokerArguments,
                     false,
                     false,
                     cancellationToken);
@@ -210,7 +214,7 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter, IAsyncDispos
                         exchangeType,
                         durable,
                         false,
-                        null,
+                        brokerArguments,
                         false,
                         false);
                 }
@@ -224,8 +228,34 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter, IAsyncDispos
                         exchangeType,
                         durable,
                         false,
-                        null);
+                        brokerArguments);
                 }
+        }
+        catch
+        {
+            await ResetResourcesAsync();
+            throw;
+        }
+        finally
+        {
+            _operationLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Binds a queue to an exchange using the compatible RabbitMQ client API.
+    /// </summary>
+    /// <param name="queueName">Queue to bind.</param>
+    /// <param name="exchangeName">Exchange to bind from.</param>
+    /// <param name="routingKey">Binding routing key.</param>
+    /// <param name="cancellationToken">Cancellation token used by async broker calls.</param>
+    public async Task BindQueueAsync(string queueName, string exchangeName, string routingKey, CancellationToken cancellationToken = default)
+    {
+        await _operationLock.WaitAsync(cancellationToken);
+        try
+        {
+            var channel = await GetChannelAsync(cancellationToken);
+            await RabbitMqApiCompat.BindQueueAsync(channel, queueName, exchangeName, routingKey, cancellationToken);
         }
         catch
         {
@@ -275,7 +305,8 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter, IAsyncDispos
         try
         {
             var channel = await GetChannelAsync(cancellationToken);
-                var confirmEnabled = await RabbitMqApiCompat.TryInvokeAsync(channel, "ConfirmSelectAsync", cancellationToken)
+                var confirmEnabled = channel is IChannel
+                    || await RabbitMqApiCompat.TryInvokeAsync(channel, "ConfirmSelectAsync", cancellationToken)
                     || await RabbitMqApiCompat.TryInvokeAsync(channel, "ConfirmSelect");
                 if (!confirmEnabled)
                 {
@@ -346,6 +377,11 @@ public sealed class RabbitMqClientAdapter : IRabbitMqClientAdapter, IAsyncDispos
                 if (!publishedAsync)
                 {
                     await RabbitMqApiCompat.InvokeRequiredAsync(channel, "BasicPublish", exchangeName, routingKey, properties, body);
+                }
+
+                if (channel is IChannel)
+                {
+                    return true;
                 }
 
                 var confirmAsync = await RabbitMqApiCompat.TryInvokeWithResultAsync(channel, "WaitForConfirmsAsync", cancellationToken);

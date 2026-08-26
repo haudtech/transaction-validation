@@ -16,11 +16,16 @@ services:
       RABBITMQ__USERNAME: ${RABBITMQ__USERNAME:-guest}
       RABBITMQ__PASSWORD: ${RABBITMQ__PASSWORD:-guest}
       RABBITMQ__QUEUENAME: ${RABBITMQ__QUEUENAME:-partner-transactions}
+      RABBITMQ__EXCHANGENAME: ${RABBITMQ__EXCHANGENAME:-partner.transactions}
+      RABBITMQ__EXCHANGETYPE: ${RABBITMQ__EXCHANGETYPE:-topic}
+      RABBITMQ__ROUTINGKEYPREFIX: ${RABBITMQ__ROUTINGKEYPREFIX:-partner.transaction}
+      RABBITMQ__ALTERNATEEXCHANGENAME: ${RABBITMQ__ALTERNATEEXCHANGENAME:-partner.transactions.unrouted}
+      RABBITMQ__UNROUTEDQUEUENAME: ${RABBITMQ__UNROUTEDQUEUENAME:-partner-transactions.unrouted}
       PARTNERVERIFICATION__BASEURL: ${PARTNERVERIFICATION__BASEURL:-http://mock:8080/}
       APPLICATIONINSIGHTS__CONNECTIONSTRING: ${APPLICATIONINSIGHTS__CONNECTIONSTRING:-}
     depends_on:
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
       mock:
         condition: service_started
 
@@ -39,8 +44,15 @@ services:
       RABBITMQCONSUMER__USERNAME: ${RABBITMQ__USERNAME:-guest}
       RABBITMQCONSUMER__PASSWORD: ${RABBITMQ__PASSWORD:-guest}
       RABBITMQCONSUMER__QUEUENAME: ${RABBITMQ__QUEUENAME:-partner-transactions}
+      RABBITMQCONSUMER__EXCHANGENAME: ${RABBITMQ__EXCHANGENAME:-partner.transactions}
+      RABBITMQCONSUMER__ALTERNATEEXCHANGENAME: ${RABBITMQ__ALTERNATEEXCHANGENAME:-partner.transactions.unrouted}
+      RABBITMQCONSUMER__BINDINGPATTERN: ${RABBITMQCONSUMER__BINDINGPATTERN:-partner.transaction.#}
+      RABBITMQCONSUMER__UNROUTEDQUEUENAME: ${RABBITMQ__UNROUTEDQUEUENAME:-partner-transactions.unrouted}
       RABBITMQCONSUMER__DURABLE: ${RABBITMQCONSUMER__DURABLE:-true}
       RABBITMQCONSUMER__AUTOACK: ${RABBITMQCONSUMER__AUTOACK:-false}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
 
   rabbitmq:
     env_file:
@@ -52,3 +64,9 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ__USERNAME:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ__PASSWORD:-guest}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 5s

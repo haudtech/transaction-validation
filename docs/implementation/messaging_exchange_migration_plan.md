@@ -152,7 +152,7 @@ New file: `src/TransactionValidation.Messaging/RabbitMqTopologyInitializer.cs`
 
 Rationale: exchange declaration is idempotent and belongs at startup, not on the request path.
 
-Acceptance: Messaging builds successfully and the non-Docker unit suite passes (`38` tests); Docker-dependent exchange verification remains pending.
+Acceptance: Messaging builds successfully, the non-Docker unit suite passes (`38` tests), and the Docker E2E suite verifies the startup topology and publish path (`5` tests passed).
 
 ---
 
@@ -162,21 +162,21 @@ The Mock consumer reads from `partner-transactions` and must not break.
 
 Reference: [../../src/TransactionValidation.Mock/Services/RabbitMqNoOpConsumerService.cs](../../src/TransactionValidation.Mock/Services/RabbitMqNoOpConsumerService.cs)
 
-- [ ] Add `ExchangeName` and `BindingPattern` (default `partner.transaction.#`) to [RabbitMqConsumerOptions.cs](../../src/TransactionValidation.Mock/Options/RabbitMqConsumerOptions.cs).
-- [ ] Add a `QueueBindAsync` compat helper in [RabbitMqApiCompat.cs](../../src/TransactionValidation.Messaging/RabbitMqApiCompat.cs).
-- [ ] In `DeclareQueueIfNeededAsync`, bind the queue to the exchange after declaring it.
-- [ ] Update [../../src/TransactionValidation.Mock/appsettings.json](../../src/TransactionValidation.Mock/appsettings.json) and its Development variant.
+- [x] Add `ExchangeName` and `BindingPattern` (default `partner.transaction.#`) to [RabbitMqConsumerOptions.cs](../../src/TransactionValidation.Mock/Options/RabbitMqConsumerOptions.cs).
+- [x] Add a `QueueBindAsync` compat helper in [RabbitMqApiCompat.cs](../../src/TransactionValidation.Messaging/RabbitMqApiCompat.cs).
+- [x] In `DeclareQueueIfNeededAsync`, bind the queue to the exchange after declaring it.
+- [x] Update [../../src/TransactionValidation.Mock/appsettings.json](../../src/TransactionValidation.Mock/appsettings.json) and its Development variant.
 
 Ordering constraint: this phase must be deployed **before** Phase 5 reaches an environment where the Mock consumer runs. If the publisher switches to the exchange first, messages route nowhere until the binding exists.
 
-Acceptance: with both changes applied, the Mock consumer logs consumed messages exactly as before.
+Acceptance: implementation compiles and the non-Docker unit suite passes (`38` tests); broker-level consumer verification remains pending.
 
 ---
 
 ## Phase 8 — Unroutable message safety
 
-- [ ] Declare an alternate exchange `partner.transactions.unrouted` and a bound queue `q.unrouted`.
-- [ ] Set the `alternate-exchange` argument when declaring the main exchange.
+- [x] Declare an alternate exchange `partner.transactions.unrouted` and a bound queue `partner-transactions.unrouted`.
+- [x] Set the `alternate-exchange` argument when declaring the main exchange.
 - [ ] Log a warning when a basic-return is received for a mandatory publish.
 
 Rationale: publisher confirms report broker acceptance, not delivery. A routing key matching no binding is confirmed and discarded. Without this phase, a misconfigured binding is invisible.
@@ -187,10 +187,10 @@ Rationale: publisher confirms report broker acceptance, not delivery. A routing 
 
 ### 9.1 Unit
 
-- [ ] `PartnerTransactionRoutingKeyResolver` — accepted, unverified, custom prefix.
-- [ ] `RabbitMqMessagePublisher` — asserts exchange name, routing key, and headers passed to a mocked adapter.
-- [ ] `RabbitMqMessagePublisher` — unconfirmed publish still throws `ConflictException`.
-- [ ] Publisher no longer calls `DeclareDurableQueueAsync`.
+- [x] `PartnerTransactionRoutingKeyResolver` — accepted, unverified, custom prefix.
+- [x] `RabbitMqMessagePublisher` — asserts exchange name, routing key, and headers passed to a mocked adapter.
+- [x] `RabbitMqMessagePublisher` — unconfirmed publish still throws `ConflictException`.
+- [x] Publisher no longer calls `DeclareDurableQueueAsync`.
 
 Note: these assert on a mocked `IRabbitMqClientAdapter`, which is acceptable because the adapter boundary is the seam under test. Broker behavior itself is covered in 9.2.
 
@@ -205,7 +205,7 @@ Note: these assert on a mocked `IRabbitMqClientAdapter`, which is acceptable bec
 ### 9.3 Regression
 
 - [ ] Existing API host tests still pass unchanged.
-- [ ] E2E smoke path in [../test/e2e_smoke_matrix.md](../test/e2e_smoke_matrix.md) still passes.
+- [x] E2E smoke path in [../test/e2e_smoke_matrix.md](../test/e2e_smoke_matrix.md) still passes (`5` passed, `0` failed).
 
 ---
 
@@ -215,6 +215,77 @@ Note: these assert on a mocked `IRabbitMqClientAdapter`, which is acceptable bec
 - [ ] Update the mermaid diagram in [../../README.md](../../README.md) so the publish step targets an exchange.
 - [ ] Mark the legacy default-exchange section in [../architecture_design/messaging_topology_and_consumer_routing.md](../architecture_design/messaging_topology_and_consumer_routing.md) as retired once Phase 7 completes.
 - [ ] Add a short "adding a new consumer" runbook: declare queue, bind pattern, add DLQ, deduplicate on `message-id`.
+
+---
+
+## Phase 11 — RabbitMQ.Client v7 typed API cleanup
+
+The project explicitly pins RabbitMQ.Client `7.0.0` in [../../Directory.Packages.props](../../Directory.Packages.props). Supporting unspecified client versions is out of scope. The reflection-based compatibility layer and legacy confirmation fallbacks add complexity without providing a supported runtime path.
+
+This phase is the final implementation phase for the messaging adapter. It supersedes the version-compatibility portions of Phase 2 while preserving the adapter interface used by the rest of the application.
+
+### 11.1 Remove version-compatibility indirection
+
+Target files:
+
+- [../../src/TransactionValidation.Messaging/RabbitMqApiCompat.cs](../../src/TransactionValidation.Messaging/RabbitMqApiCompat.cs)
+- [../../src/TransactionValidation.Messaging/RabbitMqClientAdapter.cs](../../src/TransactionValidation.Messaging/RabbitMqClientAdapter.cs)
+- [../../src/TransactionValidation.Messaging/TransactionValidation.Messaging.csproj](../../src/TransactionValidation.Messaging/TransactionValidation.Messaging.csproj)
+
+- [ ] Remove `RabbitMqApiCompat.cs` after all callers have been migrated.
+- [ ] Replace `object` connection and channel fields with `IConnection?` and `IChannel?`.
+- [ ] Use `ConnectionFactory.CreateConnectionAsync(CancellationToken)` directly.
+- [ ] Use `IConnection.CreateChannelAsync(CreateChannelOptions, CancellationToken)` directly.
+- [ ] Create the channel with `PublisherConfirmationsEnabled: true` and `PublisherConfirmationTrackingEnabled: true`.
+- [ ] Replace reflection-based queue, exchange, and binding declarations with the RabbitMQ.Client v7 `IChannel` methods.
+- [ ] Remove `System.Reflection` and any compatibility-only imports that are no longer required.
+- [ ] Update XML comments so they describe RabbitMQ.Client v7 rather than multiple client versions.
+
+### 11.2 Simplify publisher confirmation handling
+
+- [ ] Remove `ConfirmSelectAsync`, `ConfirmSelect`, `WaitForConfirmsAsync`, and `WaitForConfirms` calls.
+- [ ] Keep `BasicPublishAsync` with `mandatory: true`.
+- [ ] Treat successful completion of v7 `BasicPublishAsync` as the broker confirmation.
+- [ ] Allow RabbitMQ publish exceptions and channel/connection exceptions to propagate through the existing error and resilience pipeline.
+- [ ] Preserve the existing `false` result contract only if the direct adapter implementation has a meaningful non-exception failure path; do not convert missing confirmation support into success.
+- [ ] Preserve persistent message properties and the configured headers.
+
+### 11.3 Preserve lifecycle and failure behavior
+
+- [ ] Keep the singleton adapter and shared connection/channel lifecycle from Phase 3.
+- [ ] Keep the operation lock around channel operations.
+- [ ] Reset and recreate resources after a broker or channel failure.
+- [ ] Dispose `IChannel`, `IConnection`, and the operation lock through the existing `IAsyncDisposable` path.
+- [ ] Do not introduce a second adapter implementation or runtime package-version detection.
+
+### 11.4 Tests and validation
+
+- [ ] Update adapter unit tests to exercise the v7 channel creation options and publish path.
+- [ ] Add a regression test proving a successful v7 `BasicPublishAsync` is treated as confirmed.
+- [ ] Add a regression test proving a publish exception is not converted into a successful publish.
+- [ ] Keep publisher tests focused on the `IRabbitMqClientAdapter` contract; no RabbitMQ.Client types should leak into Core or Api.
+- [ ] Run the complete unit and integration suites.
+- [ ] Rebuild the Docker images and run the complete E2E suite.
+- [ ] Confirm the five E2E smoke tests pass, including both accepted transaction tests.
+
+Acceptance:
+
+- The Messaging project compiles directly against RabbitMQ.Client `7.0.0` with no reflection compatibility helper.
+- Publisher confirmations remain enabled and mandatory.
+- The adapter uses typed `IConnection` and `IChannel` APIs.
+- A publish is successful only after v7 `BasicPublishAsync` completes successfully.
+- Unit, integration, and E2E suites are green.
+
+Implementation order:
+
+```text
+1. Migrate connection and channel creation
+2. Migrate queue, exchange, and binding declarations
+3. Migrate publish and confirmation handling
+4. Remove RabbitMqApiCompat.cs and compatibility-only references
+5. Update focused tests
+6. Run unit, integration, and E2E validation
+```
 
 ---
 
@@ -233,6 +304,7 @@ flowchart TD
     P7 --> P8[Phase 8<br/>unroutable safety]
     P8 --> P9[Phase 9<br/>tests]
     P9 --> P10[Phase 10<br/>docs]
+    P10 --> P11[Phase 11<br/>v7 typed API cleanup]
 ```
 
 Phases 3 and 4 are independent and can be done in either order.
@@ -263,6 +335,7 @@ Rollback: revert the publisher to default-exchange publishing. The queue and its
 - [ ] One broker connection is used across many publishes.
 - [ ] A missing confirm still returns a failure to the caller.
 - [ ] A reflection miss on confirm APIs fails loudly instead of silently succeeding.
+- [ ] The adapter uses the pinned RabbitMQ.Client 7.0.0 typed API without reflection compatibility code.
 - [ ] Unroutable messages are captured and logged.
 - [ ] Unit and integration suites are green.
 - [ ] No exchange or routing-key concepts appear in Core or Api.

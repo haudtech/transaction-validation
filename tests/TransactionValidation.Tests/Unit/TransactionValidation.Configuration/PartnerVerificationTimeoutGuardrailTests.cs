@@ -1,5 +1,3 @@
-#nullable enable
-
 using System.Reflection;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;

@@ -1,5 +1,3 @@
-#nullable enable
-
 using System.Reflection;
 using RabbitMQ.Client;
 
@@ -61,6 +59,13 @@ public static class RabbitMqApiCompat
     /// <exception cref="InvalidOperationException">Thrown when no compatible channel/model creation API is available.</exception>
     public static async Task<object> CreateChannelAsync(object connection, CancellationToken cancellationToken)
     {
+        if (connection is IConnection modernConnection)
+        {
+            var options = new CreateChannelOptions(true, true, null, null);
+
+            return await modernConnection.CreateChannelAsync(options, cancellationToken);
+        }
+
         var asyncResult = await TryInvokeWithResultAsync(connection, "CreateChannelAsync", cancellationToken);
         if (asyncResult.found && asyncResult.result is not null)
         {
@@ -202,6 +207,66 @@ public static class RabbitMqApiCompat
         if (!invoked)
         {
             throw new InvalidOperationException($"RabbitMQ method '{methodName}' is not available in the current client API.");
+        }
+    }
+
+    /// <summary>
+    /// Binds a queue to an exchange using the compatible RabbitMQ client API.
+    /// </summary>
+    /// <param name="channel">RabbitMQ channel or model.</param>
+    /// <param name="queueName">Queue to bind.</param>
+    /// <param name="exchangeName">Exchange to bind from.</param>
+    /// <param name="routingKey">Binding routing key.</param>
+    /// <param name="cancellationToken">Cancellation token used by async API variants.</param>
+    public static async Task BindQueueAsync(
+        object channel,
+        string queueName,
+        string exchangeName,
+        string routingKey,
+        CancellationToken cancellationToken = default)
+    {
+        var bound = await TryInvokeAsync(
+            channel,
+            "QueueBindAsync",
+            queueName,
+            exchangeName,
+            routingKey,
+            null,
+            false,
+            cancellationToken);
+
+        if (!bound)
+        {
+            bound = await TryInvokeAsync(
+                channel,
+                "QueueBindAsync",
+                queueName,
+                exchangeName,
+                routingKey,
+                null,
+                false);
+        }
+
+        if (!bound)
+        {
+            bound = await TryInvokeAsync(
+                channel,
+                "QueueBindAsync",
+                queueName,
+                exchangeName,
+                routingKey,
+                null);
+        }
+
+        if (!bound)
+        {
+            await InvokeRequiredAsync(
+                channel,
+                "QueueBind",
+                queueName,
+                exchangeName,
+                routingKey,
+                null);
         }
     }
 

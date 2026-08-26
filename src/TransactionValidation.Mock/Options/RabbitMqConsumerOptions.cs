@@ -17,6 +17,14 @@ public sealed class RabbitMqConsumerOptions
 
     public string QueueName { get; set; } = "partner-transactions";
 
+    public string ExchangeName { get; set; } = "partner.transactions";
+
+    public string AlternateExchangeName { get; set; } = "partner.transactions.unrouted";
+
+    public string UnroutedQueueName { get; set; } = "partner-transactions.unrouted";
+
+    public string BindingPattern { get; set; } = "partner.transaction.#";
+
     public bool Durable { get; set; } = true;
 
     public bool AutoAck { get; set; } = false;

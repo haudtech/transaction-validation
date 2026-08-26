@@ -6,10 +6,7 @@ using TransactionValidation.Mock.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Host.ConfigureAppConfiguration((hostingContext, config) =>
-{
-	config.AddTransactionValidationConfiguration(hostingContext.HostingEnvironment, args);
-});
+builder.Configuration.AddTransactionValidationConfiguration(builder.Environment, args);
 
 builder.Services.AddControllers();
 builder.Services.Configure<RabbitMqConsumerOptions>(

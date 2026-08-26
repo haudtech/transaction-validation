@@ -1,5 +1,3 @@
-#nullable enable
-
 using System.Reflection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -119,6 +117,138 @@ public sealed class RabbitMqNoOpConsumerService : BackgroundService
     /// <param name="cancellationToken">Token used by async broker calls.</param>
     private async Task DeclareQueueIfNeededAsync(object channel, CancellationToken cancellationToken)
     {
+        var exchangeDeclared = await RabbitMqApiCompat.TryInvokeAsync(
+            channel,
+            "ExchangeDeclareAsync",
+            _options.AlternateExchangeName,
+            "fanout",
+            _options.Durable,
+            false,
+            new Dictionary<string, object>(),
+            false,
+            false,
+            cancellationToken);
+
+        if (!exchangeDeclared)
+        {
+            exchangeDeclared = await RabbitMqApiCompat.TryInvokeAsync(
+                channel,
+                "ExchangeDeclareAsync",
+                _options.AlternateExchangeName,
+                "fanout",
+                _options.Durable,
+                false,
+                new Dictionary<string, object>(),
+                false,
+                false);
+        }
+
+        if (!exchangeDeclared)
+        {
+            await RabbitMqApiCompat.InvokeRequiredAsync(
+                channel,
+                "ExchangeDeclare",
+                _options.AlternateExchangeName,
+                "fanout",
+                _options.Durable,
+                false,
+                new Dictionary<string, object>());
+        }
+
+        // Declare the unrouted queue that receives messages that don't match any binding pattern
+        var unroutedQueueDeclared = await RabbitMqApiCompat.TryInvokeAsync(
+            channel,
+            "QueueDeclareAsync",
+            _options.UnroutedQueueName,
+            _options.Durable,
+            false,
+            false,
+            null,
+            false,
+            false,
+            cancellationToken);
+
+        if (!unroutedQueueDeclared)
+        {
+            unroutedQueueDeclared = await RabbitMqApiCompat.TryInvokeAsync(
+                channel,
+                "QueueDeclareAsync",
+                _options.UnroutedQueueName,
+                _options.Durable,
+                false,
+                false,
+                null,
+                false,
+                false);
+        }
+
+        if (!unroutedQueueDeclared)
+        {
+            await RabbitMqApiCompat.InvokeRequiredAsync(
+                channel,
+                "QueueDeclare",
+                _options.UnroutedQueueName,
+                _options.Durable,
+                false,
+                false,
+                null);
+        }
+
+        // Bind the unrouted queue to the alternate exchange with empty routing key (fanout receives all messages)
+        await RabbitMqApiCompat.BindQueueAsync(
+            channel,
+            _options.UnroutedQueueName,
+            _options.AlternateExchangeName,
+            string.Empty,
+            cancellationToken);
+
+        exchangeDeclared = await RabbitMqApiCompat.TryInvokeAsync(
+            channel,
+            "ExchangeDeclareAsync",
+            _options.ExchangeName,
+            "topic",
+            _options.Durable,
+            false,
+            new Dictionary<string, object?>
+            {
+                ["alternate-exchange"] = _options.AlternateExchangeName
+            },
+            false,
+            false,
+            cancellationToken);
+
+        if (!exchangeDeclared)
+        {
+            exchangeDeclared = await RabbitMqApiCompat.TryInvokeAsync(
+                channel,
+                "ExchangeDeclareAsync",
+                _options.ExchangeName,
+                "topic",
+                _options.Durable,
+                false,
+                new Dictionary<string, object?>
+                {
+                    ["alternate-exchange"] = _options.AlternateExchangeName
+                },
+                false,
+                false);
+        }
+
+        if (!exchangeDeclared)
+        {
+            await RabbitMqApiCompat.InvokeRequiredAsync(
+                channel,
+                "ExchangeDeclare",
+                _options.ExchangeName,
+                "topic",
+                _options.Durable,
+                false,
+                new Dictionary<string, object?>
+                {
+                    ["alternate-exchange"] = _options.AlternateExchangeName
+                });
+        }
+
         var declared = await RabbitMqApiCompat.TryInvokeAsync(
             channel,
             "QueueDeclareAsync",
@@ -161,6 +291,13 @@ public sealed class RabbitMqNoOpConsumerService : BackgroundService
         {
             await RabbitMqApiCompat.InvokeRequiredAsync(channel, "QueueDeclare", _options.QueueName, _options.Durable, false, false, null);
         }
+
+        await RabbitMqApiCompat.BindQueueAsync(
+            channel,
+            _options.QueueName,
+            _options.ExchangeName,
+            _options.BindingPattern,
+            cancellationToken);
     }
 
     /// <summary>

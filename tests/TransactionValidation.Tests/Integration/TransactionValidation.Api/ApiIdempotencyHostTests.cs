@@ -1,5 +1,3 @@
-#nullable enable
-
 using System.Net;
 using System.Net.Http.Json;
 using TransactionValidation.Tests.Integration.TransactionValidation.Api.Support;
