@@ -1,4 +1,5 @@
 using System.Text;
+
 using RabbitMQ.Client;
 
 namespace TransactionValidation.Messaging;

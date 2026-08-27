@@ -1,10 +1,14 @@
 using System.Reflection;
+
 using FluentAssertions;
+
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+
 using TransactionValidation.Configuration.Extensions;
 using TransactionValidation.Core.Interfaces;
 using TransactionValidation.Integration;
+
 using Xunit;
 
 namespace TransactionValidation.Tests.Unit.TransactionValidation.Configuration;

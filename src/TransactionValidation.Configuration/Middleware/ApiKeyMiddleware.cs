@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
+
 using TransactionValidation.Configuration.Options;
 
 namespace TransactionValidation.Configuration.Middleware;

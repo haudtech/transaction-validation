@@ -1,11 +1,15 @@
 using System.Net;
 using System.Net.Http;
+
 using FluentAssertions;
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
+
 using TransactionValidation.Core.Exceptions;
 using TransactionValidation.Core.Interfaces;
 using TransactionValidation.Integration;
+
 using Xunit;
 
 namespace TransactionValidation.Tests.Unit.TransactionValidation.Configuration;
