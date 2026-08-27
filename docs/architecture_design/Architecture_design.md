@@ -10,7 +10,7 @@ This design is aligned to:
 
 ## 1. Purpose and Scope
 
-The system accepts partner transaction requests, validates them, applies idempotency checks with cached replay for duplicates, verifies partner identity through an external verification endpoint, and publishes accepted transactions to a queue for downstream processing.
+The system accepts partner transaction requests, validates them, applies idempotency checks with cached replay for duplicates, verifies partner identity through an external verification endpoint, and publishes accepted transactions once to a durable topic exchange for independent downstream consumers.
 
 Core capabilities:
 
@@ -29,7 +29,8 @@ flowchart LR
     Partner[Partner Client] --> API[TransactionValidation.Api]
     API --> Mock[TransactionValidation.Mock]
     API --> MQ[(RabbitMQ)]
-    MQ --> Consumer[Mock Consumer Service]
+    MQ --> Primary[Primary Consumer Queue]
+    MQ --> Audit[Audit Consumer Queue]
     API --> Obs[Telemetry and Logs]
 ```
 
@@ -43,7 +44,8 @@ flowchart TB
         Core[TransactionValidation.Core]
         Intg[TransactionValidation.Integration]
         Msg[TransactionValidation.Messaging]
-        Cons[Mock Consumer Hosted Service]
+        Primary[Primary Consumer Hosted Service]
+        Audit[Audit Consumer Hosted Service]
         Idem[Idempotency Store]
     end
 
@@ -56,7 +58,8 @@ flowchart TB
 
     Intg --> Mock[TransactionValidation.Mock]
     Msg --> MQ[(RabbitMQ)]
-    MQ --> Cons
+    MQ --> Primary
+    MQ --> Audit
 ```
 
 Responsibilities by project:
@@ -65,8 +68,8 @@ Responsibilities by project:
 - TransactionValidation.Configuration: centralized DI, options binding, middleware, exception mapping, telemetry wiring.
 - TransactionValidation.Core: domain models, contracts, validation, exceptions.
 - TransactionValidation.Integration: partner verification client with resilience policies.
-- TransactionValidation.Messaging: queue publishing abstraction and RabbitMQ implementation.
-- TransactionValidation.Mock: local mock provider for partner verification behavior and hosted RabbitMQ consumer service.
+- TransactionValidation.Messaging: exchange publishing abstraction and RabbitMQ implementation.
+- TransactionValidation.Mock: local mock provider for partner verification behavior and two hosted RabbitMQ consumers with independent queues.
 - TransactionValidation.Tests: unit and integration tests.
 
 ## 4. High-Level Runtime Sequence
@@ -80,7 +83,8 @@ sequenceDiagram
     participant Mock as TransactionValidation.Mock
     participant Publish as Message Publisher
     participant MQ as RabbitMQ
-    participant Consumer as Mock Consumer Service
+    participant Primary as Primary Consumer
+    participant Audit as Audit Consumer
 
     Client->>API: Submit transaction request
     API->>API: Authenticate, validate, idempotency check
@@ -97,11 +101,13 @@ sequenceDiagram
 
         alt Verified and accepted
             API->>Publish: Publish envelope
-            Publish->>MQ: Persistent message with confirm
+            Publish->>MQ: Persistent message to partner.transactions with confirm
             MQ-->>Publish: Confirm
             API-->>Client: Accepted
-            MQ->>Consumer: Deliver message
-            Consumer-->>MQ: Ack after consume
+            MQ->>Primary: Deliver copy to partner-transactions
+            Primary-->>MQ: Ack after consume
+            MQ->>Audit: Deliver copy to partner-transactions.audit
+            Audit-->>MQ: Ack after consume
         else Rejected
             API-->>Client: ProblemDetails (404 / 408 / 503)
         end

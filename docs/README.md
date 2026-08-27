@@ -34,6 +34,7 @@ This folder is the central entry point for the project’s technical and enginee
 - Messaging topology and consumer routing: [architecture_design/messaging_topology_and_consumer_routing.md](architecture_design/messaging_topology_and_consumer_routing.md)
 - Use case diagram: [diagram/use_case_diagram.md](diagram/use_case_diagram.md)
 - Sequence diagram: [diagram/sequence_diagram.md](diagram/sequence_diagram.md)
+- Message processing lifecycle sequence: [diagram/message_processing_lifecycle_sequence.md](diagram/message_processing_lifecycle_sequence.md)
 
 ### CI and workflow guidance
 - Workflow docs index: [workflow_actions/github/README.md](workflow_actions/github/README.md)

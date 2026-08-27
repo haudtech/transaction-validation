@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
+using RabbitMQ.Client;
 using TransactionValidation.Core.Models;
 using Xunit;
 
@@ -77,6 +79,80 @@ public sealed class TransactionValidationE2ESmokeTests : IClassFixture<E2ETestFi
         Assert.Equal(firstBody?.MessageId, secondBody?.MessageId);
         Assert.Equal(firstBody?.CorrelationId, secondBody?.CorrelationId);
         Assert.Equal("accepted", secondBody?.Status);
+    }
+
+    [Trait("Category", "E2E")]
+    [Trait("Feature", "MultipleConsumers")]
+    [Fact(DisplayName = "E2E one transaction is delivered to both independent consumer queues")]
+    public async Task CreateTransaction_IsDeliveredToBothIndependentConsumerQueues()
+    {
+        var id = Guid.NewGuid().ToString("N");
+        using var response = await PostAcceptedWithTimeoutRetriesAsync(
+            CreateValidRequest($"e2e-fanout-{id}"),
+            $"e2e-idem-fanout-{id}");
+        var accepted = await response.Content.ReadFromJsonAsync<AcceptedResponseDto>();
+
+        Assert.NotNull(accepted);
+        var primary = await _fixture.WaitForObservationAsync("primary", accepted!.MessageId);
+        var audit = await _fixture.WaitForObservationAsync("audit", accepted.MessageId);
+
+        Assert.Equal(primary.MessageId, audit.MessageId);
+        Assert.Equal(primary.CorrelationId, audit.CorrelationId);
+        Assert.Equal("partner.transaction.accepted", primary.RoutingKey);
+        Assert.Equal("partner.transaction.accepted", audit.RoutingKey);
+        Assert.NotEqual(primary.QueueName, audit.QueueName);
+    }
+
+    [Trait("Category", "E2E")]
+    [Trait("Feature", "MultipleConsumers")]
+    [Fact(DisplayName = "E2E selective binding delivers unverified messages only to the primary queue")]
+    public async Task UnverifiedTransaction_IsDeliveredOnlyToPrimaryConsumerQueue()
+    {
+        var id = Guid.NewGuid().ToString("N");
+        var envelope = new TransactionEnvelope
+        {
+            MessageId = Guid.NewGuid().ToString("N"),
+            CorrelationId = Guid.NewGuid().ToString("N"),
+            ReceivedAt = DateTimeOffset.UtcNow,
+            PartnerVerified = false,
+            Transaction = CreateValidRequest($"e2e-unverified-{id}")
+        };
+
+        await _fixture.PublishEnvelopeAsync(envelope, "partner.transaction.unverified");
+
+        var primary = await _fixture.WaitForObservationAsync("primary", envelope.MessageId);
+        await _fixture.AssertNoObservationAsync("audit", envelope.MessageId);
+
+        Assert.Equal("partner.transaction.unverified", primary.RoutingKey);
+        Assert.Equal("partner-transactions", primary.QueueName);
+    }
+
+    [Trait("Category", "E2E")]
+    [Trait("Feature", "ConsumerFailureIsolation")]
+    [Fact(DisplayName = "E2E audit consumer redelivers a message after failing before acknowledgement")]
+    public async Task AuditConsumer_FailureBeforeAcknowledgement_RedeliversMessage()
+    {
+        var id = Guid.NewGuid().ToString("N");
+        var envelope = new TransactionEnvelope
+        {
+            MessageId = Guid.NewGuid().ToString("N"),
+            CorrelationId = Guid.NewGuid().ToString("N"),
+            ReceivedAt = DateTimeOffset.UtcNow,
+            PartnerVerified = true,
+            Transaction = CreateValidRequest($"e2e-redelivery-{id}")
+        };
+
+        await _fixture.ArmFailureBeforeAcknowledgementAsync("audit", envelope.MessageId);
+        await _fixture.PublishEnvelopeAsync(envelope, "partner.transaction.accepted");
+
+        var primary = await _fixture.WaitForObservationAsync("primary", envelope.MessageId);
+        var auditObservations = await _fixture.WaitForObservationCountAsync("audit", envelope.MessageId, 2);
+
+        Assert.Equal(envelope.MessageId, primary.MessageId);
+        Assert.Contains(auditObservations, observation => observation.Redelivered);
+        Assert.All(auditObservations, observation => Assert.Equal(envelope.CorrelationId, observation.CorrelationId));
+        Assert.Equal("partner-transactions", primary.QueueName);
+        Assert.Equal("partner-transactions.audit", auditObservations[0].QueueName);
     }
 
     [Trait("Category", "E2E")]
@@ -213,6 +289,8 @@ public sealed class E2ETestFixture : IAsyncLifetime
 
     public string ApiKey { get; private set; } = "local-dev-api-key";
 
+    public HttpClient MockClient { get; private set; } = null!;
+
     public async Task InitializeAsync()
     {
         ApiKey = ResolveSetting("E2E_API_KEY")
@@ -233,6 +311,12 @@ public sealed class E2ETestFixture : IAsyncLifetime
             Timeout = TimeSpan.FromSeconds(30)
         };
 
+        var mockHost = ResolveSetting("E2E_MOCK_HOST") ?? "http://localhost:5002";
+        MockClient = new HttpClient
+        {
+            BaseAddress = new Uri(mockHost, UriKind.Absolute),
+            Timeout = TimeSpan.FromSeconds(30)
+        };
         await WaitForMockReadinessAsync();
         await WaitForApiReadinessAsync();
     }
@@ -240,7 +324,109 @@ public sealed class E2ETestFixture : IAsyncLifetime
     public Task DisposeAsync()
     {
         Client.Dispose();
+        MockClient.Dispose();
         return Task.CompletedTask;
+    }
+
+    public async Task<ConsumerObservationDto> WaitForObservationAsync(string consumerName, string messageId)
+    {
+        var timeoutAt = DateTimeOffset.UtcNow.AddSeconds(30);
+        while (DateTimeOffset.UtcNow < timeoutAt)
+        {
+            using var response = await MockClient.GetAsync($"/api/v1/mock/consumer-observations/{consumerName}");
+            response.EnsureSuccessStatusCode();
+            var observations = await response.Content.ReadFromJsonAsync<List<ConsumerObservationDto>>() ?? [];
+            var observation = observations.FirstOrDefault(item => item.MessageId == messageId);
+            if (observation is not null)
+            {
+                return observation;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(250));
+        }
+
+        throw new Xunit.Sdk.XunitException(
+            $"Consumer '{consumerName}' did not observe message '{messageId}' within the timeout.");
+    }
+
+    public async Task<IReadOnlyList<ConsumerObservationDto>> WaitForObservationCountAsync(
+        string consumerName,
+        string messageId,
+        int count)
+    {
+        var timeoutAt = DateTimeOffset.UtcNow.AddSeconds(30);
+        while (DateTimeOffset.UtcNow < timeoutAt)
+        {
+            using var response = await MockClient.GetAsync($"/api/v1/mock/consumer-observations/{consumerName}");
+            response.EnsureSuccessStatusCode();
+            var observations = await response.Content.ReadFromJsonAsync<List<ConsumerObservationDto>>() ?? [];
+            var matches = observations.Where(item => item.MessageId == messageId).ToList();
+            if (matches.Count >= count)
+            {
+                return matches;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(250));
+        }
+
+        throw new Xunit.Sdk.XunitException(
+            $"Consumer '{consumerName}' did not observe message '{messageId}' {count} times within the timeout.");
+    }
+
+    public async Task ArmFailureBeforeAcknowledgementAsync(string consumerName, string messageId)
+    {
+        using var response = await MockClient.PostAsync(
+            $"/api/v1/mock/consumer-observations/{consumerName}/fail-before-ack/{messageId}",
+            content: null);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task PublishEnvelopeAsync(TransactionEnvelope envelope, string routingKey)
+    {
+        var factory = new ConnectionFactory
+        {
+            HostName = Environment.GetEnvironmentVariable("RABBITMQ__HOSTNAME") ?? "localhost",
+            Port = int.TryParse(Environment.GetEnvironmentVariable("RABBITMQ__PORT"), out var port) ? port : 5672,
+            UserName = Environment.GetEnvironmentVariable("RABBITMQ__USERNAME") ?? "guest",
+            Password = Environment.GetEnvironmentVariable("RABBITMQ__PASSWORD") ?? "guest"
+        };
+
+        await using var connection = await factory.CreateConnectionAsync();
+        await using var channel = await connection.CreateChannelAsync(
+            new CreateChannelOptions(true, true, null, null));
+        var properties = new BasicProperties
+        {
+            Persistent = true,
+            MessageId = envelope.MessageId,
+            CorrelationId = envelope.CorrelationId,
+            Headers = new Dictionary<string, object?>
+            {
+                ["message-type"] = "PartnerTransactionAccepted",
+                ["message-version"] = "1",
+                ["correlation-id"] = envelope.CorrelationId,
+                ["message-id"] = envelope.MessageId
+            }
+        };
+
+        await channel.BasicPublishAsync(
+            "partner.transactions",
+            routingKey,
+            mandatory: true,
+            properties,
+            JsonSerializer.SerializeToUtf8Bytes(envelope));
+    }
+
+    public async Task AssertNoObservationAsync(string consumerName, string messageId)
+    {
+        var timeoutAt = DateTimeOffset.UtcNow.AddSeconds(3);
+        while (DateTimeOffset.UtcNow < timeoutAt)
+        {
+            using var response = await MockClient.GetAsync($"/api/v1/mock/consumer-observations/{consumerName}");
+            response.EnsureSuccessStatusCode();
+            var observations = await response.Content.ReadFromJsonAsync<List<ConsumerObservationDto>>() ?? [];
+            Assert.DoesNotContain(observations, item => item.MessageId == messageId);
+            await Task.Delay(TimeSpan.FromMilliseconds(250));
+        }
     }
 
     private async Task WaitForApiReadinessAsync()
@@ -279,6 +465,11 @@ public sealed class E2ETestFixture : IAsyncLifetime
     {
         var mockHost = ResolveSetting("E2E_MOCK_HOST") ?? "http://localhost:5002";
         using var client = new HttpClient { BaseAddress = new Uri(mockHost, UriKind.Absolute), Timeout = TimeSpan.FromSeconds(5) };
+        await WaitForMockReadinessAsync(client, mockHost);
+    }
+
+    private static async Task WaitForMockReadinessAsync(HttpClient client, string mockHost)
+    {
         var timeoutAt = DateTimeOffset.UtcNow.AddMinutes(2);
 
         while (DateTimeOffset.UtcNow < timeoutAt)
@@ -318,6 +509,23 @@ public sealed class E2ETestFixture : IAsyncLifetime
         }
 
         return null;
+    }
+
+    public sealed class ConsumerObservationDto
+    {
+        public string ConsumerName { get; set; } = string.Empty;
+
+        public string QueueName { get; set; } = string.Empty;
+
+        public string MessageId { get; set; } = string.Empty;
+
+        public string CorrelationId { get; set; } = string.Empty;
+
+        public string RoutingKey { get; set; } = string.Empty;
+
+        public bool Redelivered { get; set; }
+
+        public int DeliveryAttempt { get; set; }
     }
 
     private static string? ReadFromDotEnv(string key)

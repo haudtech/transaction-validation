@@ -22,13 +22,14 @@ public static class ConfigurationBuilderExtensions
         IHostEnvironment hostEnvironment,
         string[] args)
     {
+        // Load .env before resolving the environment so it can select the environment-specific JSON file.
+        AddDotEnvIfExists(configuration, hostEnvironment.ContentRootPath);
         var environmentName = ResolveEnvironmentName(hostEnvironment.EnvironmentName);
 
         configuration.Sources.Clear();
         configuration
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
             .AddJsonFile($"appsettings.{environmentName}.json", optional: true, reloadOnChange: true)
-            .AddDotEnvIfExists(hostEnvironment.ContentRootPath)
             .AddEnvironmentVariables()
             .AddCommandLine(args);
 

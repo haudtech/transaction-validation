@@ -9,9 +9,21 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddTransactionValidationConfiguration(builder.Environment, args);
 
 builder.Services.AddControllers();
-builder.Services.Configure<RabbitMqConsumerOptions>(
-	builder.Configuration.GetSection(RabbitMqConsumerOptions.SectionName));
-builder.Services.AddHostedService<RabbitMqNoOpConsumerService>();
+builder.Services.Configure<RabbitMqPrimaryConsumerOptions>(
+	builder.Configuration.GetSection(RabbitMqPrimaryConsumerOptions.SectionName));
+builder.Services.Configure<RabbitMqAuditConsumerOptions>(
+	builder.Configuration.GetSection(RabbitMqAuditConsumerOptions.SectionName));
+builder.Services.AddSingleton<ConsumerObservationStore>();
+builder.Services.AddSingleton<ConsumerFailureControl>();
+if (builder.Configuration.GetValue<bool>($"{RabbitMqPrimaryConsumerOptions.SectionName}:Enabled"))
+{
+	builder.Services.AddHostedService<RabbitMqNoOpConsumerService>();
+}
+
+if (builder.Configuration.GetValue<bool>($"{RabbitMqAuditConsumerOptions.SectionName}:Enabled"))
+{
+	builder.Services.AddHostedService<RabbitMqAuditConsumerService>();
+}
 
 var app = builder.Build();
 app.MapControllers();

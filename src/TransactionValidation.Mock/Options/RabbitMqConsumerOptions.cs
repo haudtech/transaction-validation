@@ -1,33 +1,26 @@
 namespace TransactionValidation.Mock.Options;
 
 /// <summary>
-/// Configuration for the local RabbitMQ consumer used to observe queued transaction envelopes during smoke testing and development.
+/// Common RabbitMQ configuration shared by the Mock project's independent consumers.
 /// </summary>
-public sealed class RabbitMqConsumerOptions
+public abstract class RabbitMqConsumerOptions
 {
-    public const string SectionName = "RabbitMqConsumer";
+    public required bool Enabled { get; set; }
 
-    public string HostName { get; set; } = "localhost";
+    public required string HostName { get; set; }
 
-    public int Port { get; set; } = 5672;
+    public required int Port { get; set; }
 
-    public string UserName { get; set; } = "guest";
+    public required string UserName { get; set; }
 
-    public string Password { get; set; } = "guest";
+    public required string Password { get; set; }
 
-    public string QueueName { get; set; } = "partner-transactions";
+    public required string ExchangeName { get; set; }
 
-    public string ExchangeName { get; set; } = "partner.transactions";
+    public required bool Durable { get; set; }
 
-    public string AlternateExchangeName { get; set; } = "partner.transactions.unrouted";
+    public required bool AutoAck { get; set; }
 
-    public string UnroutedQueueName { get; set; } = "partner-transactions.unrouted";
+    public required int PollIntervalMilliseconds { get; set; }
 
-    public string BindingPattern { get; set; } = "partner.transaction.#";
-
-    public bool Durable { get; set; } = true;
-
-    public bool AutoAck { get; set; } = false;
-
-    public int PollIntervalMilliseconds { get; set; } = 750;
 }

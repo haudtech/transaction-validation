@@ -1,6 +1,6 @@
 # Messaging Topology and Consumer Routing
 
-Scope: how accepted partner transactions are routed from the API to downstream consumers, covering the current default-exchange approach (legacy) and the planned exchange-based approach that supports multiple consumers.
+Scope: how accepted partner transactions are routed from the API to downstream consumers, covering the legacy default-exchange approach and the implemented topic-exchange POC with multiple independent queues.
 
 Related documents:
 
@@ -13,11 +13,11 @@ Related documents:
 
 The current implementation publishes to a single named queue. That works for one consumer, but every additional downstream service would require the API to know about that service and publish to it explicitly.
 
-This document records the current behavior as the legacy baseline and defines the target topology so the transition is intentional rather than incremental.
+This document records the retired default-exchange behavior as a rollback baseline and describes the implemented topic-exchange topology used by the local multiple-consumer POC.
 
 ---
 
-## 2. Current approach (legacy): default exchange, single queue
+## 2. Retired baseline: default exchange, single queue
 
 ### 2.1 Behavior
 
@@ -61,7 +61,7 @@ Limitation 1 and 3 are the architectural blockers. Limitation 4 is a performance
 
 ---
 
-## 3. Target approach: topic exchange with consumer-owned queues
+## 3. Implemented approach: topic exchange with consumer-owned queues
 
 ### 3.1 Principle
 
@@ -72,12 +72,10 @@ The API publishes **one** message to an exchange and does not know who consumes 
 ```mermaid
 flowchart LR
     API[PartnerTransactions API] -->|publish once<br/>partner.transaction.accepted| EX{{topic exchange<br/>partner.transactions}}
-    EX -->|partner.transaction.accepted| Q1[[q.settlement]]
-    EX -->|partner.transaction.accepted| Q2[[q.fraud-screening]]
-    EX -->|partner.transaction.#| Q3[[q.audit-archive]]
-    Q1 --> C1[Settlement service]
-    Q2 --> C2[Fraud service]
-    Q3 --> C3[Audit service]
+    EX -->|partner.transaction.#| Q1[[partner-transactions]]
+    EX -->|partner.transaction.accepted| Q2[[partner-transactions.audit]]
+    Q1 --> C1[RabbitMqNoOpConsumerService]
+    Q2 --> C2[RabbitMqAuditConsumerService]
     EX -.no matching binding.-> AE{{alternate exchange}}
     Q1 -.rejected / expired.-> DLX{{dead-letter exchange}}
 ```
@@ -108,7 +106,7 @@ The routing key is derived inside the Messaging project from the envelope, not s
 | Binding | Each consumer | Interest is declared by the party that has the interest |
 | Dead-letter queue | Each consumer | Failure handling is per-consumer |
 
-This split is what allows a new consumer to be added without changing or redeploying the API.
+This split is what allows a new consumer to be added without changing or redeploying the API. The local POC runs both consumers in one Mock process, but each consumer owns a separate durable queue.
 
 ---
 
@@ -265,4 +263,4 @@ Routing is the broker's responsibility. The API's responsibility ends at publish
 | Failure isolation | Shared | Per-consumer DLQ |
 | Unroutable messages | Silently dropped | Captured via alternate exchange |
 
-The legacy approach is correct for the current single-consumer scope. The exchange-based topology is the required step before a second consumer is introduced.
+The default-exchange approach is retained only as a rollback reference and is retired from the active publish path. The exchange-based topology is implemented and verified with two independent consumer queues.

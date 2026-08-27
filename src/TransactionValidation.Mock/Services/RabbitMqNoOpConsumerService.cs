@@ -2,6 +2,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
+using System.Text.Json;
+using TransactionValidation.Core.Models;
 using TransactionValidation.Messaging;
 using TransactionValidation.Mock.Options;
 
@@ -13,7 +15,8 @@ namespace TransactionValidation.Mock.Services;
 /// </summary>
 public sealed class RabbitMqNoOpConsumerService : BackgroundService
 {
-    private readonly RabbitMqConsumerOptions _options;
+    private readonly RabbitMqPrimaryConsumerOptions _options;
+    private readonly ConsumerObservationStore _observationStore;
     private readonly ILogger<RabbitMqNoOpConsumerService> _logger;
 
     /// <summary>
@@ -22,10 +25,12 @@ public sealed class RabbitMqNoOpConsumerService : BackgroundService
     /// <param name="options">Queue consumer configuration values.</param>
     /// <param name="logger">Logger used for consumption diagnostics.</param>
     public RabbitMqNoOpConsumerService(
-        IOptions<RabbitMqConsumerOptions> options,
+        IOptions<RabbitMqPrimaryConsumerOptions> options,
+        ConsumerObservationStore observationStore,
         ILogger<RabbitMqNoOpConsumerService> logger)
     {
         _options = options.Value;
+        _observationStore = observationStore;
         _logger = logger;
     }
 
@@ -89,6 +94,21 @@ public sealed class RabbitMqNoOpConsumerService : BackgroundService
             }
 
             var deliveryTag = delivery.DeliveryTag;
+            var envelope = JsonSerializer.Deserialize<TransactionEnvelope>(delivery.Body.Span);
+            if (envelope is null)
+            {
+                throw new InvalidOperationException("Unable to deserialize a transaction envelope.");
+            }
+
+            _observationStore.Add(new ConsumerObservation(
+                "primary",
+                _options.QueueName,
+                envelope.MessageId,
+                envelope.CorrelationId,
+                delivery.RoutingKey,
+                delivery.Redelivered,
+                1,
+                DateTimeOffset.UtcNow));
 
             _logger.LogInformation("Consumed message from queue {QueueName}. DeliveryTag={DeliveryTag}", _options.QueueName, deliveryTag);
 

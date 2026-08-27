@@ -279,16 +279,46 @@ Implementation order:
 
 ---
 
-## Phase 11 — Documentation sync
+## Phase 11 — Multiple consumer POC
 
-Run this final phase only after Phase 10 so the architecture, diagrams, and consumer runbook describe the completed RabbitMQ.Client v7 typed implementation.
+This phase validates the primary purpose of the topic exchange: multiple independent consumers receive their own copy of a published message through separate queues. The detailed implementation plan is [multiple_consumer_poc_plan.md](multiple_consumer_poc_plan.md).
 
-- [ ] Update [../architecture_design/Architecture_design.md](../architecture_design/Architecture_design.md) messaging section to reference the exchange topology and typed adapter boundary.
-- [ ] Update the mermaid diagram in [../../README.md](../../README.md) so the publish step targets the topic exchange and the confirmation step reflects RabbitMQ.Client v7.
-- [ ] Mark the legacy default-exchange section in [../architecture_design/messaging_topology_and_consumer_routing.md](../architecture_design/messaging_topology_and_consumer_routing.md) as retired once the v7 adapter cleanup is complete.
-- [ ] Add a short "adding a new consumer" runbook: declare a durable queue, bind a routing pattern, add a DLQ, and deduplicate on `message-id`.
-- [ ] Update messaging documentation to state that RabbitMQ.Client `7.0.0` is the supported client version.
-- [ ] Remove or revise documentation that describes unsupported multi-version reflection fallbacks.
+The POC remains local to the Mock project. It adds a second background consumer with its own queue and binding; it does not implement the future Azure Function.
+
+- [x] Add `RabbitMqAuditConsumerOptions` with queue `partner-transactions.audit` and binding `partner.transaction.#`.
+- [x] Add `RabbitMqAuditConsumerService` as a second hosted consumer using RabbitMQ.Client `7.0.0` typed APIs.
+- [x] Register the second consumer independently from `RabbitMqNoOpConsumerService`.
+- [x] Configure the second consumer in Mock appsettings and Docker Compose.
+- [x] Ensure both consumers use the shared `partner.transactions` topic exchange but different durable queues.
+- [x] Keep one independent durable queue per consumer; do not share a queue between consumers.
+- [x] Add deterministic test observation for `message-id`, `correlation-id`, routing key, and queue name.
+- [x] Add an E2E fan-out test proving one publication is observed by both queues.
+- [x] Add a selective-routing test proving different binding patterns can target different consumers.
+- [ ] Verify that a shared queue is treated as competing-consumer behavior, not fan-out; shared queues remain outside the approved design.
+- [x] Verify consumer-level failure isolation and audit redelivery in the one-Mock-service POC (`8` E2E tests passed).
+- [x] Keep Azure Function hosting and deployment out of this local POC.
+
+Acceptance:
+
+- One accepted transaction is published once to `partner.transactions`.
+- Both independent queues receive the same `message-id` and `correlation-id`.
+- The existing five E2E smoke tests, fan-out test, selective-routing test, and audit redelivery test pass (`8` E2E tests passed).
+- The second consumer can be stopped without preventing the first consumer from receiving its queue copy.
+
+---
+
+## Phase 12 — Documentation sync
+
+Run this final phase only after Phase 11 so the architecture, diagrams, and consumer runbook describe the completed RabbitMQ.Client v7 implementation and the multiple-consumer POC.
+
+- [x] Update the architecture topology document with the implemented two-queue POC.
+- [x] Update [../architecture_design/Architecture_design.md](../architecture_design/Architecture_design.md) messaging section to reference the exchange topology and typed adapter boundary.
+- [x] Update the mermaid diagram in [../../README.md](../../README.md) so the publish step targets the topic exchange and the confirmation step reflects RabbitMQ.Client v7.
+- [x] Mark the legacy default-exchange section in [../architecture_design/messaging_topology_and_consumer_routing.md](../architecture_design/messaging_topology_and_consumer_routing.md) as retired once the v7 adapter cleanup is complete.
+- [x] Add [multiple_consumer_runbook.md](multiple_consumer_runbook.md) covering durable queues, bindings, acknowledgement, DLQ strategy, and `message-id` deduplication.
+- [x] Update messaging documentation to state that RabbitMQ.Client `7.0.0` is the supported client version.
+- [x] Remove or revise active documentation that describes unsupported multi-version reflection fallbacks; historical commit templates remain archival records.
+- [x] Document the multiple-consumer POC queue and binding configuration.
 
 ---
 
@@ -307,7 +337,8 @@ flowchart TD
     P7 --> P8[Phase 8<br/>unroutable safety]
     P8 --> P9[Phase 9<br/>tests]
     P9 --> P10[Phase 10<br/>v7 typed API cleanup]
-    P10 --> P11[Phase 11<br/>docs]
+    P10 --> P11[Phase 11<br/>multiple consumer POC]
+    P11 --> P12[Phase 12<br/>docs]
 ```
 
 Phases 3 and 4 are independent and can be done in either order.
@@ -332,15 +363,17 @@ Rollback: revert the publisher to default-exchange publishing. The queue and its
 
 ## Definition of done
 
-- [ ] The API publishes one message to `partner.transactions` per accepted transaction.
-- [ ] Two queues bound to the same routing key both receive it.
-- [ ] The Mock consumer works without code changes beyond the binding.
-- [ ] One broker connection is used across many publishes.
-- [ ] A missing confirm still returns a failure to the caller.
+- [x] The API publishes one message to `partner.transactions` per accepted transaction.
+- [x] Two independent queues receive the same accepted message when their bindings match the routing key.
+- [x] The Mock consumers work with independent queue and binding configuration.
+- [x] One broker connection and channel are reused across many publishes.
+- [x] A failed or unconfirmed publish does not return success to the caller.
 - [x] The adapter uses the pinned RabbitMQ.Client 7.0.0 typed API without reflection compatibility code.
-- [ ] Unroutable messages are captured and logged.
-- [ ] Unit and integration suites are green.
-- [ ] No exchange or routing-key concepts appear in Core or Api.
+- [x] Unroutable messages are captured by the configured alternate exchange and unrouted queue.
+- [x] Unit and integration suites are green (`37` unit tests and `11` integration tests passed).
+- [x] No exchange or routing-key concepts appear in Core or Api.
+
+The remaining optional coverage is explicit broker-level warning/return handling and a competing-consumer contrast test for a deliberately shared queue. Shared queues are not part of the approved multiple-consumer design.
 
 ---
 
