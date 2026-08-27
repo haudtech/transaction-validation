@@ -13,43 +13,57 @@ namespace TransactionValidation.Tests.Unit.TransactionValidation.Messaging;
 public sealed class RabbitMqMessagePublisherTests
 {
     [Fact]
-    public async Task TryInvokeWithResultAsync_WhenMethodReturnsValueTask_UsesResultValue()
-    {
-        var target = new ValueTaskResultTarget();
-
-        var result = await RabbitMqApiCompat.TryInvokeWithResultAsync(target, nameof(ValueTaskResultTarget.GetAsync));
-
-        result.found.Should().BeTrue();
-        result.result.Should().NotBeNull();
-        result.result.Should().BeOfType<ValueTaskResult>();
-        ((ValueTaskResult)result.result!).DeliveryTag.Should().Be(42UL);
-    }
-
-    [Fact]
-    public async Task PublishAsync_WhenPublisherConfirms_DeclaresQueueAndPublishes()
+    public async Task PublishAsync_WhenPublisherConfirms_PublishesToExchangeWithRoutingAndHeaders()
     {
         var adapterMock = new Mock<IRabbitMqClientAdapter>();
+        var resolverMock = new Mock<IMessageRoutingKeyResolver>();
+        resolverMock
+            .Setup(x => x.Resolve(It.IsAny<TransactionEnvelope>()))
+            .Returns("partner.transaction.accepted");
         adapterMock
-            .Setup(x => x.PublishPersistentWithConfirmAsync("partner-transactions", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.PublishPersistentWithConfirmAsync(
+                "partner.transactions",
+                "partner.transaction.accepted",
+                It.IsAny<string>(),
+                It.Is<IReadOnlyDictionary<string, object>>(headers =>
+                    (string)headers["message-type"] == "PartnerTransactionAccepted"
+                    && (string)headers["message-version"] == "1"
+                    && headers.ContainsKey("correlation-id")
+                    && headers.ContainsKey("message-id")),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        var sut = new RabbitMqMessagePublisher("partner-transactions", true, adapterMock.Object);
+        var sut = new RabbitMqMessagePublisher("partner.transactions", adapterMock.Object, resolverMock.Object);
 
         await sut.PublishAsync(CreateEnvelope(), CancellationToken.None);
 
-        adapterMock.Verify(x => x.DeclareDurableQueueAsync("partner-transactions", true, It.IsAny<CancellationToken>()), Times.Once);
-        adapterMock.Verify(x => x.PublishPersistentWithConfirmAsync("partner-transactions", It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        adapterMock.Verify(x => x.DeclareDurableQueueAsync(It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
+        adapterMock.Verify(x => x.PublishPersistentWithConfirmAsync(
+            "partner.transactions",
+            "partner.transaction.accepted",
+            It.IsAny<string>(),
+            It.IsAny<IReadOnlyDictionary<string, object>>(),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task PublishAsync_WhenPublisherConfirmFails_ThrowsConflictException()
     {
         var adapterMock = new Mock<IRabbitMqClientAdapter>();
+        var resolverMock = new Mock<IMessageRoutingKeyResolver>();
+        resolverMock
+            .Setup(x => x.Resolve(It.IsAny<TransactionEnvelope>()))
+            .Returns("partner.transaction.accepted");
         adapterMock
-            .Setup(x => x.PublishPersistentWithConfirmAsync("partner-transactions", It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.PublishPersistentWithConfirmAsync(
+                "partner.transactions",
+                "partner.transaction.accepted",
+                It.IsAny<string>(),
+                It.IsAny<IReadOnlyDictionary<string, object>>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
-        var sut = new RabbitMqMessagePublisher("partner-transactions", true, adapterMock.Object);
+        var sut = new RabbitMqMessagePublisher("partner.transactions", adapterMock.Object, resolverMock.Object);
 
         var action = async () => await sut.PublishAsync(CreateEnvelope(), CancellationToken.None);
 
@@ -75,19 +89,4 @@ public sealed class RabbitMqMessagePublisherTests
         };
     }
 
-    /// <summary>
-    /// Provides a value-task-returning method used to validate compatibility invocation helpers.
-    /// </summary>
-    private sealed class ValueTaskResultTarget
-    {
-        public ValueTask<ValueTaskResult> GetAsync() => new(new ValueTaskResult { DeliveryTag = 42UL });
-    }
-
-    /// <summary>
-    /// Represents a lightweight result payload returned by the compatibility test target.
-    /// </summary>
-    private sealed class ValueTaskResult
-    {
-        public ulong DeliveryTag { get; set; }
-    }
 }

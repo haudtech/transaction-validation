@@ -4,7 +4,7 @@
 
 Define a minimal automated E2E layer that complements existing integration-host tests without duplicating broad scenario coverage.
 
-The integration-host suite already validates most behavior semantics in-memory. This E2E smoke layer focuses only on runtime risks:
+The integration-host suite already validates most behavior semantics in-memory. This E2E layer focuses on runtime risks and the local multiple-consumer POC:
 
 - container startup and readiness
 - real HTTP/network path
@@ -14,15 +14,16 @@ The integration-host suite already validates most behavior semantics in-memory. 
 
 ## Scope Policy
 
-Keep E2E deliberately small:
+Keep the original runtime smoke set small; the local POC adds focused broker cases:
 
-- 3 to 5 critical-path cases
+- 5 critical-path smoke cases
+- 3 focused multiple-consumer cases
 - no broad duplication of all integration-host scenarios
 - assertion depth is contract-level (status, content type, key payload fields)
 
 Primary behavior depth remains in integration-host tests.
 
-## 5-Case E2E Smoke Matrix
+## E2E Smoke Matrix
 
 | E2E Case | Runtime Risk Covered | Manual HTTP Mapping | Expected Result | Keep In Integration-Host Too? |
 |---|---|---|---|---|
@@ -31,6 +32,9 @@ Primary behavior depth remains in integration-host tests.
 | E2E-03: Duplicate idempotency via header | idempotency replay behavior under real network/runtime | duplicateByHeaderSamePayload | 202 Accepted (cached replay) | Yes |
 | E2E-04: Missing API key | auth enforcement in deployed boundary path | missingApiKey | 401 Unauthorized | Yes |
 | E2E-05: Validation failure | model validation and error contract in deployed runtime | invalidPayload | 400 ProblemDetails | Yes |
+| E2E-06: Independent queue fan-out | one publication reaches both consumer queues | multiple consumer fan-out | same message and correlation IDs in both queues | No |
+| E2E-07: Selective routing | accepted-only audit binding excludes unverified messages | selective routing | primary queue only for unverified message | No |
+| E2E-08: Consumer redelivery | failure before acknowledgement preserves delivery | audit redelivery | audit observes a redelivered message | No |
 
 Notes:
 
@@ -99,8 +103,10 @@ Do not merge these categories into a single summary file.
 
 ## Definition of Done for E2E Introduction
 
-- 5 smoke cases implemented and tagged Category=E2E
+- 8 smoke cases implemented and tagged Category=E2E
 - tasks added for up/run/down/sequence
 - CI job added for merge or nightly E2E run
 - TRX and markdown summary artifacts published
 - integration-host suite remains the primary PR gate
+
+The multiple-consumer cases are local POC coverage. They use separate durable queues and do not represent Azure Function deployment.

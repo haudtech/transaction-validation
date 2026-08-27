@@ -1,5 +1,3 @@
-#nullable enable
-
 using TransactionValidation.Core.Interfaces;
 using TransactionValidation.Core.Models;
 

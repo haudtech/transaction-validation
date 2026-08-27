@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -84,14 +85,39 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IRabbitMqClientAdapter>(sp =>
         {
             var options = sp.GetRequiredService<RabbitMqOptions>();
-            return new RabbitMqClientAdapter(options.HostName, options.Port, options.UserName, options.Password);
+            return new RabbitMqClientAdapter(
+                options.HostName,
+                options.Port,
+                options.UserName,
+                options.Password,
+                options.PublishConfirmTimeoutSeconds);
+        });
+
+        services.AddSingleton<IMessageRoutingKeyResolver>(sp =>
+        {
+            var options = sp.GetRequiredService<RabbitMqOptions>();
+            return new PartnerTransactionRoutingKeyResolver(options.RoutingKeyPrefix);
+        });
+
+        services.AddHostedService(sp =>
+        {
+            var options = sp.GetRequiredService<RabbitMqOptions>();
+            return new RabbitMqTopologyInitializer(
+                options.ExchangeName,
+                options.ExchangeType,
+                options.Durable,
+                options.AlternateExchangeName,
+                options.UnroutedQueueName,
+                sp.GetRequiredService<IRabbitMqClientAdapter>(),
+                sp.GetRequiredService<ILogger<RabbitMqTopologyInitializer>>());
         });
 
         services.AddSingleton<IMessagePublisher>(sp =>
         {
             var options = sp.GetRequiredService<RabbitMqOptions>();
             var rabbitMqClientAdapter = sp.GetRequiredService<IRabbitMqClientAdapter>();
-            return new RabbitMqMessagePublisher(options.QueueName, options.Durable, rabbitMqClientAdapter);
+            var routingKeyResolver = sp.GetRequiredService<IMessageRoutingKeyResolver>();
+            return new RabbitMqMessagePublisher(options.ExchangeName, rabbitMqClientAdapter, routingKeyResolver);
         });
 
         var telemetryOptions = configuration.GetSection(OpenTelemetryOptions.SectionName).Get<OpenTelemetryOptions>() ?? new OpenTelemetryOptions();

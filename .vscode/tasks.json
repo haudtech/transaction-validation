@@ -2,6 +2,22 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
+			"label": "format:verify",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"format",
+				"--verify-no-changes",
+				"--verbosity",
+				"diagnostic",
+				"${workspaceFolder}/TransactionValidation.sln"
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "build"
+		},
+		{
 			"label": "build",
 			"type": "shell",
 			"command": "dotnet",
@@ -17,6 +33,24 @@
 			"group": "build"
 		},
 		{
+			"label": "check",
+			"type": "shell",
+			"command": "echo",
+			"args": [
+				"Running format verification, build, and unit tests"
+			],
+			"dependsOn": [
+				"format:verify",
+				"build",
+				"test:unit"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "build"
+		},
+		{
 			"label": "test:integration",
 			"type": "shell",
 			"command": "dotnet",
@@ -26,7 +60,7 @@
 				"-m:1",
 				"${workspaceFolder}/tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj",
 				"--filter",
-				"Category=Integration"
+				"\"Category=Integration\""
 			],
 			"problemMatcher": [
 				"$msCompile"
@@ -43,7 +77,7 @@
 				"-m:1",
 				"${workspaceFolder}/tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj",
 				"--filter",
-				"Category!=Integration&Category!=E2E"
+			"\"Category!=Integration&Category!=E2E\""
 			],
 			"problemMatcher": [
 				"$msCompile"
@@ -166,6 +200,11 @@
 				"-d",
 				"--build"
 			],
+			"options": {
+				"env": {
+					"API_HOST_PORT": "5001"
+				}
+			},
 			"problemMatcher": [],
 			"group": "test"
 		},
@@ -185,6 +224,11 @@
 				"--logger",
 				"trx\\;LogFileName=e2e-tests.trx"
 			],
+			"options": {
+				"env": {
+					"API_HOST_PORT": "5001"
+				}
+			},
 			"problemMatcher": [
 				"$msCompile"
 			],

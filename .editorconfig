@@ -18,7 +18,3 @@ csharp_style_expression_bodied_methods = when_on_single_line:suggestion
 
 # Filename casing: PascalCase for types
 dotnet_naming_rule.types_should_be_pascal_case.severity = suggestion
-
-[*.{cs,vb}]
-# Keep generated files excluded from format enforcement (if generated file pattern used)
-generated_code = true

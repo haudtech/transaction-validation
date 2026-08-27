@@ -39,6 +39,8 @@ sequenceDiagram
 	participant Mock as MockPartnerVerification
 	participant Publisher as MessagePublisher
 	participant MQ as RabbitMQ
+	participant Primary as Primary Consumer
+	participant Audit as Audit Consumer
 
 	P->>API: POST /api/v1/partner/transactions
 	API->>Auth: Validate X-API-Key
@@ -73,9 +75,13 @@ sequenceDiagram
 			alt Verified
 				Verifier-->>API: Verified
 				API->>Publisher: Publish internal envelope
-				Publisher->>MQ: Enqueue persistent message + wait confirms
+				Publisher->>MQ: Publish persistent message to partner.transactions + wait confirms
 				MQ-->>Publisher: Ack
 				Publisher-->>API: Published
+				MQ->>Primary: Copy to partner-transactions
+				Primary-->>MQ: Ack
+				MQ->>Audit: Copy to partner-transactions.audit when binding matches
+				Audit-->>MQ: Ack
 				API->>Cache: StoreCachedResponse(key, fingerprint, accepted response)
 				API-->>P: 202 Accepted
 			else Verification failed
@@ -116,7 +122,7 @@ docker compose up --build
 Service endpoints when compose is running:
 
 - API: http://localhost:5000
-- Mock partner verification API: http://localhost:5002
+- Mock partner verification API and consumer observations: http://localhost:5002
 - RabbitMQ management: http://localhost:15672
 
 Repository entrypoint for implementation, workflow, and architecture documentation.

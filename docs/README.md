@@ -19,6 +19,7 @@ This folder is the central entry point for the project’s technical and enginee
 ### Implementation and delivery
 - Implementation phases: [implementation/implementation_phases.md](implementation/implementation_phases.md)
 - Checklist and tracking: [implementation/implementation_checklist.md](implementation/implementation_checklist.md)
+- Messaging exchange migration plan: [implementation/messaging_exchange_migration_plan.md](implementation/messaging_exchange_migration_plan.md)
 - Scaffold and conventions: [implementation/implementation_scaffold.md](implementation/implementation_scaffold.md)
 - E2E smoke matrix (runtime confidence layer): [test/e2e_smoke_matrix.md](test/e2e_smoke_matrix.md)
 - Repo-specific architecture rules: [implementation/repo_architecture_rules.md](implementation/repo_architecture_rules.md)
@@ -30,8 +31,10 @@ This folder is the central entry point for the project’s technical and enginee
 - Debugger and IntelliSense case study: [debugger/README.md](debugger/README.md)
 
 ### Architecture and diagrams
+- Messaging topology and consumer routing: [architecture_design/messaging_topology_and_consumer_routing.md](architecture_design/messaging_topology_and_consumer_routing.md)
 - Use case diagram: [diagram/use_case_diagram.md](diagram/use_case_diagram.md)
 - Sequence diagram: [diagram/sequence_diagram.md](diagram/sequence_diagram.md)
+- Message processing lifecycle sequence: [diagram/message_processing_lifecycle_sequence.md](diagram/message_processing_lifecycle_sequence.md)
 
 ### CI and workflow guidance
 - Workflow docs index: [workflow_actions/github/README.md](workflow_actions/github/README.md)
