@@ -2,6 +2,22 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
+			"label": "format:verify",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"format",
+				"--verify-no-changes",
+				"--verbosity",
+				"diagnostic",
+				"${workspaceFolder}/TransactionValidation.sln"
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "build"
+		},
+		{
 			"label": "build",
 			"type": "shell",
 			"command": "dotnet",
@@ -11,6 +27,24 @@
 				"-m:1",
 				"${workspaceFolder}/TransactionValidation.sln"
 			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "build"
+		},
+		{
+			"label": "check",
+			"type": "shell",
+			"command": "echo",
+			"args": [
+				"Running format verification, build, and unit tests"
+			],
+			"dependsOn": [
+				"format:verify",
+				"build",
+				"test:unit"
+			],
+			"dependsOrder": "sequence",
 			"problemMatcher": [
 				"$msCompile"
 			],
