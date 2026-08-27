@@ -1,8 +1,7 @@
 using FluentAssertions;
-using Xunit;
-
 using TransactionValidation.Core.Models;
 using TransactionValidation.Core.Validation;
+using Xunit;
 
 namespace TransactionValidation.Core.Validation.Tests;
 

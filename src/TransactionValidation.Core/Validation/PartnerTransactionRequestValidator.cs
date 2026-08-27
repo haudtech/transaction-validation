@@ -1,5 +1,5 @@
-using FluentValidation;
 using System.Globalization;
+using FluentValidation;
 using TransactionValidation.Core.Models;
 
 namespace TransactionValidation.Core.Validation;

@@ -1,6 +1,6 @@
+using DotNetEnv;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using DotNetEnv;
 
 namespace TransactionValidation.Configuration.Extensions;
 

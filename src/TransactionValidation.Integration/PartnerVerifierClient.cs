@@ -1,6 +1,6 @@
+using System.Net;
 using TransactionValidation.Core.Exceptions;
 using TransactionValidation.Core.Interfaces;
-using System.Net;
 
 namespace TransactionValidation.Integration;
 
