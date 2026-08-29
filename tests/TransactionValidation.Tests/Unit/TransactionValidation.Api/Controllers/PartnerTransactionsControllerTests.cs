@@ -1,14 +1,19 @@
 using FluentAssertions;
+
 using FluentValidation;
+
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+
 using Moq;
+
 using TransactionValidation.Api.Controllers;
 using TransactionValidation.Api.Idempotency;
 using TransactionValidation.Core.Exceptions;
 using TransactionValidation.Core.Interfaces;
 using TransactionValidation.Core.Models;
 using TransactionValidation.Core.Validation;
+
 using Xunit;
 
 namespace TransactionValidation.Tests.Unit.TransactionValidation.Api.Controllers;

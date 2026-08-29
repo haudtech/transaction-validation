@@ -11,7 +11,24 @@ max_line_length = 120
 
 # Place System directives first and sort usings
 dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = true
 csharp_using_directive_placement = inside_namespace
+
+# C# newline formatting
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_new_line_before_members_in_object_initializers = true
+csharp_new_line_before_members_in_anonymous_types = true
+csharp_new_line_between_query_expression_clauses = true
+
+# C# indentation formatting
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_indent_labels = one_less_than_current
+csharp_indent_block_contents = true
+csharp_indent_braces = false
 
 # Prefer expression-bodied members where concise
 csharp_style_expression_bodied_methods = when_on_single_line:suggestion

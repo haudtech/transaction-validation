@@ -1,9 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
+
 using Microsoft.AspNetCore.Mvc;
+
 using TransactionValidation.Core.Exceptions;
 using TransactionValidation.Core.Models;
 using TransactionValidation.Tests.Integration.TransactionValidation.Api.Support;
+
 using Xunit;
 
 namespace TransactionValidation.Tests.Integration.TransactionValidation.Api;

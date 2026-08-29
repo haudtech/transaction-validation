@@ -1,6 +1,8 @@
 using FluentAssertions;
+
 using TransactionValidation.Core.Models;
 using TransactionValidation.Messaging;
+
 using Xunit;
 
 namespace TransactionValidation.Tests.Unit.TransactionValidation.Messaging;

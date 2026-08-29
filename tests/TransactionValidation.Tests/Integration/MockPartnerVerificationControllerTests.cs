@@ -1,7 +1,10 @@
 using FluentAssertions;
+
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+
 using TransactionValidation.Mock.Controllers;
+
 using Xunit;
 
 namespace TransactionValidation.Tests.Integration;

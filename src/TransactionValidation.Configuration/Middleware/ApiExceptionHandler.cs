@@ -1,7 +1,9 @@
 using System.Text.Json;
+
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+
 using TransactionValidation.Core.Exceptions;
 
 namespace TransactionValidation.Configuration.Middleware;

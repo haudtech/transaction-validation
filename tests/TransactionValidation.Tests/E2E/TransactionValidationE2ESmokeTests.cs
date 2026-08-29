@@ -1,9 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+
 using Microsoft.AspNetCore.Mvc;
+
 using RabbitMQ.Client;
+
 using TransactionValidation.Core.Models;
+
 using Xunit;
 
 namespace TransactionValidation.Tests.E2E;

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+
 using TransactionValidation.Core.Interfaces;
 
 namespace TransactionValidation.Tests.Integration.TransactionValidation.Api.Support;

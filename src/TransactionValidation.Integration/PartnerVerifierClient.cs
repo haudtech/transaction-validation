@@ -1,4 +1,5 @@
 using System.Net;
+
 using TransactionValidation.Core.Exceptions;
 using TransactionValidation.Core.Interfaces;
 

@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+
 using Serilog;
+
 using TransactionValidation.Api.Idempotency;
 using TransactionValidation.Configuration.Extensions;
 using TransactionValidation.Configuration.Options;

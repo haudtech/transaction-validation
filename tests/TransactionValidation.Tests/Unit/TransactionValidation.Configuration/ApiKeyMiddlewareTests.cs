@@ -1,8 +1,12 @@
 using FluentAssertions;
+
 using Microsoft.AspNetCore.Http;
+
 using TransactionValidation.Configuration.Middleware;
 using TransactionValidation.Configuration.Options;
+
 using Xunit;
+
 using MicrosoftOptions = Microsoft.Extensions.Options.Options;
 
 namespace TransactionValidation.Configuration.Tests;

@@ -1,7 +1,10 @@
 using FluentAssertions;
+
 using Microsoft.AspNetCore.Http;
+
 using TransactionValidation.Configuration.Middleware;
 using TransactionValidation.Core.Exceptions;
+
 using Xunit;
 
 namespace TransactionValidation.Configuration.Tests;

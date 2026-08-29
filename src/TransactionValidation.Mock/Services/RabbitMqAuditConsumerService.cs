@@ -1,8 +1,11 @@
 using System.Text.Json;
+
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+
 using RabbitMQ.Client;
+
 using TransactionValidation.Core.Models;
 using TransactionValidation.Mock.Options;
 
