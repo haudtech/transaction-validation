@@ -105,8 +105,63 @@ public partial class Program
 
     private static void AddAzureServiceBusMessagingServices(IServiceCollection services, IConfiguration configuration)
     {
-        // Azure Service Bus registration remains intentionally deferred until the dedicated migration phase is approved.
-        _ = services;
-        _ = configuration;
+        services.Configure<ServiceBusPublisherOptions>(configuration.GetSection(ServiceBusPublisherOptions.SectionName));
+
+        services.AddSingleton(sp =>
+        {
+            var options = sp.GetRequiredService<IOptions<ServiceBusPublisherOptions>>().Value;
+
+            var missingProperties = new List<string>();
+            if (string.IsNullOrWhiteSpace(options.ConnectionString))
+            {
+                missingProperties.Add(nameof(ServiceBusPublisherOptions.ConnectionString));
+            }
+
+            if (string.IsNullOrWhiteSpace(options.TopicName))
+            {
+                missingProperties.Add(nameof(ServiceBusPublisherOptions.TopicName));
+            }
+
+            if (string.IsNullOrWhiteSpace(options.Subject))
+            {
+                missingProperties.Add(nameof(ServiceBusPublisherOptions.Subject));
+            }
+
+            if (string.IsNullOrWhiteSpace(options.RoutingKey))
+            {
+                missingProperties.Add(nameof(ServiceBusPublisherOptions.RoutingKey));
+            }
+
+            if (string.IsNullOrWhiteSpace(options.EventType))
+            {
+                missingProperties.Add(nameof(ServiceBusPublisherOptions.EventType));
+            }
+
+            if (missingProperties.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"Azure Service Bus publisher configuration is incomplete. Missing values: {string.Join(", ", missingProperties)}");
+            }
+
+            return options;
+        });
+
+        services.AddSingleton<IServiceBusMessageSender>(sp =>
+        {
+            var options = sp.GetRequiredService<ServiceBusPublisherOptions>();
+            return new ServiceBusMessageSender(options.ConnectionString, options.TopicName);
+        });
+
+        services.AddSingleton<IMessagePublisher>(sp =>
+        {
+            var sender = sp.GetRequiredService<IServiceBusMessageSender>();
+            var options = sp.GetRequiredService<ServiceBusPublisherOptions>();
+            return new ServiceBusMessagePublisher(
+                sender,
+                options.TopicName,
+                options.Subject,
+                options.RoutingKey,
+                options.EventType);
+        });
     }
 }
