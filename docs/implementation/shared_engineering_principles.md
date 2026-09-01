@@ -67,10 +67,42 @@ SHOULD:
 MUST:
 - Keep DI registrations explicit and appropriate for lifetimes.
 - Keep registrations idempotent and easy to review.
+- Separate shared infrastructure registrations from broker-specific or implementation-specific registrations.
+- Use a single runtime selection point when one of several transport implementations can be active.
 
 SHOULD:
 - Register interfaces before concrete types in the same extension method.
 - Register health checks and configuration options with `Configure<T>`.
+- Keep the common service extension focused on truly shared concerns and avoid leaking message-broker implementation details into it.
+
+Example of the preferred pattern:
+
+```csharp
+builder.Services.AddTransactionValidationCommonServices(builder.Configuration);
+
+builder.Services.AddConfiguredBroker(
+    builder.Configuration,
+    AddRabbitMqMessagingServices,
+    AddAzureServiceBusMessagingServices);
+
+static void AddRabbitMqMessagingServices(IServiceCollection services, IConfiguration configuration)
+{
+    services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
+    services.AddSingleton<IRabbitMqClientAdapter, RabbitMqClientAdapter>();
+    services.AddSingleton<IMessagePublisher, RabbitMqMessagePublisher>();
+}
+
+static void AddAzureServiceBusMessagingServices(IServiceCollection services, IConfiguration configuration)
+{
+    // Future Azure Service Bus wiring stays isolated here.
+}
+```
+
+Why this is required:
+- the broker selection switch lives in one place
+- only one transport is active at runtime
+- the shared infrastructure project does not depend on broker-specific app types
+- future broker migrations can happen without rewriting the surrounding application startup
 
 ---
 

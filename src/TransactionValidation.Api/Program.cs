@@ -1,12 +1,16 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 using Serilog;
 
 using TransactionValidation.Api.Idempotency;
 using TransactionValidation.Configuration.Extensions;
 using TransactionValidation.Configuration.Options;
+using TransactionValidation.Core.Interfaces;
+using TransactionValidation.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +25,10 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddTransactionValidationCommonServices(builder.Configuration);
+builder.Services.AddConfiguredBroker(
+    builder.Configuration,
+    AddRabbitMqMessagingServices,
+    AddAzureServiceBusMessagingServices);
 
 builder.Services.AddSingleton<IIdempotencyStore>(sp =>
 {
@@ -51,4 +59,54 @@ app.Run();
 /// </summary>
 public partial class Program
 {
+    private static void AddRabbitMqMessagingServices(IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<RabbitMqOptions>>().Value);
+
+        services.AddSingleton<IRabbitMqClientAdapter>(sp =>
+        {
+            var options = sp.GetRequiredService<RabbitMqOptions>();
+            return new RabbitMqClientAdapter(
+                options.HostName,
+                options.Port,
+                options.UserName,
+                options.Password,
+                options.PublishConfirmTimeoutSeconds);
+        });
+
+        services.AddSingleton<IMessageRoutingKeyResolver>(sp =>
+        {
+            var options = sp.GetRequiredService<RabbitMqOptions>();
+            return new PartnerTransactionRoutingKeyResolver(options.RoutingKeyPrefix);
+        });
+
+        services.AddHostedService(sp =>
+        {
+            var options = sp.GetRequiredService<RabbitMqOptions>();
+            return new RabbitMqTopologyInitializer(
+                options.ExchangeName,
+                options.ExchangeType,
+                options.Durable,
+                options.AlternateExchangeName,
+                options.UnroutedQueueName,
+                sp.GetRequiredService<IRabbitMqClientAdapter>(),
+                sp.GetRequiredService<ILogger<RabbitMqTopologyInitializer>>());
+        });
+
+        services.AddSingleton<IMessagePublisher>(sp =>
+        {
+            var options = sp.GetRequiredService<RabbitMqOptions>();
+            var rabbitMqClientAdapter = sp.GetRequiredService<IRabbitMqClientAdapter>();
+            var routingKeyResolver = sp.GetRequiredService<IMessageRoutingKeyResolver>();
+            return new RabbitMqMessagePublisher(options.ExchangeName, rabbitMqClientAdapter, routingKeyResolver);
+        });
+    }
+
+    private static void AddAzureServiceBusMessagingServices(IServiceCollection services, IConfiguration configuration)
+    {
+        // Azure Service Bus registration remains intentionally deferred until the dedicated migration phase is approved.
+        _ = services;
+        _ = configuration;
+    }
 }
