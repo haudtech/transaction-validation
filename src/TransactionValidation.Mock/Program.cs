@@ -34,6 +34,20 @@ builder.Services.AddConfiguredBroker(
     {
         services.AddSingleton<ConsumerObservationStore>();
         services.AddSingleton<ConsumerFailureControl>();
+
+        if (configuration.GetValue<bool>($"{ServiceBusPrimaryConsumerOptions.SectionName}:Enabled"))
+        {
+            services.Configure<ServiceBusPrimaryConsumerOptions>(
+                configuration.GetSection(ServiceBusPrimaryConsumerOptions.SectionName));
+            services.AddHostedService<ServiceBusPrimaryConsumerService>();
+        }
+
+        if (configuration.GetValue<bool>($"{ServiceBusAuditConsumerOptions.SectionName}:Enabled"))
+        {
+            services.Configure<ServiceBusAuditConsumerOptions>(
+                configuration.GetSection(ServiceBusAuditConsumerOptions.SectionName));
+            services.AddHostedService<ServiceBusAuditConsumerService>();
+        }
     });
 
 builder.Services.AddControllers();

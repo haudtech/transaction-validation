@@ -98,6 +98,30 @@ static void AddAzureServiceBusMessagingServices(IServiceCollection services, ICo
 }
 ```
 
+Preferred decomposition for the same idea:
+
+```csharp
+builder.Services.AddConfiguredBroker(
+    builder.Configuration,
+    RegisterRabbitMqServices,
+    RegisterAzureServiceBusServices);
+
+static void RegisterRabbitMqServices(IServiceCollection services, IConfiguration configuration)
+{
+    services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
+    services.AddHostedService<RabbitMqNoOpConsumerService>();
+}
+
+static void RegisterAzureServiceBusServices(IServiceCollection services, IConfiguration configuration)
+{
+    services.Configure<ServiceBusPrimaryConsumerOptions>(
+        configuration.GetSection(ServiceBusPrimaryConsumerOptions.SectionName));
+    services.AddHostedService<ServiceBusPrimaryConsumerService>();
+}
+```
+
+This rule applies to every new broker migration: keep the broker switch in one place, keep each broker-specific registration in its own method, and avoid passing implementation details through the shared application startup.
+
 Why this is required:
 - the broker selection switch lives in one place
 - only one transport is active at runtime
