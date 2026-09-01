@@ -22,7 +22,12 @@ This document describes the prerequisites for building, running, and testing the
 - A local RabbitMQ broker is required for `TransactionValidation.Messaging`.
 - You can run RabbitMQ locally or via Docker Compose.
 
-## 5. NuGet Package Dependencies
+## 5. Azure Service Bus validation environment
+For the Azure-native broker path, use a dedicated Azure Service Bus namespace and topic/subscription topology. Full setup instructions are documented in [../azure_service_bus_setup.md](../azure_service_bus_setup.md).
+
+Do not use Azurite as the validation target for the Service Bus fan-out scenario because it does not provide the same topic/subscription semantics required by this project.
+
+## 6. NuGet Package Dependencies
 The implementation uses these NuGet packages across projects:
 - `Serilog.AspNetCore`
 - `Serilog.Sinks.Console`
@@ -37,16 +42,16 @@ The implementation uses these NuGet packages across projects:
 - `Moq`
 - `FluentAssertions`
 
-## 6. Optional Infrastructure
+## 7. Optional Infrastructure
 - Docker and Docker Compose for local development and infrastructure orchestration.
 - A valid Azure Application Insights connection string only if the optional Azure Monitor exporter is enabled.
 
-## 7. Environment and Configuration
+## 8. Environment and Configuration
 - A working development shell with access to the repository root.
 - Application settings are expected to be configured in `appsettings.json` and `appsettings.Development.json`.
 - `ApplicationInsights:ConnectionString` is optional and only required for Azure monitoring.
 
-## 8. Recommended CLI Commands
+## 9. Recommended CLI Commands
 
 ```bash
 cd /Users/tech/dev/net/TransactionValidation
@@ -54,12 +59,12 @@ dotnet restore
 dotnet build
 ```
 
-## 9. Notes
+## 10. Notes
 
 - The workspace currently uses a multi-project `.sln` layout with shared configuration, core, integration, messaging, and mock projects.
 - Follow the ordered implementation phases in [implementation_phases.md](../implementation_phases.md) when generating code.
 
-## 10. Phase-to-prerequisite readiness map
+## 11. Phase-to-prerequisite readiness map
 
 The implementation checklist depends on these prerequisite groups before a phase is treated as truly ready.
 

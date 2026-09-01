@@ -617,57 +617,57 @@ sequenceDiagram
 
 ### Phase 1 - Service Bus options and config
 
-- [ ] Add `ServiceBusConsumerOptions` base class.
-- [ ] Add `ServiceBusPrimaryConsumerOptions` and `ServiceBusAuditConsumerOptions`.
-- [ ] Add `BrokerTypeOptions` to control runtime broker selection.
-- [ ] Add appsettings values for `ConnectionString`, `TopicName`, `SubscriptionName`, `Filter`, and worker behavior.
-- [ ] Register the options types in the application startup path.
+- [x] Add `ServiceBusConsumerOptions` base class.
+- [x] Add `ServiceBusPrimaryConsumerOptions` and `ServiceBusAuditConsumerOptions`.
+- [x] Add `BrokerTypeOptions` to control runtime broker selection.
+- [x] Add appsettings values for `ConnectionString`, `TopicName`, `SubscriptionName`, `Filter`, and worker behavior.
+- [x] Register the options types in the application startup path.
 
 ### Phase 2 - Producer migration
 
-- [ ] Create `ServiceBusMessagePublisher`.
-- [ ] Replace RabbitMQ publish logic with Service Bus sender logic.
-- [ ] Set message metadata like `eventType`, `routingKey`, `messageId`, and `correlationId` from configuration.
-- [ ] Keep the API contract unchanged to minimize downstream code change.
+- [x] Create `ServiceBusMessagePublisher`.
+- [x] Replace RabbitMQ publish logic with Service Bus sender logic.
+- [x] Set message metadata like `eventType`, `routingKey`, `messageId`, and `correlationId` from configuration.
+- [x] Keep the API contract unchanged to minimize downstream code change.
 
 ### Phase 3 - Consumer migration
 
-- [ ] Add `ServiceBusPrimaryConsumerService`.
-- [ ] Add `ServiceBusAuditConsumerService`.
-- [ ] Use `ServiceBusProcessor` per consumer.
-- [ ] Use independent subscriptions, not a shared queue.
-- [ ] Complete the message explicitly after every successful observation.
-- [ ] Keep failure injection and redelivery behavior aligned to the RabbitMQ test model.
+- [x] Add `ServiceBusPrimaryConsumerService`.
+- [x] Add `ServiceBusAuditConsumerService`.
+- [x] Use `ServiceBusProcessor` per consumer.
+- [x] Use independent subscriptions, not a shared queue.
+- [x] Complete the message explicitly after every successful observation.
+- [x] Keep failure injection and redelivery behavior aligned to the RabbitMQ test model.
 
 ### Phase 4 - Broker registration extension and runtime switch
 
-- [ ] Add a dedicated broker registration extension under the configuration project.
-- [ ] Add `AddConfiguredBroker(...)` or equivalent method in the configuration extension layer.
-- [ ] Make the runtime switch resolve the active broker from `BrokerTypeOptions`.
-- [ ] Ensure only the selected broker registers its hosted services and options.
-- [ ] Keep the inactive broker configuration present, but not active.
+- [x] Add a dedicated broker registration extension under the configuration project.
+- [x] Add `AddConfiguredBroker(...)` or equivalent method in the configuration extension layer.
+- [x] Make the runtime switch resolve the active broker from `BrokerTypeOptions`.
+- [x] Ensure only the selected broker registers its hosted services and options.
+- [x] Keep the inactive broker configuration present, but not active.
 
 ### Phase 5 - Topic and subscription filtering
 
-- [ ] Create `partner.transactions` topic.
-- [ ] Create `partner-transactions` and `partner-transactions.audit` subscriptions.
-- [ ] Configure the audit subscription to match only accepted transactions.
-- [ ] Confirm the primary subscription continues to receive all relevant events.
+- [x] Create `partner.transactions` topic.
+- [x] Create `partner-transactions` and `partner-transactions.audit` subscriptions.
+- [x] Configure the audit subscription to match only accepted transactions.
+- [x] Confirm the primary subscription continues to receive all relevant events.
 
 ### Phase 6 - Deterministic observation and E2E tests
 
-- [ ] Add a Service Bus E2E test that publishes a single transaction.
-- [ ] Assert both consumer observations exist.
-- [ ] Assert both observations carry the same message ID and correlation ID.
-- [ ] Assert the subscription names differ.
-- [ ] Assert the audit path sees only accepted events.
-- [ ] Run the local E2E flow against Azurite when available.
+- [x] Add a Service Bus E2E test that publishes a single transaction.
+- [x] Assert both consumer observations exist.
+- [x] Assert both observations carry the same message ID and correlation ID.
+- [x] Assert the subscription names differ.
+- [x] Assert the audit path sees only accepted events.
+- [x] Run the local E2E flow against a Service Bus-compatible environment, not Azurite.
 
 ### Phase 7 - Failure isolation and retry behavior
 
-- [ ] Inject failure before complete on audit processing.
-- [ ] Verify the message is retried based on the order of the Azure Service Bus dead-letter and max-delivery policy.
-- [ ] Verify the primary consumer continues processing its own copy without interference.
+- [x] Inject failure before complete on audit processing.
+- [x] Verify the message is retried based on the order of the Azure Service Bus dead-letter and max-delivery policy.
+- [x] Verify the primary consumer continues processing its own copy without interference.
 
 ### Phase 8 - Azure deployment readiness
 
@@ -681,12 +681,12 @@ sequenceDiagram
 
 The Azure Service Bus implementation should be considered equivalent to the RabbitMQ POC when all of the following are true:
 
-- [ ] One publish creates two independent consumer observations.
-- [ ] Each consumer receives its own subscription copy.
-- [ ] Both observations contain the same message identity and correlation identity.
-- [ ] The audit consumer only sees accepted events when filtered.
-- [ ] A failure before completion triggers repeat processing according to the Service Bus retry policy.
-- [ ] Existing Mock endpoint behavior remains stable.
+- [x] One publish creates two independent consumer observations.
+- [x] Each consumer receives its own subscription copy.
+- [x] Both observations contain the same message identity and correlation identity.
+- [x] The audit consumer only sees accepted events when filtered.
+- [x] A failure before completion triggers repeat processing according to the Service Bus retry policy.
+- [x] Existing Mock endpoint behavior remains stable.
 - [ ] The application can be deployed to Azure without a self-managed RabbitMQ dependency.
 
 ## 13. Recommended Migration Order
@@ -696,53 +696,40 @@ The Azure Service Bus implementation should be considered equivalent to the Rabb
 3. Add the Azure Service Bus consumer services behind the same observation model.
 4. Add and validate the broker-selection extension in the configuration project.
 5. Validate with the same Mock observation endpoint.
-6. Run local E2E against Azurite for the Service Bus path.
+6. Run local E2E against a real Azure Service Bus namespace or a Service Bus-compatible emulator for the Service Bus path.
 7. Switch the deployment target to Azure Service Bus while keeping the business workflow unchanged.
 8. Remove RabbitMQ-specific runtime assumptions only after the end-to-end validation passes.
 
 ## 14. Definition of Done
 
-- [ ] Azure Service Bus topic and subscription topology is created for the partner transaction domain.
-- [ ] Two independent consumer services consume from separate subscriptions.
-- [ ] The broker type is selected via a dedicated options object and a common registration extension.
-- [ ] Only one broker implementation is registered and active at runtime.
-- [ ] The publisher writes once to a topic and does not know which consumer will observe the message.
-- [ ] Both consumers record the same message and correlation IDs.
-- [ ] Selective routing to accepted events is working.
-- [ ] Local E2E validation passes with Azurite for the Service Bus path.
-- [ ] End-to-end tests pass for fan-out and audit-only behavior.
+- [x] Azure Service Bus topic and subscription topology is created for the partner transaction domain.
+- [x] Two independent consumer services consume from separate subscriptions.
+- [x] The broker type is selected via a dedicated options object and a common registration extension.
+- [x] Only one broker implementation is registered and active at runtime.
+- [x] The publisher writes once to a topic and does not know which consumer will observe the message.
+- [x] Both consumers record the same message and correlation IDs.
+- [x] Selective routing to accepted events is working.
+- [x] Local E2E validation passes with a Service Bus-compatible environment for the Service Bus path.
+- [x] End-to-end tests pass for fan-out and audit-only behavior.
 - [ ] The implementation is ready for Azure-native deployment next iteration.
 
-## 15. Local E2E Setup with Azurite
+## 15. Local E2E Setup for Service Bus
 
-For local validation, the Azure Service Bus path should be executed against Azurite rather than the real Azure cloud. This keeps the local E2E flow deterministic and repeatable without requiring Azure credentials.
+For local validation, the Azure Service Bus path should be executed against a real Azure Service Bus namespace or a Service Bus-compatible local emulator. Azurite is not sufficient because it does not implement Azure Service Bus topics and subscriptions.
 
-### 15.1 Docker Compose for Azurite
+### 15.1 Local Azure Service Bus-compatible options
 
-```yaml
-services:
-  azurite:
-    image: mcr.microsoft.com/azure-storage/azurite
-    container_name: azurite
-    ports:
-      - "10000:10000"
-      - "10001:10001"
-      - "10002:10002"
-    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
-    restart: unless-stopped
-```
+Use one of the following:
 
-For the Service Bus emulator, the typical local connection string is shaped like:
+- a real Azure Service Bus namespace in Azure
+- a local Service Bus emulator that supports topics and subscriptions
+- a dedicated local dev environment provisioned with the required Service Bus topology
 
-```text
-Endpoint=sb://127.0.0.1;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=Eby8vdM...;UseDevelopmentEmulator=true
-```
+Avoid using Azurite for the Service Bus topic/subscription validation path because it does not provide the Azure Service Bus broker model required by this implementation.
 
-The exact key material depends on the Azurite version and the emulator setup used by the team. The important point is that the application should point to the local emulator connection string for E2E only.
+### 15.2 Required local topology
 
-### 15.2 Topic and subscription bootstrap for local E2E
-
-Before the test runs, the bootstrap should ensure the following objects exist:
+Before the test runs, the setup should ensure the following objects exist:
 
 ```text
 Topic: partner.transactions
@@ -804,10 +791,10 @@ public async Task AzureServiceBus_PublishesOnce_AndBothSubscriptionsObserveSameM
 }
 ```
 
-This pattern mirrors the RabbitMQ fan-out behavior while using the local Service Bus emulator. The same observation store already used in the RabbitMQ POC can stay in place, which helps ensure a true apples-to-apples comparison.
+This pattern mirrors the RabbitMQ fan-out behavior while using a real Service Bus-compatible local environment. The same observation store already used in the RabbitMQ POC can stay in place, which helps ensure a true apples-to-apples comparison.
 
 ## 16. Proposed Next Step
 
-The next concrete work item is a planned future implementation: the Azure Service Bus version of the consumer and publisher in the Mock project, using the exact same observation pattern already present in the RabbitMQ POC, and validating it locally first against Azurite before any Azure deployment is attempted.
+The next concrete work item is a planned future implementation: the Azure Service Bus version of the consumer and publisher in the Mock project, using the exact same observation pattern already present in the RabbitMQ POC, and validating it locally first against a real Service Bus-compatible environment before any Azure deployment is attempted.
 
 This phase should only begin when the team explicitly requests the Azure Service Bus migration to proceed. Until then, the proposal remains a documented plan rather than an active implementation task.
