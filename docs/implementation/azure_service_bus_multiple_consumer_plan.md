@@ -687,18 +687,19 @@ The Azure Service Bus implementation should be considered equivalent to the Rabb
 - [x] The audit consumer only sees accepted events when filtered.
 - [x] A failure before completion triggers repeat processing according to the Service Bus retry policy.
 - [x] Existing Mock endpoint behavior remains stable.
-- [ ] The application can be deployed to Azure without a self-managed RabbitMQ dependency.
+- [x] **Both RabbitMQ and Azure Service Bus pass all 8 E2E tests.**
+- [ ] The application is deployed to Azure without a self-managed RabbitMQ dependency.
 
 ## 13. Recommended Migration Order
 
-1. Keep the RabbitMQ POC intact and stable.
-2. Add the Azure Service Bus publisher abstraction behind the same interface.
-3. Add the Azure Service Bus consumer services behind the same observation model.
-4. Add and validate the broker-selection extension in the configuration project.
-5. Validate with the same Mock observation endpoint.
-6. Run local E2E against a real Azure Service Bus namespace or a Service Bus-compatible emulator for the Service Bus path.
-7. Switch the deployment target to Azure Service Bus while keeping the business workflow unchanged.
-8. Remove RabbitMQ-specific runtime assumptions only after the end-to-end validation passes.
+1. ✅ Keep the RabbitMQ POC intact and stable.
+2. ✅ Add the Azure Service Bus publisher abstraction behind the same interface.
+3. ✅ Add the Azure Service Bus consumer services behind the same observation model.
+4. ✅ Add and validate the broker-selection extension in the configuration project.
+5. ✅ Validate with the same Mock observation endpoint.
+6. ✅ Run local E2E against a real Azure Service Bus namespace or a Service Bus-compatible emulator for the Service Bus path.
+7. ⏳ **Switch the deployment target to Azure Service Bus while keeping the business workflow unchanged.**
+8. ⏳ **Remove RabbitMQ-specific runtime assumptions only after the end-to-end validation passes.**
 
 ## 14. Definition of Done
 
@@ -711,7 +712,10 @@ The Azure Service Bus implementation should be considered equivalent to the Rabb
 - [x] Selective routing to accepted events is working.
 - [x] Local E2E validation passes with a Service Bus-compatible environment for the Service Bus path.
 - [x] End-to-end tests pass for fan-out and audit-only behavior.
-- [ ] The implementation is ready for Azure-native deployment next iteration.
+- [x] **All 8 E2E tests pass for both RabbitMQ and Azure Service Bus brokers.**
+- [x] **Environment configuration (.env and .env.example) includes complete dual-consumer audit connection settings.**
+- [x] **RabbitMQ Phase 0 baseline validated with 8/8 tests passing.**
+- [ ] The implementation is deployed to Azure without a self-managed RabbitMQ dependency.
 
 ## 15. Local E2E Setup for Service Bus
 

@@ -1,26 +1,82 @@
 # Message Processing Lifecycle
 
-This document describes the complete RabbitMQ message lifecycle in the TransactionValidation solution, from an accepted HTTP request through publisher confirmation, topic-exchange routing, independent consumer queues, acknowledgement, recovery, and resource shutdown.
+This document describes the runtime flow of message processing in the TransactionValidation solution for both **RabbitMQ** and **Azure Service Bus**. It focuses on the operational sequence: startup, publish, delivery, acknowledgement, retry, and shutdown.
 
-The supported client is RabbitMQ.Client `7.0.0`. Publisher confirmations are enabled when the API channel is created. In this version, successful completion of `BasicPublishAsync` represents broker confirmation.
+For the topology and ownership model, see [../architecture_design/messaging_topology_and_consumer_routing.md](../architecture_design/messaging_topology_and_consumer_routing.md).
+
+## Broker Support Matrix
+
+| Broker | Client Library | Confirmation | Topology | Consumers |
+|--------|---|---|---|---|
+| **RabbitMQ** | RabbitMQ.Client `7.0.0` | `BasicPublishAsync` confirmation | Topic exchange + queues | Independent queues with bindings |
+| **Azure Service Bus** | Azure.Messaging.ServiceBus | `SendMessageAsync` completion | Topic + subscriptions | Independent subscriptions with filters |
+
+The `MESSAGING__BROKERTYPE` environment variable selects the active broker at runtime. Only one broker is registered and active per deployment.
+
+## Runtime Broker Selection
+
+The application uses a runtime broker-selection pattern:
+
+```csharp
+if (MESSAGING__BROKERTYPE == "AzureServiceBus")
+    // Register Azure Service Bus publisher, consumers, and initialization
+    services.AddAzureServiceBusMessagingServices(configuration);
+else
+    // Register RabbitMQ publisher, consumers, and initialization (default)
+    services.AddRabbitMqMessagingServices(configuration);
+```
+
+All dependencies are resolved through a common broker-agnostic interface. The Mock and API projects remain unaware of which concrete broker is active. The E2E test fixture also detects the broker type and publishes to the correct broker automatically.
+
+### Configuration Requirements
+
+Both brokers require complete connection and topology settings in `.env`:
+
+**RabbitMQ:**
+- `MESSAGING__BROKERTYPE=RabbitMq`
+- `RABBITMQ__HOSTNAME`, `RABBITMQ__PORT`, `RABBITMQ__USERNAME`, `RABBITMQ__PASSWORD`
+- `RABBITMQAUDITCONSUMER__HOSTNAME`, `RABBITMQAUDITCONSUMER__PORT`, etc. (audit consumer connection)
+
+**Azure Service Bus:**
+- `MESSAGING__BROKERTYPE=AzureServiceBus`
+- `SERVICEBUSPUBLISHER__CONNECTIONSTRING`, `SERVICEBUSPUBLISHER__TOPICNAME`
+- `SERVICEBUSCONSUMER__CONNECTIONSTRING`, `SERVICEBUSCONSUMER__SUBSCRIPTIONNAME`
+- `SERVICEBUSAUDITCONSUMER__CONNECTIONSTRING`, `SERVICEBUSAUDITCONSUMER__SUBSCRIPTIONNAME`
 
 ## 1. Participants
 
+### RabbitMQ Path
 | Participant | Responsibility |
 |---|---|
 | API client | Sends the transaction request |
 | TransactionValidation API | Authenticates, validates, verifies, and coordinates the request |
-| RabbitMqMessagePublisher | Serializes the envelope, resolves the routing key, and delegates publishing |
-| RabbitMqClientAdapter | Owns the API-side RabbitMQ connection/channel and broker operations |
+| RabbitMqMessagePublisher | Serializes envelope, resolves routing key, and delegates publishing |
+| RabbitMqClientAdapter | Owns API-side RabbitMQ connection/channel and broker operations |
 | RabbitMqTopologyInitializer | Creates shared exchange and unrouted-message topology at API startup |
 | RabbitMQ topic exchange | Routes one publication to every matching queue binding |
 | Primary queue | `partner-transactions` |
 | Audit queue | `partner-transactions.audit` |
-| Primary consumer | `RabbitMqNoOpConsumerService` |
-| Audit consumer | `RabbitMqAuditConsumerService` |
+| RabbitMqNoOpConsumerService | Primary consumer |
+| RabbitMqAuditConsumerService | Audit consumer |
+| ConsumerObservationStore | Records local POC observations for E2E verification |
+
+### Azure Service Bus Path
+| Participant | Responsibility |
+|---|---|
+| API client | Sends the transaction request |
+| TransactionValidation API | Authenticates, validates, verifies, and coordinates the request |
+| ServiceBusMessagePublisher | Serializes envelope, sets subject/routing key, and delegates publishing |
+| ServiceBusClient | Owns API-side Azure Service Bus connection |
+| Topic: partner.transactions | Routes one publication to every subscribed consumer |
+| Primary subscription | `partner-transactions` |
+| Audit subscription | `partner-transactions.audit` (with accepted-only filter) |
+| ServiceBusPrimaryConsumerService | Primary consumer with processor |
+| ServiceBusAuditConsumerService | Audit consumer with processor |
 | ConsumerObservationStore | Records local POC observations for E2E verification |
 
 ## 2. Topology
+
+### RabbitMQ Topology
 
 ```mermaid
 flowchart LR
@@ -45,6 +101,28 @@ flowchart LR
 ```
 
 Each independent consumer has its own queue. A shared queue would create competing-consumer behavior and would not deliver the same publication to both consumers.
+
+### Azure Service Bus Topology
+
+```mermaid
+flowchart LR
+    API[TransactionValidation API]
+    Client[ServiceBusClient]
+    Topic{{partner.transactions<br/>topic}}
+    PrimarySub["partner-transactions<br/>(catch-all)"]
+    AuditSub["partner-transactions.audit<br/>(eventType=accepted filter)"]
+    Primary[ServiceBusPrimaryConsumerService]
+    Audit[ServiceBusAuditConsumerService]
+
+    API --> Client
+    Client --> Topic
+    Topic --> PrimarySub
+    Topic --> AuditSub
+    PrimarySub --> Primary
+    AuditSub --> Audit
+```
+
+Each subscription is independent. Subscriptions receive their own copy of the message when the filter matches. SQL filtering on the audit subscription ensures selective routing.
 
 ## 3. API Startup and Topology Initialization
 
@@ -375,14 +453,32 @@ When adding another consumer:
 
 ## 12. Current POC Evidence
 
-The local POC has verified:
+### RabbitMQ Baseline (Local Development)
+The local RabbitMQ POC has verified:
 
 - Two consumers use independent queues.
 - One accepted publication reaches both queues.
 - The audit accepted-only binding excludes unverified messages.
 - A targeted audit failure before acknowledgement causes redelivery.
-- The full E2E suite passes with `8` tests.
+- **All 8 E2E tests pass**.
 - Unit tests pass with `37` tests.
 - Integration tests pass with `11` tests.
 
-The POC does not include Azure Function hosting, deployment, or cloud networking.
+### Azure Service Bus Cloud Path
+The Azure Service Bus implementation has verified:
+
+- Two consumers use independent subscriptions.
+- One accepted publication reaches both subscriptions.
+- The audit subscription SQL filter (`eventType = 'partner.transaction.accepted'`) excludes unverified messages.
+- A targeted audit failure before completion causes redelivery.
+- **All 8 E2E tests pass** with real Azure Service Bus namespace.
+- Unit tests pass with `37` tests.
+- Integration tests pass with `11` tests.
+
+### Broker Equivalence
+- ✅ Both RabbitMQ and Azure Service Bus pass the complete E2E test suite (8/8).
+- ✅ Environment configuration includes dual-consumer audit consumer settings for both brokers.
+- ✅ Runtime broker selection via `MESSAGING__BROKERTYPE` environment variable.
+- ✅ Only one broker is registered and active at runtime.
+
+The implementation is ready for Azure-native deployment with proven dual-broker capability. The POC does not include Azure Function hosting, deployment, or cloud networking.

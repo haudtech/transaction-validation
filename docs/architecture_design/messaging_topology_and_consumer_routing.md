@@ -1,263 +1,274 @@
 # Messaging Topology and Consumer Routing
 
-Scope: how accepted partner transactions are routed from the API to downstream consumers, covering the legacy default-exchange approach and the implemented topic-exchange POC with multiple independent queues.
+Status: Active architecture reference
+
+This document defines the current messaging architecture: one published transaction event is routed to independent downstream consumers without the API knowing which consumers exist.
 
 Related documents:
 
 - Primary architecture overview: [Architecture_design.md](Architecture_design.md)
+- Runtime lifecycle: [../diagram/message_processing_lifecycle_sequence.md](../diagram/message_processing_lifecycle_sequence.md)
 - Idempotency semantics: [api_idempotency_flow_and_semantics.md](api_idempotency_flow_and_semantics.md)
 
 ---
 
-## 1. Why this document exists
+## 1. Design intent
 
-The current implementation publishes to a single named queue. That works for one consumer, but every additional downstream service would require the API to know about that service and publish to it explicitly.
+The API publishes one business event to a broker-facing contract. The broker decides which consumers receive it.
 
-This document records the retired default-exchange behavior as a rollback baseline and describes the implemented topic-exchange topology used by the local multiple-consumer POC.
+This removes producer-to-consumer coupling. The API does not enumerate downstream services or hardcode destination queues. Each consumer declares its own interest through queue bindings or topic subscriptions.
+
+The runtime broker is selected by `MESSAGING__BROKERTYPE`. Both RabbitMQ and Azure Service Bus implement the same architecture contract:
+
+- one accepted event is published once
+- each consumer gets its own copy or subscription view
+- the audit path is filtered to accepted events only
+- consumers deduplicate by `message-id`
+- retries remain safe because duplicate delivery is idempotent
 
 ---
 
-## 2. Retired baseline: default exchange, single queue
+## 2. Shared design principles
 
-### 2.1 Behavior
+### 2.1 Producer owns publication, not delivery topology
 
-The publisher sends messages to the AMQP **default exchange** using the queue name as the routing key. With the default exchange, a message published with routing key `X` is delivered to the queue named `X`.
+The API publishes a single transaction envelope and does not directly enumerate downstream consumers.
 
-Implementation references:
+### 2.2 Consumers own their own delivery path
 
-- Publisher: [../../src/TransactionValidation.Messaging/RabbitMqMessagePublisher.cs](../../src/TransactionValidation.Messaging/RabbitMqMessagePublisher.cs)
-- Adapter: [../../src/TransactionValidation.Messaging/RabbitMqClientAdapter.cs](../../src/TransactionValidation.Messaging/RabbitMqClientAdapter.cs)
-- Adapter contract: [../../src/TransactionValidation.Messaging/IRabbitMqClientAdapter.cs](../../src/TransactionValidation.Messaging/IRabbitMqClientAdapter.cs)
-- Options: [../../src/TransactionValidation.Configuration/Options/RabbitMqOptions.cs](../../src/TransactionValidation.Configuration/Options/RabbitMqOptions.cs)
+Each consumer owns its own queue or subscription and declares the routing/filter rule that matches its business interest.
 
-### 2.2 Flow
+### 2.3 Fan-out is explicit and independent
 
-```mermaid
-flowchart LR
-    API[PartnerTransactions API] -->|routing key = queue name| DE{{default exchange}}
-    DE --> Q[[partner-transactions]]
-    Q --> C[Mock consumer service]
+The same transaction event is delivered to both the primary and audit paths without coupling them together.
+
+### 2.4 Acknowledgement and retry remain consumer-owned
+
+The message is not considered complete until each consumer has processed and acknowledged its own copy.
+
+### 2.5 Contract remains transport-agnostic
+
+The core domain model and API behavior are independent of RabbitMQ or Azure Service Bus names, filters, or queues.
+
+---
+
+## 3. Current runtime topology
+
+### 3.1 Broker abstraction layer
+
+The application selects one broker implementation at runtime:
+
+```csharp
+if (MESSAGING__BROKERTYPE == "AzureServiceBus")
+{
+    services.AddAzureServiceBusMessagingServices(configuration);
+}
+else
+{
+    services.AddRabbitMqMessagingServices(configuration);
+}
 ```
 
-### 2.3 Characteristics
+This preserves a consistent domain contract while allowing each broker to implement the same behavior using its native topology:
 
-| Aspect | Current state |
-|---|---|
-| Exchange | Default exchange (empty name) |
-| Routing key | Equals the target queue name |
-| Topology owner | Publisher declares the consumer queue |
-| Consumer model | Point-to-point, effectively one logical consumer |
-| Queue declaration | Performed on every publish call |
-| Adding a consumer | Requires publisher/API change |
+- RabbitMQ uses queues and exchange bindings
+- Azure Service Bus uses a topic and subscriptions
 
-### 2.4 Limitations
-
-1. **Publisher knows its subscribers.** The API must be configured with the destination queue, so downstream topology leaks into the producing service.
-2. **No fan-out path.** A second consumer either shares the same queue and competes for messages, or requires a second explicit publish.
-3. **Topology ownership is inverted.** The publisher declares a queue that a different service consumes, which couples deployment of the two.
-4. **Per-publish declaration overhead.** Queue declaration is repeated on each publish rather than performed once.
-
-Limitation 1 and 3 are the architectural blockers. Limitation 4 is a performance concern tracked separately.
+Both broker implementations satisfy the same architecture contract for event fan-out and consumer isolation.
 
 ---
 
-## 3. Implemented approach: topic exchange with consumer-owned queues
+## 4. RabbitMQ active topology
 
-### 3.1 Principle
-
-The API publishes **one** message to an exchange and does not know who consumes it. Each consumer owns its queue and binds it to the exchange with a routing pattern that expresses its interest.
-
-### 3.2 Topology
+### 4.1 Topology model
 
 ```mermaid
 flowchart LR
-    API[PartnerTransactions API] -->|publish once<br/>partner.transaction.accepted| EX{{topic exchange<br/>partner.transactions}}
+    API[TransactionValidation API] -->|publish once| EX{{partner.transactions<br/>topic exchange}}
     EX -->|partner.transaction.#| Q1[[partner-transactions]]
     EX -->|partner.transaction.accepted| Q2[[partner-transactions.audit]]
-    Q1 --> C1[RabbitMqNoOpConsumerService]
-    Q2 --> C2[RabbitMqAuditConsumerService]
-    EX -.no matching binding.-> AE{{alternate exchange}}
-    Q1 -.rejected / expired.-> DLX{{dead-letter exchange}}
+    Q1 --> P[RabbitMqNoOpConsumerService]
+    Q2 --> A[RabbitMqAuditConsumerService]
+    EX -.no match.-> AE{{partner.transactions.unrouted}}
+    AE --> U[[partner-transactions.unrouted]]
 ```
 
-### 3.3 Why topic rather than fanout
+### 4.2 Routing model
 
-A fanout exchange delivers every message to every bound queue, which pushes filtering into consumer code. A topic exchange keeps selection in the broker, so a consumer that only cares about accepted transactions never receives unverified ones.
+The primary consumer is interested in all partner transaction messages via a wildcard binding pattern:
 
-Fanout remains acceptable if every consumer genuinely needs every message, but topic is the safer default because it does not require re-architecting when the first selective consumer appears.
+```text
+partner.transaction.#
+```
 
-### 3.4 Routing key convention
+The audit consumer is intentionally narrower and listens only to accepted events:
 
 ```text
 partner.transaction.accepted
-partner.transaction.unverified
 ```
 
-Format: `partner.transaction.<outcome>`
+This creates a true multi-consumer fan-out pattern without coupling the audit path to the primary path.
 
-The routing key is derived inside the Messaging project from the envelope, not supplied by the caller. This keeps routing decisions in one place and prevents controllers from constructing broker-specific strings.
+### 4.3 Ownership model
 
-### 3.5 Topology ownership
-
-| Object | Owner | Rationale |
+| Resource | Owner | Notes |
 |---|---|---|
-| Exchange | Publisher (API) | The producer defines the contract surface it publishes to |
-| Queue | Each consumer | A queue is an implementation detail of the consuming service |
-| Binding | Each consumer | Interest is declared by the party that has the interest |
-| Dead-letter queue | Each consumer | Failure handling is per-consumer |
+| Exchange | Publisher/API | Shared contract surface |
+| Primary queue | Primary consumer | Owns its binding and consume loop |
+| Audit queue | Audit consumer | Owns accepted-only binding |
+| Alternate exchange | Broker bootstrap | Captures unroutable traffic |
 
-This split is what allows a new consumer to be added without changing or redeploying the API. The local POC runs both consumers in one Mock process, but each consumer owns a separate durable queue.
+The important architectural rule is that the queue is not shared. Independent consumers must each own their own queue.
 
 ---
 
-## 4. Required changes in the Messaging project
+## 5. Azure Service Bus active topology
 
-### 4.1 Options
+### 5.1 Topology model
 
-Replace publish-side queue configuration with exchange configuration.
-
-```csharp
-public sealed class RabbitMqOptions
-{
-    public const string SectionName = "RabbitMq";
-
-    public string HostName { get; init; } = "localhost";
-    public int Port { get; init; } = 5672;
-    public string UserName { get; init; } = "guest";
-    public string Password { get; init; } = "guest";
-
-    public string ExchangeName { get; init; } = "partner.transactions";
-    public string ExchangeType { get; init; } = "topic";
-    public bool Durable { get; init; } = true;
-
-    public string RoutingKeyPrefix { get; init; } = "partner.transaction";
-}
+```mermaid
+flowchart LR
+    API[TransactionValidation API] -->|publish once| TOPIC{{partner.transactions<br/>service bus topic}}
+    TOPIC --> S1[partner-transactions<br/>subscription]
+    TOPIC --> S2[partner-transactions.audit<br/>subscription with SQL filter]
+    S1 --> P[ServiceBusPrimaryConsumerService]
+    S2 --> A[ServiceBusAuditConsumerService]
 ```
 
-`QueueName` is retained only if the API hosts a local consumer; it is no longer part of the publish path.
+### 5.2 Routing and filtering model
 
-### 4.2 Adapter contract
+Azure Service Bus uses topic subscriptions instead of RabbitMQ queues. The subscription model mirrors the same business intent:
 
-```csharp
-public interface IRabbitMqClientAdapter
-{
-    Task DeclareExchangeAsync(string exchangeName, string exchangeType, bool durable, CancellationToken cancellationToken = default);
+- primary subscription receives all messages in the topic
+- audit subscription receives only accepted events via a SQL filter such as:
 
-    Task<bool> PublishPersistentWithConfirmAsync(
-        string exchangeName,
-        string routingKey,
-        string payload,
-        IReadOnlyDictionary<string, object> headers,
-        CancellationToken cancellationToken = default);
-}
+```sql
+eventType = 'partner.transaction.accepted'
 ```
 
-Queue declaration may remain on the interface for consumer-side and test usage, but it is removed from the publish path.
+This preserves the same delivery semantics as RabbitMQ, while using Azure-native subscription filtering instead of exchange binding patterns.
 
-### 4.3 Routing key resolution
+### 5.3 Ownership model
 
-```csharp
-public interface IMessageRoutingKeyResolver
-{
-    string Resolve(TransactionEnvelope envelope);
-}
-```
-
-Future routing dimensions (partner tier, currency, amount band) are added here rather than in the controller or publisher.
-
-### 4.4 Exchange declaration timing
-
-Exchange declaration moves from per-publish to one-time startup initialization, since exchange declaration is idempotent and does not need to run per message.
-
-### 4.5 Unchanged components
-
-| Component | Change required |
-|---|---|
-| [../../src/TransactionValidation.Core/Interfaces/IMessagePublisher.cs](../../src/TransactionValidation.Core/Interfaces/IMessagePublisher.cs) | None |
-| [../../src/TransactionValidation.Api/Controllers/PartnerTransactionsController.cs](../../src/TransactionValidation.Api/Controllers/PartnerTransactionsController.cs) | None |
-| Validation, idempotency, partner verification | None |
-
-Core stays transport-agnostic: exchanges and routing keys never appear in `IMessagePublisher`.
-
----
-
-## 5. Message contract
-
-Once more than one consumer exists, the envelope becomes a published contract.
-
-Published headers:
-
-| Header | Purpose |
-|---|---|
-| `message-type` | Logical event name for consumer dispatch |
-| `message-version` | Contract version for compatibility checks |
-| `correlation-id` | End-to-end tracing across services |
-| `message-id` | Consumer-side deduplication key |
-
-Compatibility rules:
-
-- Adding optional fields is allowed.
-- Renaming or removing fields is a breaking change and requires a version increment.
-- Consumers must ignore unknown fields.
-
-Envelope definition: [../../src/TransactionValidation.Core/Models/TransactionEnvelope.cs](../../src/TransactionValidation.Core/Models/TransactionEnvelope.cs)
-
----
-
-## 6. Delivery semantics and failure handling
-
-### 6.1 Delivery guarantee
-
-Publisher confirms plus consumer retries produce **at-least-once** delivery. Consumers must therefore deduplicate using `message-id`. This mirrors the API-side idempotency model described in [api_idempotency_flow_and_semantics.md](api_idempotency_flow_and_semantics.md).
-
-### 6.2 Publisher confirms do not guarantee consumption
-
-A publisher confirm means the broker accepted the message. It does not mean any queue received it. If a routing key matches no binding, the message is discarded silently while the publish still reports success.
-
-An **alternate exchange** is therefore required so unroutable messages are captured and surfaced instead of lost.
-
-### 6.3 Per-consumer isolation
-
-Each consumer queue has its own dead-letter exchange so that one failing consumer does not block others. A shared queue would couple the failure modes of independent services.
-
----
-
-## 7. Migration path
-
-The transition is designed so the existing consumer is unaffected.
-
-| Step | Action | Effect on existing consumer |
+| Resource | Owner | Notes |
 |---|---|---|
-| 1 | Declare the topic exchange | None |
-| 2 | Bind `partner-transactions` to the exchange with `partner.transaction.#` | None |
-| 3 | Switch the publisher to exchange-based publishing | None; messages still arrive |
-| 4 | Verify the existing queue drains normally | Validation step |
-| 5 | Onboard new consumers by adding queues and bindings | None |
-| 6 | Remove the legacy binding when unused | Legacy path retired |
+| Topic | Publisher/API | Shared publish contract |
+| Primary subscription | Primary consumer | Subscription owns its message interest |
+| Audit subscription | Audit consumer | Filtered to accepted events |
+| Processor | Consumer service | Owns receive loop and ack behavior |
 
-Step 2 is the compatibility mechanism: the existing consumer continues to read from the same queue and cannot observe the change.
+Like RabbitMQ, the design depends on independent subscription ownership rather than shared competing consumers.
 
 ---
 
-## 8. Design constraints
+## 6. Shared message contract
 
-The following are explicitly out of scope for the target design:
+All brokers use the same domain envelope contract regardless of transport. The message payload and metadata are designed to be broker-neutral.
 
-1. **No per-consumer publisher implementations.** Registering one publisher per downstream service reintroduces producer-to-consumer coupling.
-2. **No publisher-side list of target queues.** Iterating over destinations in the API restores the same limitation the exchange is meant to remove.
-3. **No broker concepts in Core.** Exchange names and routing keys stay inside the Messaging project.
+Essential envelope metadata:
 
-Routing is the broker's responsibility. The API's responsibility ends at publishing one well-described message.
+- `message-id`: unique event identity for deduplication and tracing
+- `correlation-id`: end-to-end tracing across processing steps
+- `transaction-id`: domain-level transaction identity
+- `event-type` or equivalent routing metadata: used for filtering and consumer selection
+
+The envelope is created in the core domain layer and is not specific to RabbitMQ or Azure Service Bus. The broker adapters translate that contract into the native message format of the current broker.
 
 ---
 
-## 9. Summary
+## 7. Consumer routing behavior
 
-| Dimension | Legacy (current) | Target |
-|---|---|---|
-| Exchange | Default | Topic (`partner.transactions`) |
-| Routing key | Queue name | `partner.transaction.<outcome>` |
-| Consumers supported | One | Many, independently |
+### 7.1 Primary consumer
+
+The primary path is intended for the core business processing flow.
+
+Responsibilities:
+
+- accept the transaction message
+- record processing state
+- validate downstream business semantics
+- acknowledge the message only after successful handling
+
+### 7.2 Audit consumer
+
+The audit path is intentionally narrower and is only interested in accepted outcomes.
+
+Responsibilities:
+
+- record the accepted event
+- maintain an audit trail or evidence store
+- avoid processing unrelated event types
+- acknowledge its own copy after successful recording
+
+### 7.3 Deduplication and retry safety
+
+At-least-once delivery is the active model. Consumers therefore apply message deduplication by `message-id` before side effects.
+
+This mirrors the API idempotency model and prevents duplicate business writes when a delivery is retried after a temporary failure.
+
+---
+
+## 8. Failure handling and retry semantics
+
+### 8.1 Publisher confirm and broker acceptance
+
+The broker confirms that the event was accepted by the broker. This does not guarantee consumer-side processing completion.
+
+### 8.2 Consumer failure before ack
+
+If a consumer fails before acknowledging its message:
+
+- the message remains unacknowledged
+- the broker may redeliver it after reconnect or recovery
+- the consumer must treat the duplicate as safe via idempotency checks
+
+### 8.3 Consumer failure after ack
+
+If the consumer acknowledges before completion, the message is not redelivered. This is only safe when all required side effects are truly complete before the acknowledge call.
+
+### 8.4 Unroutable traffic
+
+When a message does not match any meaningful routing rule, the broker should still surface this via a dead-letter or alternate path rather than silently dropping it.
+
+This is part of the operational safety model.
+
+---
+
+## 9. Why this architecture is the current target
+
+This design solves the core architectural problem of the earlier single-queue model:
+
+- the API does not need to know all downstream consumers
+- new consumers can be added without modifying producer code
+- the primary and audit paths are independent and recover independently
+- message flow remains portable across supported brokers
+
+This is the architecture the solution is currently designed around, and it remains valid for both RabbitMQ and Azure Service Bus.
+
+---
+
+## 10. Design constraints
+
+The active architecture intentionally keeps the following constraints:
+
+1. No per-consumer publisher logic in the API layer.
+2. No broker-specific concepts in the core business layer.
+3. No shared competing consumer queue for independent processing paths.
+4. No business side effects without deduplication guardrails.
+5. Only one broker implementation is active at runtime, selected by configuration.
+
+---
+
+## 11. Summary
+
+The current architecture is a broker-neutral, multi-consumer fan-out design. The API publishes a single message, and the broker routes it to the relevant consumers according to topology rules.
+
+- RabbitMQ uses a topic exchange and queue bindings.
+- Azure Service Bus uses a topic and subscription filters.
+- Both brokers satisfy the same business contract and operational behavior.
+- The design is intentionally independent, recoverable, and extendable.
+
+This is the active architecture and replaces the retired default-exchange baseline described in the older design notes.
 | Queue ownership | Publisher | Consumer |
 | Adding a consumer | API change + deploy | Broker binding only |
 | Failure isolation | Shared | Per-consumer DLQ |

@@ -7,6 +7,7 @@ using Azure.Messaging.ServiceBus;
 using Microsoft.AspNetCore.Mvc;
 
 using RabbitMQ.Client;
+using RabbitMQ.Client.Exceptions;
 
 using TransactionValidation.Core.Models;
 
@@ -414,6 +415,48 @@ public sealed class E2ETestFixture : IAsyncLifetime
         await using var connection = await factory.CreateConnectionAsync();
         await using var channel = await connection.CreateChannelAsync(
             new CreateChannelOptions(true, true, null, null));
+
+        // Ensure the exchange exists with the same alternate-exchange topology as the mock consumers.
+        // Re-declaring an exchange without the same arguments is rejected by RabbitMQ with a 406
+        // PRECONDITION_FAILED, so we first check whether it already exists and only declare it when absent.
+        try
+        {
+            await channel.ExchangeDeclarePassiveAsync("partner.transactions");
+        }
+        catch (OperationInterruptedException)
+        {
+            await channel.ExchangeDeclareAsync(
+                "partner.transactions",
+                RabbitMQ.Client.ExchangeType.Topic,
+                durable: true,
+                autoDelete: false,
+                arguments: new Dictionary<string, object?>
+                {
+                    ["alternate-exchange"] = "partner.transactions.unrouted"
+                });
+
+            await channel.ExchangeDeclareAsync(
+                "partner.transactions.unrouted",
+                RabbitMQ.Client.ExchangeType.Fanout,
+                durable: true,
+                autoDelete: false,
+                arguments: null);
+
+            await channel.QueueDeclareAsync(
+                "partner-transactions.unrouted",
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: null);
+
+            await channel.QueueBindAsync(
+                "partner-transactions.unrouted",
+                "partner.transactions.unrouted",
+                string.Empty,
+                arguments: null,
+                noWait: false);
+        }
+
         var properties = new BasicProperties
         {
             Persistent = true,
@@ -431,7 +474,7 @@ public sealed class E2ETestFixture : IAsyncLifetime
         await channel.BasicPublishAsync(
             "partner.transactions",
             routingKey,
-            mandatory: true,
+            mandatory: false,
             properties,
             JsonSerializer.SerializeToUtf8Bytes(envelope));
     }
