@@ -2,6 +2,8 @@
 
 This document provides a high-level architecture view of the TransactionValidation BFF. It focuses on how major components collaborate and how the solution is organized, without implementation-level detail.
 
+The current design supports both RabbitMQ and Azure Service Bus as runtime broker implementations. The active broker is selected through `MESSAGING__BROKERTYPE`, while the business flow and consumer model remain consistent across both implementations.
+
 This design is aligned to:
 
 - [implementation/implementation_scaffold.md](../implementation/implementation_scaffold.md)
@@ -10,7 +12,7 @@ This design is aligned to:
 
 ## 1. Purpose and Scope
 
-The system accepts partner transaction requests, validates them, applies idempotency checks with cached replay for duplicates, verifies partner identity through an external verification endpoint, and publishes accepted transactions once to a durable topic exchange for independent downstream consumers.
+The system accepts partner transaction requests, validates them, applies idempotency checks with cached replay for duplicates, verifies partner identity through an external verification endpoint, and publishes accepted transactions once through a broker-native topic or exchange pattern for independent downstream consumers.
 
 Core capabilities:
 
@@ -28,9 +30,9 @@ Core capabilities:
 flowchart LR
     Partner[Partner Client] --> API[TransactionValidation.Api]
     API --> Mock[TransactionValidation.Mock]
-    API --> MQ[(RabbitMQ)]
-    MQ --> Primary[Primary Consumer Queue]
-    MQ --> Audit[Audit Consumer Queue]
+    API --> Broker[(RabbitMQ or Azure Service Bus)]
+    Broker --> Primary[Primary Consumer Path]
+    Broker --> Audit[Audit Consumer Path]
     API --> Obs[Telemetry and Logs]
 ```
 
@@ -57,20 +59,20 @@ flowchart TB
     Api --> Idem
 
     Intg --> Mock[TransactionValidation.Mock]
-    Msg --> MQ[(RabbitMQ)]
-    MQ --> Primary
-    MQ --> Audit
+    Msg --> Broker[(RabbitMQ or Azure Service Bus)]
+    Broker --> Primary
+    Broker --> Audit
 ```
 
 Responsibilities by project:
 
 - TransactionValidation.Api: API entrypoint, endpoint orchestration, HTTP pipeline.
-- TransactionValidation.Configuration: centralized DI, options binding, middleware, exception mapping, telemetry wiring.
+- TransactionValidation.Configuration: centralized DI, options binding, middleware, exception mapping, telemetry wiring, and runtime broker selection.
 - TransactionValidation.Core: domain models, contracts, validation, exceptions.
 - TransactionValidation.Integration: partner verification client with resilience policies.
-- TransactionValidation.Messaging: exchange publishing abstraction and RabbitMQ implementation.
-- TransactionValidation.Mock: local mock provider for partner verification behavior and two hosted RabbitMQ consumers with independent queues.
-- TransactionValidation.Tests: unit and integration tests.
+- TransactionValidation.Messaging: broker abstraction and broker-specific publishers/consumers for RabbitMQ and Azure Service Bus.
+- TransactionValidation.Mock: local mock provider for partner verification behavior and independent primary/audit consumer services for the active broker.
+- TransactionValidation.Tests: unit, integration, and end-to-end tests covering both broker modes.
 
 ## 4. High-Level Runtime Sequence
 
@@ -82,7 +84,7 @@ sequenceDiagram
     participant Verify as Partner Verification Client
     participant Mock as TransactionValidation.Mock
     participant Publish as Message Publisher
-    participant MQ as RabbitMQ
+    participant Broker as RabbitMQ or Azure Service Bus
     participant Primary as Primary Consumer
     participant Audit as Audit Consumer
 
@@ -101,13 +103,13 @@ sequenceDiagram
 
         alt Verified and accepted
             API->>Publish: Publish envelope
-            Publish->>MQ: Persistent message to partner.transactions with confirm
-            MQ-->>Publish: Confirm
+            Publish->>Broker: Send to topic/exchange contract
+            Broker-->>Publish: Broker accept / confirm
             API-->>Client: Accepted
-            MQ->>Primary: Deliver copy to partner-transactions
-            Primary-->>MQ: Ack after consume
-            MQ->>Audit: Deliver copy to partner-transactions.audit
-            Audit-->>MQ: Ack after consume
+            Broker->>Primary: Deliver primary copy
+            Primary-->>Broker: Ack after consume
+            Broker->>Audit: Deliver audit copy (filtered/accepted-only)
+            Audit-->>Broker: Ack after consume
         else Rejected
             API-->>Client: ProblemDetails (404 / 408 / 503)
         end
@@ -126,22 +128,24 @@ Configuration precedence is intentionally layered for predictable overrides:
 Deployment modes:
 
 - Local process mode: API and Mock run from dotnet tooling.
-- Container mode: API, Mock, and RabbitMQ run via docker compose.
+- Container mode: API, Mock, and the active broker run via docker compose.
+- Broker selection: `MESSAGING__BROKERTYPE` chooses the active topology; RabbitMQ remains the local dev default while Azure Service Bus is supported for cloud validation.
 
 ## 6. Cross-Cutting Concerns
 
 - Security: API key middleware guards external entrypoints.
-- Reliability: outbound verification uses resilience policies; queue publishing expects broker confirm semantics.
+- Reliability: outbound verification uses resilience policies; broker publishing expects native broker confirmation semantics.
 - Idempotency: duplicate same-payload requests replay the cached accepted response; same-key different-payload requests fail with conflict.
 - Error handling: domain exceptions are mapped to RFC 7807 ProblemDetails through centralized exception handling, including upstream `404 Not Found`, `408 Request Timeout`, and `503 Service Unavailable` categories.
 - Observability: structured logging and OpenTelemetry pipeline with optional Azure Monitor export.
+- Broker neutrality: runtime selection keeps the business flow stable regardless of whether the active implementation is RabbitMQ or Azure Service Bus.
 
 ## 7. Phase Alignment (Overview)
 
 - Phases 1-2: solution structure, core domain contracts, validators.
 - Phases 3-4: configuration and middleware foundation, mock verification service.
-- Phases 5-6: integration and messaging implementations, endpoint orchestration, idempotency behavior, and publish-to-consume runtime flow.
-- Phases 7-8: observability maturity and quality coverage.
+- Phases 5-6: integration and messaging implementations, endpoint orchestration, idempotency behavior, publish-to-consume runtime flow, and broker selection.
+- Phases 7-8: observability maturity, quality coverage, and dual-broker validation.
 - Phases 9-10: containerization, run documentation, and final readiness review.
 
 ## 8. Design Boundaries

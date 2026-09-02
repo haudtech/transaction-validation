@@ -14,7 +14,7 @@ Technology stack
 | Idempotency | `Idempotency-Key` support with in-memory TTL dedupe, cached `202 Accepted` replay for same key+payload, and conflict on key reuse with different payload (`partnerId|transactionReference` fallback) |
 | Error handling | ASP.NET Core `IExceptionHandler` + RFC 7807 `ProblemDetails` mapping |
 | Resilience | `Microsoft.Extensions.Http.Resilience` (Polly-based pipelines) |
-| Messaging | RabbitMQ (`RabbitMQ.Client`) |
+| Messaging | RabbitMQ (`RabbitMQ.Client`) or Azure Service Bus (`Azure.Messaging.ServiceBus`), selected at runtime via `MESSAGING__BROKERTYPE` |
 | Observability | Serilog, OpenTelemetry, optional Azure Monitor exporter |
 | Configuration | `appsettings*.json`, environment variables, `DotNetEnv` |
 | Containerization | Docker, Docker Compose |
@@ -23,9 +23,22 @@ Technology stack
 | Coverage | `coverlet.collector` (XPlat Code Coverage, Cobertura XML) + `dotnet-reportgenerator-globaltool` (HTML/Markdown/Text reports) |
 | Quality gates | Split CI workflows for unit and integration tests with explicit category filters |
 
+## Supported broker modes
+
+The solution supports two runtime messaging modes:
+
+- `RabbitMq` — local default for Docker-based development and validation
+- `AzureServiceBus` — Azure Service Bus topic/subscription mode for cloud validation and deployment
+
+Only one broker implementation is active at a time, selected by the `MESSAGING__BROKERTYPE` environment variable.
+
 ## Architecture Overview (Sequence)
 
 Primary architecture overview: [docs/architecture_design/Architecture_design.md](docs/architecture_design/Architecture_design.md)
+
+Messaging topology and routing: [docs/architecture_design/messaging_topology_and_consumer_routing.md](docs/architecture_design/messaging_topology_and_consumer_routing.md)
+
+Message lifecycle and runtime flow: [docs/diagram/message_processing_lifecycle_sequence.md](docs/diagram/message_processing_lifecycle_sequence.md)
 
 ```mermaid
 sequenceDiagram
@@ -104,7 +117,7 @@ The main task entrypoints are:
 Quick local run
 ```bash
 # build the solution
- dotnet build --nologo -m:1 TransactionValidation.sln
+dotnet build --nologo -m:1 TransactionValidation.sln
 
 # run the main VS Code task flow
 # from the Command Palette: Tasks: Run Task
@@ -112,6 +125,13 @@ Quick local run
 #   test:coverage
 #   test:integration:trx
 #   test:e2e
+```
+
+Environment setup
+```bash
+cp .env.example .env
+# then set MESSAGING__BROKERTYPE to RabbitMq or AzureServiceBus
+# and configure the matching broker settings in .env
 ```
 
 Docker compose run
@@ -123,13 +143,16 @@ Service endpoints when compose is running:
 
 - API: http://localhost:5000
 - Mock partner verification API and consumer observations: http://localhost:5002
-- RabbitMQ management: http://localhost:15672
+- RabbitMQ management (when RabbitMQ is selected): http://localhost:15672
+- Azure Service Bus endpoint depends on the configured namespace and connection settings
 
 Repository entrypoint for implementation, workflow, and architecture documentation.
 
 ## Documentation
 
 Start here: [docs/README.md](docs/README.md)
+
+The documentation set includes architecture, topology, and runtime sequence references for both broker implementations.
 
 ## Requirement to Implementation Traceability
 

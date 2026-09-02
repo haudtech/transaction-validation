@@ -2,9 +2,12 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 
+using Azure.Messaging.ServiceBus;
+
 using Microsoft.AspNetCore.Mvc;
 
 using RabbitMQ.Client;
+using RabbitMQ.Client.Exceptions;
 
 using TransactionValidation.Core.Models;
 
@@ -387,6 +390,20 @@ public sealed class E2ETestFixture : IAsyncLifetime
 
     public async Task PublishEnvelopeAsync(TransactionEnvelope envelope, string routingKey)
     {
+        var brokerType = Environment.GetEnvironmentVariable("MESSAGING__BROKERTYPE") ?? "RabbitMq";
+
+        if (brokerType.Equals("AzureServiceBus", StringComparison.OrdinalIgnoreCase))
+        {
+            await PublishViaAzureServiceBusAsync(envelope, routingKey);
+        }
+        else
+        {
+            await PublishViaRabbitMqAsync(envelope, routingKey);
+        }
+    }
+
+    private async Task PublishViaRabbitMqAsync(TransactionEnvelope envelope, string routingKey)
+    {
         var factory = new ConnectionFactory
         {
             HostName = Environment.GetEnvironmentVariable("RABBITMQ__HOSTNAME") ?? "localhost",
@@ -398,6 +415,48 @@ public sealed class E2ETestFixture : IAsyncLifetime
         await using var connection = await factory.CreateConnectionAsync();
         await using var channel = await connection.CreateChannelAsync(
             new CreateChannelOptions(true, true, null, null));
+
+        // Ensure the exchange exists with the same alternate-exchange topology as the mock consumers.
+        // Re-declaring an exchange without the same arguments is rejected by RabbitMQ with a 406
+        // PRECONDITION_FAILED, so we first check whether it already exists and only declare it when absent.
+        try
+        {
+            await channel.ExchangeDeclarePassiveAsync("partner.transactions");
+        }
+        catch (OperationInterruptedException)
+        {
+            await channel.ExchangeDeclareAsync(
+                "partner.transactions",
+                RabbitMQ.Client.ExchangeType.Topic,
+                durable: true,
+                autoDelete: false,
+                arguments: new Dictionary<string, object?>
+                {
+                    ["alternate-exchange"] = "partner.transactions.unrouted"
+                });
+
+            await channel.ExchangeDeclareAsync(
+                "partner.transactions.unrouted",
+                RabbitMQ.Client.ExchangeType.Fanout,
+                durable: true,
+                autoDelete: false,
+                arguments: null);
+
+            await channel.QueueDeclareAsync(
+                "partner-transactions.unrouted",
+                durable: true,
+                exclusive: false,
+                autoDelete: false,
+                arguments: null);
+
+            await channel.QueueBindAsync(
+                "partner-transactions.unrouted",
+                "partner.transactions.unrouted",
+                string.Empty,
+                arguments: null,
+                noWait: false);
+        }
+
         var properties = new BasicProperties
         {
             Persistent = true,
@@ -415,9 +474,37 @@ public sealed class E2ETestFixture : IAsyncLifetime
         await channel.BasicPublishAsync(
             "partner.transactions",
             routingKey,
-            mandatory: true,
+            mandatory: false,
             properties,
             JsonSerializer.SerializeToUtf8Bytes(envelope));
+    }
+
+    private async Task PublishViaAzureServiceBusAsync(TransactionEnvelope envelope, string routingKey)
+    {
+        var connectionString = ResolveSetting("SERVICEBUSPUBLISHER__CONNECTIONSTRING")
+            ?? throw new InvalidOperationException("SERVICEBUSPUBLISHER__CONNECTIONSTRING is not set");
+        var topicName = ResolveSetting("SERVICEBUSPUBLISHER__TOPICNAME") ?? "partner.transactions";
+
+        await using var client = new ServiceBusClient(connectionString);
+        var sender = client.CreateSender(topicName);
+
+        var message = new ServiceBusMessage(JsonSerializer.SerializeToUtf8Bytes(envelope))
+        {
+            MessageId = envelope.MessageId,
+            CorrelationId = envelope.CorrelationId,
+            Subject = routingKey,
+            ContentType = "application/json"
+        };
+
+        // Add custom headers - eventType and routingKey are used for subscription filtering and correlation
+        message.ApplicationProperties["routingKey"] = routingKey;
+        message.ApplicationProperties["eventType"] = routingKey;
+        message.ApplicationProperties["message-type"] = "PartnerTransactionAccepted";
+        message.ApplicationProperties["message-version"] = "1";
+        message.ApplicationProperties["correlation-id"] = envelope.CorrelationId;
+        message.ApplicationProperties["message-id"] = envelope.MessageId;
+
+        await sender.SendMessageAsync(message);
     }
 
     public async Task AssertNoObservationAsync(string consumerName, string messageId)

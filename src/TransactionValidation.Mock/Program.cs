@@ -9,22 +9,48 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddTransactionValidationConfiguration(builder.Environment, args);
 
-builder.Services.AddControllers();
-builder.Services.Configure<RabbitMqPrimaryConsumerOptions>(
-    builder.Configuration.GetSection(RabbitMqPrimaryConsumerOptions.SectionName));
-builder.Services.Configure<RabbitMqAuditConsumerOptions>(
-    builder.Configuration.GetSection(RabbitMqAuditConsumerOptions.SectionName));
-builder.Services.AddSingleton<ConsumerObservationStore>();
-builder.Services.AddSingleton<ConsumerFailureControl>();
-if (builder.Configuration.GetValue<bool>($"{RabbitMqPrimaryConsumerOptions.SectionName}:Enabled"))
-{
-    builder.Services.AddHostedService<RabbitMqNoOpConsumerService>();
-}
+builder.Services.AddConfiguredBroker(
+    builder.Configuration,
+    (services, configuration) =>
+    {
+        services.Configure<RabbitMqPrimaryConsumerOptions>(
+            configuration.GetSection(RabbitMqPrimaryConsumerOptions.SectionName));
+        services.Configure<RabbitMqAuditConsumerOptions>(
+            configuration.GetSection(RabbitMqAuditConsumerOptions.SectionName));
+        services.AddSingleton<ConsumerObservationStore>();
+        services.AddSingleton<ConsumerFailureControl>();
 
-if (builder.Configuration.GetValue<bool>($"{RabbitMqAuditConsumerOptions.SectionName}:Enabled"))
-{
-    builder.Services.AddHostedService<RabbitMqAuditConsumerService>();
-}
+        if (configuration.GetValue<bool>($"{RabbitMqPrimaryConsumerOptions.SectionName}:Enabled"))
+        {
+            services.AddHostedService<RabbitMqNoOpConsumerService>();
+        }
+
+        if (configuration.GetValue<bool>($"{RabbitMqAuditConsumerOptions.SectionName}:Enabled"))
+        {
+            services.AddHostedService<RabbitMqAuditConsumerService>();
+        }
+    },
+    (services, configuration) =>
+    {
+        services.AddSingleton<ConsumerObservationStore>();
+        services.AddSingleton<ConsumerFailureControl>();
+
+        if (configuration.GetValue<bool>($"{ServiceBusPrimaryConsumerOptions.SectionName}:Enabled"))
+        {
+            services.Configure<ServiceBusPrimaryConsumerOptions>(
+                configuration.GetSection(ServiceBusPrimaryConsumerOptions.SectionName));
+            services.AddHostedService<ServiceBusPrimaryConsumerService>();
+        }
+
+        if (configuration.GetValue<bool>($"{ServiceBusAuditConsumerOptions.SectionName}:Enabled"))
+        {
+            services.Configure<ServiceBusAuditConsumerOptions>(
+                configuration.GetSection(ServiceBusAuditConsumerOptions.SectionName));
+            services.AddHostedService<ServiceBusAuditConsumerService>();
+        }
+    });
+
+builder.Services.AddControllers();
 
 var app = builder.Build();
 app.MapControllers();

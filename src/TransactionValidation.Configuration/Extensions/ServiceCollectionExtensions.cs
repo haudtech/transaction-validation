@@ -30,7 +30,8 @@ namespace TransactionValidation.Configuration.Extensions;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the shared BFF services required for validation, API security, partner verification, RabbitMQ publishing, and observability.
+    /// Registers the shared BFF services required for validation, API security, partner verification, and observability.
+    /// Broker-specific messaging services are registered separately so the application can switch transports at runtime without cross-project coupling.
     /// </summary>
     /// <param name="services">The DI container being configured.</param>
     /// <param name="configuration">The runtime configuration source.</param>
@@ -40,14 +41,12 @@ public static class ServiceCollectionExtensions
         services.Configure<ApiKeyOptions>(configuration.GetSection(ApiKeyOptions.SectionName));
         services.Configure<IdempotencyOptions>(configuration.GetSection(IdempotencyOptions.SectionName));
         services.Configure<PartnerVerificationOptions>(configuration.GetSection(PartnerVerificationOptions.SectionName));
-        services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
         services.Configure<OpenTelemetryOptions>(configuration.GetSection(OpenTelemetryOptions.SectionName));
         services.Configure<SerilogOptions>(configuration.GetSection(SerilogOptions.SectionName));
 
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<ApiKeyOptions>>().Value);
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<IdempotencyOptions>>().Value);
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<PartnerVerificationOptions>>().Value);
-        services.AddSingleton(sp => sp.GetRequiredService<IOptions<RabbitMqOptions>>().Value);
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<OpenTelemetryOptions>>().Value);
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<SerilogOptions>>().Value);
 
@@ -84,44 +83,6 @@ public static class ServiceCollectionExtensions
 
             options.CircuitBreaker.MinimumThroughput = Math.Max(2, partnerVerificationOptions.CircuitBreakerFailures);
             options.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(partnerVerificationOptions.CircuitBreakerDurationSeconds);
-        });
-
-        services.AddSingleton<IRabbitMqClientAdapter>(sp =>
-        {
-            var options = sp.GetRequiredService<RabbitMqOptions>();
-            return new RabbitMqClientAdapter(
-                options.HostName,
-                options.Port,
-                options.UserName,
-                options.Password,
-                options.PublishConfirmTimeoutSeconds);
-        });
-
-        services.AddSingleton<IMessageRoutingKeyResolver>(sp =>
-        {
-            var options = sp.GetRequiredService<RabbitMqOptions>();
-            return new PartnerTransactionRoutingKeyResolver(options.RoutingKeyPrefix);
-        });
-
-        services.AddHostedService(sp =>
-        {
-            var options = sp.GetRequiredService<RabbitMqOptions>();
-            return new RabbitMqTopologyInitializer(
-                options.ExchangeName,
-                options.ExchangeType,
-                options.Durable,
-                options.AlternateExchangeName,
-                options.UnroutedQueueName,
-                sp.GetRequiredService<IRabbitMqClientAdapter>(),
-                sp.GetRequiredService<ILogger<RabbitMqTopologyInitializer>>());
-        });
-
-        services.AddSingleton<IMessagePublisher>(sp =>
-        {
-            var options = sp.GetRequiredService<RabbitMqOptions>();
-            var rabbitMqClientAdapter = sp.GetRequiredService<IRabbitMqClientAdapter>();
-            var routingKeyResolver = sp.GetRequiredService<IMessageRoutingKeyResolver>();
-            return new RabbitMqMessagePublisher(options.ExchangeName, rabbitMqClientAdapter, routingKeyResolver);
         });
 
         var telemetryOptions = configuration.GetSection(OpenTelemetryOptions.SectionName).Get<OpenTelemetryOptions>() ?? new OpenTelemetryOptions();
