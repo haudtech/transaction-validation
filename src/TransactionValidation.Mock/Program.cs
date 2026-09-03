@@ -51,8 +51,10 @@ builder.Services.AddConfiguredBroker(
     });
 
 builder.Services.AddControllers();
+builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 app.MapControllers();
 app.MapGet("/", () => Results.Ok("TransactionValidation Mock"));
+app.MapHealthChecks("/healthz");
 app.Run();

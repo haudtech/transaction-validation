@@ -8,6 +8,7 @@ using Serilog;
 
 using StackExchange.Redis;
 
+using TransactionValidation.Api.HealthChecks;
 using TransactionValidation.Api.Idempotency;
 using TransactionValidation.Configuration.Extensions;
 using TransactionValidation.Configuration.Options;
@@ -34,6 +35,10 @@ builder.Services.AddConfiguredBroker(
 
 AddIdempotencyStore(builder.Services, builder.Configuration);
 
+builder.Services.AddHealthChecks()
+    .AddCheck<MessagingHealthCheck>("messaging")
+    .AddCheck<RedisHealthCheck>("redis");
+
 var app = builder.Build();
 
 app.UseTransactionValidationCommon();
@@ -46,6 +51,7 @@ if (app.Environment.IsDevelopment())
 
 app.MapControllers();
 app.MapGet("/", () => Results.Ok("TransactionValidation API"));
+app.MapHealthChecks("/healthz");
 
 app.Run();
 

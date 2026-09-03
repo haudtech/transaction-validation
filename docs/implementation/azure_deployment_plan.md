@@ -1,6 +1,6 @@
 # Azure Deployment Plan
 
-Status: In progress — Phases 1 and 2 done, Phase 3 next
+Status: In progress — Phases 1, 2 and 3 done, Phase 4 next
 
 Scope: steps required to deploy the TransactionValidation BFF to Azure as a single dev/POC environment, expandable later to dev + staging. This plan was agreed after a point-by-point clarification pass and supersedes ad-hoc deployment notes elsewhere.
 
@@ -41,11 +41,13 @@ Status: Done
 
 ## Phase 3 — Health checks
 
-Status: Not started
+Status: Done
 
-- [ ] Add `builder.Services.AddHealthChecks()` in both `TransactionValidation.Api` and `TransactionValidation.Mock`.
-- [ ] Add a lightweight Service Bus reachability check.
-- [ ] Add `app.MapHealthChecks("/healthz")` wired to Container Apps readiness/liveness probes.
+- [x] Add `builder.Services.AddHealthChecks()` in both `TransactionValidation.Api` and `TransactionValidation.Mock`.
+- [x] Add a lightweight messaging check (`MessagingHealthCheck` — confirms `IMessagePublisher` resolves for the active broker) and a Redis check (`RedisHealthCheck` — pings Redis when configured, healthy no-op otherwise).
+- [x] Add `app.MapHealthChecks("/healthz")` in both apps, ready for Container Apps readiness/liveness probes.
+- [x] Fix: exempt `/healthz` from `ApiKeyMiddleware` — found via live end-to-end verification (probes don't send the API key header and were getting `401`).
+- [x] Verified end-to-end: ran the API locally and confirmed `GET /healthz` returns `200 Healthy`.
 
 ## Phase 4 — Production logging profile
 
@@ -89,7 +91,7 @@ Status: Not started
 
 - [x] Phase 1 — Managed Identity auth for Azure Service Bus
 - [x] Phase 2 — Redis-backed idempotency store
-- [ ] Phase 3 — Health checks
+- [x] Phase 3 — Health checks
 - [ ] Phase 4 — Production logging profile
 - [ ] Phase 5 — Bicep infrastructure
 - [ ] Phase 6 — CI/CD pipeline
