@@ -171,6 +171,39 @@ export ServiceBusAuditConsumer__AutoComplete="false"
 export ServiceBusAuditConsumer__MaxConcurrentCalls="1"
 ```
 
+## 8a. Managed Identity auth (recommended for Azure deployment)
+
+Connection-string (SAS key) auth is intended for local development only. When the app runs in Azure, leave `*_ConnectionString` empty and set the namespace FQDN instead; `ServiceBusClientFactory` then authenticates with `DefaultAzureCredential`.
+
+```bash
+export ServiceBusPublisher__ConnectionString=""
+export ServiceBusPublisher__Namespace="sb-txv-dev-001.servicebus.windows.net"
+
+export ServiceBusConsumer__ConnectionString=""
+export ServiceBusConsumer__Namespace="sb-txv-dev-001.servicebus.windows.net"
+
+export ServiceBusAuditConsumer__ConnectionString=""
+export ServiceBusAuditConsumer__Namespace="sb-txv-dev-001.servicebus.windows.net"
+```
+
+Grant the app's system-assigned managed identity the minimum roles on the namespace:
+
+```bash
+az role assignment create \
+  --assignee-object-id <api-app-identity-principal-id> \
+  --assignee-principal-type ServicePrincipal \
+  --role "Azure Service Bus Data Sender" \
+  --scope $(az servicebus namespace show --resource-group rg-txv-dev --name sb-txv-dev-001 --query id -o tsv)
+
+az role assignment create \
+  --assignee-object-id <mock-app-identity-principal-id> \
+  --assignee-principal-type ServicePrincipal \
+  --role "Azure Service Bus Data Receiver" \
+  --scope $(az servicebus namespace show --resource-group rg-txv-dev --name sb-txv-dev-001 --query id -o tsv)
+```
+
+`DefaultAzureCredential` also works locally via `az login`, so this path can be exercised outside Azure once the developer's account has the same roles.
+
 ## 9. E2E verification checklist
 
 When the Azure Service Bus path is enabled, validate the following:

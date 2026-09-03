@@ -112,9 +112,9 @@ public partial class Program
             var options = sp.GetRequiredService<IOptions<ServiceBusPublisherOptions>>().Value;
 
             var missingProperties = new List<string>();
-            if (string.IsNullOrWhiteSpace(options.ConnectionString))
+            if (string.IsNullOrWhiteSpace(options.ConnectionString) && string.IsNullOrWhiteSpace(options.Namespace))
             {
-                missingProperties.Add(nameof(ServiceBusPublisherOptions.ConnectionString));
+                missingProperties.Add($"{nameof(ServiceBusPublisherOptions.ConnectionString)} or {nameof(ServiceBusPublisherOptions.Namespace)}");
             }
 
             if (string.IsNullOrWhiteSpace(options.TopicName))
@@ -149,7 +149,7 @@ public partial class Program
         services.AddSingleton<IServiceBusMessageSender>(sp =>
         {
             var options = sp.GetRequiredService<ServiceBusPublisherOptions>();
-            return new ServiceBusMessageSender(options.ConnectionString, options.TopicName);
+            return new ServiceBusMessageSender(options.ConnectionString, options.Namespace, options.TopicName);
         });
 
         services.AddSingleton<IMessagePublisher>(sp =>
