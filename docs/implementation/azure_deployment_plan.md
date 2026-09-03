@@ -1,6 +1,6 @@
 # Azure Deployment Plan
 
-Status: In progress — Phases 1, 2 and 3 done, Phase 4 next
+Status: In progress — Phases 1–4 done, Phase 5 next
 
 Scope: steps required to deploy the TransactionValidation BFF to Azure as a single dev/POC environment, expandable later to dev + staging. This plan was agreed after a point-by-point clarification pass and supersedes ad-hoc deployment notes elsewhere.
 
@@ -51,10 +51,14 @@ Status: Done
 
 ## Phase 4 — Production logging profile
 
-Status: Not started
+Status: Done
 
-- [ ] Add `appsettings.Production.json` (Api + Mock) with a Console-only Serilog sink; drop the `File` sink since container filesystems are ephemeral.
-- [ ] Confirm Container Apps captures stdout to Log Analytics; Azure Monitor / Application Insights wiring already exists via `UseAzureMonitor` in `ServiceCollectionExtensions`.
+- [x] Removed the `File` sink from the base `appsettings.json` (Api) so Production (default environment when unset) is Console-only; container filesystems are ephemeral.
+- [x] Kept the `File` sink in `appsettings.Development.json` only, so local dev logging to `logs/app-.txt` is unchanged.
+- [x] Added `appsettings.Production.json` (Api) explicitly documenting the Console-only profile for ops clarity, even though the base file alone already produces this behavior.
+- [x] `TransactionValidation.Mock` has no Serilog wiring (default ASP.NET Core logging only), so no change was needed there.
+- [x] Verified end-to-end: ran the Api with `ASPNETCORE_ENVIRONMENT=Production`, confirmed `GET /healthz` → `200 Healthy` and no `logs/` directory was created; confirmed Development still writes files as before.
+- Note: a plain JSON-array override in `appsettings.Production.json` would **not** have removed the base file sink (later config providers merge arrays by index, they don't shrink them), so the base file itself had to drop the `File` entry rather than relying on a Production-only override.
 
 ## Phase 5 — Bicep infrastructure
 
@@ -92,7 +96,7 @@ Status: Not started
 - [x] Phase 1 — Managed Identity auth for Azure Service Bus
 - [x] Phase 2 — Redis-backed idempotency store
 - [x] Phase 3 — Health checks
-- [ ] Phase 4 — Production logging profile
+- [x] Phase 4 — Production logging profile
 - [ ] Phase 5 — Bicep infrastructure
 - [ ] Phase 6 — CI/CD pipeline
 - [ ] Phase 7 — Validation
