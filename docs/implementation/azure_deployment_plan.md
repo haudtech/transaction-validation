@@ -1,6 +1,6 @@
 # Azure Deployment Plan
 
-Status: In progress — Phases 1–4 done, Phase 5 next
+Status: In progress — Phases 1–6 done, Phase 7 next
 
 Scope: steps required to deploy the TransactionValidation BFF to Azure as a single dev/POC environment, expandable later to dev + staging. This plan was agreed after a point-by-point clarification pass and supersedes ad-hoc deployment notes elsewhere.
 
@@ -37,7 +37,7 @@ Status: Done
 - [x] Add `RedisOptions` (`Redis:ConnectionString`) and `RedisIdempotencyStore : IIdempotencyStore` using `StackExchange.Redis` directly (atomic `SET NX` for acquisition, matching the existing TTL/duplicate/conflict semantics).
 - [x] Make `Program.cs` select `RedisIdempotencyStore` when `Redis:ConnectionString` is configured, otherwise keep `InMemoryIdempotencyStore` — local dev behavior is unchanged.
 - [x] Consolidate the Redis-vs-in-memory decision and `IConnectionMultiplexer` registration into a single `AddIdempotencyStore` method.
-- [ ] Provision Azure Cache for Redis with a private endpoint only (Phase 5); no public network access.
+- [x] Provision Azure Cache for Redis with a private endpoint only (`infra/bicep/modules/redis.bicep`, Phase 5); no public network access.
 
 ## Phase 3 — Health checks
 
@@ -62,27 +62,51 @@ Status: Done
 
 ## Phase 5 — Bicep infrastructure
 
-Status: Not started
+Status: Done
 
 New `infra/bicep/` with modules:
 
-- [ ] `vnet.bicep` — required for private endpoints
-- [ ] `servicebus.bicep` — topic + primary/audit subscriptions + SQL filters + private endpoint
-- [ ] `redis.bicep` — Azure Cache for Redis with private endpoint only
-- [ ] `keyvault.bicep` — secrets (API key, any remaining connection strings)
-- [ ] `containerapps.bicep` — Container Apps environment, `txv-api` (external HTTPS-only ingress), `txv-mock` (internal-only ingress), system-assigned managed identities
-- [ ] Role assignments: `Azure Service Bus Data Sender` (API), `Azure Service Bus Data Receiver` (Mock), `Key Vault Secrets User` (both)
+- [x] `vnet.bicep` — VNet with `snet-infra` (delegated to Container Apps) and `snet-pe` (private endpoints)
+- [x] `servicebus.bicep` — topic + primary/audit subscriptions + SQL filters + private endpoint
+- [x] `redis.bicep` — Azure Cache for Redis with private endpoint only
+- [x] `keyvault.bicep` — secrets (API key, Redis connection string)
+- [x] `containerapps.bicep` — Log Analytics, ACR, Container Apps environment, `txv-api` (external HTTPS-only ingress), `txv-mock` (internal-only ingress), system-assigned managed identities
+- [x] Role assignments: `Azure Service Bus Data Sender` (API), `Azure Service Bus Data Receiver` (Mock), `Key Vault Secrets User` (API), `AcrPull` (both apps)
+- [x] `main.bicep` (subscription-scope entry point, creates the resource group and wires all five modules) + `main.parameters.dev.json`
+- [x] Verified with `az deployment sub what-if` against a real subscription — confirmed the template is valid and produces the expected resource plan.
 
 ## Phase 6 — CI/CD pipeline
 
-Status: Not started
+Status: Done
 
-- [ ] Add `.github/workflows/deploy-azure.yml`.
-- [ ] Configure OIDC federated login (`azure/login@v2`) — no long-lived secrets stored in GitHub.
-- [ ] Build/push images to Azure Container Registry.
-- [ ] Run `az deployment group create` for the Bicep templates, then update Container Apps revisions.
+- [x] Add `.github/workflows/deploy-azure.yml` — triggered on pushes to `main` touching `src/**`; builds both images via `az acr build` (ACR Tasks, no local Docker in the runner) and updates the two Container Apps' revisions with the new image tag (`github.sha`).
+- [x] Add `.github/workflows/infra.yml` — separate from app deploys since infra changes are rarer and higher blast radius:
+  - on pull requests touching `infra/bicep/**`: runs `az deployment sub what-if` only (preview, no changes)
+  - on merge to `main` touching `infra/bicep/**`: runs the real `az deployment sub create`, gated behind the `azure-infra` GitHub environment (configure required reviewers there for manual approval)
+  - `workflow_dispatch` on both workflows as a manual escape hatch
+- [x] Configure OIDC federated login (`azure/login@v2`) in both workflows — no long-lived secrets stored in GitHub; requires `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` secrets plus a federated credential on the Azure AD app registration (one-time setup, not part of the workflow file itself).
+- [x] `API_KEY_SECRET_VALUE` GitHub secret feeds the `@secure()` `apiKeySecretValue` Bicep parameter — never committed to the repo.
+- [x] Resource/app names in `deploy-azure.yml` are resolved dynamically from the `infra.yml` deployment's outputs (`az deployment sub show --name txv-infra-dev`) rather than hardcoded — added `apiAppName`/`mockAppName`/`acrName` outputs to `containerapps.bicep` and `main.bicep` for this. The only fixed value shared between the two workflows is the deployment name itself (`txv-infra-dev`), a single deliberate coupling point instead of four duplicated derived strings.
 
-## Phase 7 — Validation
+### Prerequisite: one-time Azure AD OIDC setup (blocks both workflows until done)
+
+Status: Done
+
+`AZURE_CLIENT_ID` / `AZURE_TENANT_ID` / `AZURE_SUBSCRIPTION_ID` are identifiers, not credentials — the actual trust comes from a federated credential. Completed via CLI, step by step, against the real subscription and repo:
+
+- [x] Created Azure AD App Registration `txv-github-actions-oidc` (appId/`AZURE_CLIENT_ID` = `b5ddd0a1-5d22-434e-a518-1ae33af326f2`) and its service principal.
+- [x] Assigned `Contributor` at subscription scope (`/subscriptions/31ddc37b-7b65-43a9-b668-0a3796314995`) so `infra.yml` can create the resource group and all resources in `main.bicep`.
+- [x] Added federated credentials on the App Registration for both GitHub environments:
+  - `github-azure-infra` → subject `repo:haudtech/transaction-validation:environment:azure-infra`
+  - `github-azure-dev` → subject `repo:haudtech/transaction-validation:environment:azure-dev`
+  - both: issuer `https://token.actions.githubusercontent.com`, audience `api://AzureADTokenExchange`
+- [x] Created the `azure-infra` and `azure-dev` GitHub environments and configured `haudtech` as a required reviewer on `azure-infra` (manual approval gate before real infra changes apply).
+- [x] Stored `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` (`15125a0a-8358-4d0b-b60b-993e7913ff6f`), `AZURE_SUBSCRIPTION_ID` (`31ddc37b-7b65-43a9-b668-0a3796314995`) as GitHub repository secrets.
+- [x] Generated a random `API_KEY_SECRET_VALUE` (`openssl rand -base64 32`) and stored it as a GitHub secret directly from the command that generated it — the raw value was never printed to the terminal or chat.
+
+Both workflows can now authenticate via OIDC; nothing else blocks running them.
+
+
 
 Status: Not started
 
@@ -97,6 +121,6 @@ Status: Not started
 - [x] Phase 2 — Redis-backed idempotency store
 - [x] Phase 3 — Health checks
 - [x] Phase 4 — Production logging profile
-- [ ] Phase 5 — Bicep infrastructure
-- [ ] Phase 6 — CI/CD pipeline
+- [x] Phase 5 — Bicep infrastructure
+- [x] Phase 6 — CI/CD pipeline
 - [ ] Phase 7 — Validation

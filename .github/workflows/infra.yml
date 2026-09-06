@@ -1,0 +1,73 @@
+name: Infrastructure (Bicep)
+
+# Rare, deliberate changes to Azure infrastructure. Kept separate from deploy-azure.yml,
+# which runs on every app-code push and should never re-apply infra.
+
+on:
+  pull_request:
+    paths:
+      - 'infra/bicep/**'
+  push:
+    branches: [main]
+    paths:
+      - 'infra/bicep/**'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  LOCATION: eastus
+  # Stable, predictable deployment name so deploy-azure.yml can query its outputs later.
+  INFRA_DEPLOYMENT_NAME: txv-infra-dev
+
+jobs:
+  what-if:
+    # Preview-only; safe to run automatically on every PR touching infra.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Preview infrastructure changes
+        run: |
+          az deployment sub what-if \
+            --location ${{ env.LOCATION }} \
+            --template-file infra/bicep/main.bicep \
+            --parameters infra/bicep/main.parameters.dev.json \
+            --parameters apiKeySecretValue="${{ secrets.API_KEY_SECRET_VALUE }}"
+
+  apply:
+    # Real change; only on merge to main. Gate this with required reviewers on the
+    # "azure-infra" GitHub environment (Settings > Environments) for a manual approval step.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: azure-infra
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy infrastructure
+        run: |
+          az deployment sub create \
+            --name ${{ env.INFRA_DEPLOYMENT_NAME }} \
+            --location ${{ env.LOCATION }} \
+            --template-file infra/bicep/main.bicep \
+            --parameters infra/bicep/main.parameters.dev.json \
+            --parameters apiKeySecretValue="${{ secrets.API_KEY_SECRET_VALUE }}"

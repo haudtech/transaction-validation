@@ -240,3 +240,6 @@ resource mockAcrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022
 output apiFqdn string = apiApp.properties.configuration.ingress.fqdn
 output mockFqdn string = mockApp.properties.configuration.ingress.fqdn
 output acrLoginServer string = acr.properties.loginServer
+output acrName string = acr.name
+output apiAppName string = apiApp.name
+output mockAppName string = mockApp.name

@@ -94,3 +94,6 @@ output resourceGroupName string = rg.name
 output apiFqdn string = containerApps.outputs.apiFqdn
 output mockFqdn string = containerApps.outputs.mockFqdn
 output acrLoginServer string = containerApps.outputs.acrLoginServer
+output acrName string = containerApps.outputs.acrName
+output apiAppName string = containerApps.outputs.apiAppName
+output mockAppName string = containerApps.outputs.mockAppName
