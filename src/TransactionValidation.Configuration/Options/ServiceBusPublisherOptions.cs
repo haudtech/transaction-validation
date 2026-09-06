@@ -9,6 +9,9 @@ public sealed class ServiceBusPublisherOptions
 
     public string ConnectionString { get; set; } = string.Empty;
 
+    /// <summary>Namespace FQDN used for Managed Identity auth when <see cref="ConnectionString"/> is not set.</summary>
+    public string Namespace { get; set; } = string.Empty;
+
     public string TopicName { get; set; } = string.Empty;
 
     public string Subject { get; set; } = string.Empty;

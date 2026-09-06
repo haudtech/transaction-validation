@@ -10,9 +10,9 @@ public sealed class ServiceBusMessageSender : IServiceBusMessageSender, IAsyncDi
     private readonly ServiceBusClient _client;
     private readonly ServiceBusSender _sender;
 
-    public ServiceBusMessageSender(string connectionString, string topicName)
+    public ServiceBusMessageSender(string connectionString, string @namespace, string topicName)
     {
-        _client = new ServiceBusClient(connectionString);
+        _client = ServiceBusClientFactory.Create(connectionString, @namespace);
         _sender = _client.CreateSender(topicName);
     }
 

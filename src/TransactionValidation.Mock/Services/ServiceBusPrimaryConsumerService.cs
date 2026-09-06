@@ -39,7 +39,7 @@ public sealed class ServiceBusPrimaryConsumerService : BackgroundService
             _options.SubscriptionName,
             _options.AutoComplete);
 
-        await using var client = new ServiceBusClient(_options.ConnectionString);
+        await using var client = TransactionValidation.Messaging.ServiceBusClientFactory.Create(_options.ConnectionString, _options.Namespace);
         var processor = client.CreateProcessor(
             _options.TopicName,
             _options.SubscriptionName,

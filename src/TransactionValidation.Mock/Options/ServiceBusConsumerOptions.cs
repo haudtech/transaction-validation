@@ -7,7 +7,10 @@ public abstract class ServiceBusConsumerOptions
 {
     public required bool Enabled { get; set; }
 
-    public required string ConnectionString { get; set; }
+    public string ConnectionString { get; set; } = string.Empty;
+
+    /// <summary>Namespace FQDN used for Managed Identity auth when <see cref="ConnectionString"/> is not set.</summary>
+    public string Namespace { get; set; } = string.Empty;
 
     public required string TopicName { get; set; }
 

@@ -29,6 +29,13 @@ public sealed class ApiKeyMiddleware
     /// <param name="options">The configured API key settings.</param>
     public async Task InvokeAsync(HttpContext context, IOptions<ApiKeyOptions> options)
     {
+        // Platform readiness/liveness probes don't send the API key header.
+        if (context.Request.Path.StartsWithSegments("/healthz"))
+        {
+            await _next(context);
+            return;
+        }
+
         var apiKeyOptions = options.Value;
         if (!apiKeyOptions.Enabled)
         {
