@@ -1,8 +1,8 @@
 name: Deploy to Azure
 
-# Runs on every push touching application code: build both images via ACR Tasks
-# (no local Docker needed in the runner), then point the existing Container Apps
-# at the freshly built tags. Never touches infra/bicep (see infra.yml for that).
+# Runs on every push touching application code: build both images on the runner,
+# push them to ACR, then point the existing Container Apps at the freshly built
+# tags. Never touches infra/bicep (see infra.yml for that).
 
 on:
   push:
@@ -46,21 +46,26 @@ jobs:
           echo "API_APP_NAME=$(echo "$outputs" | jq -r '.apiAppName.value')" >> "$GITHUB_ENV"
           echo "MOCK_APP_NAME=$(echo "$outputs" | jq -r '.mockAppName.value')" >> "$GITHUB_ENV"
 
-      - name: Build and push API image (ACR Tasks)
-        run: |
-          az acr build \
-            --registry ${{ env.ACR_NAME }} \
-            --image txv-api:${{ github.sha }} \
-            --file src/TransactionValidation.Api/Dockerfile \
-            .
+      # ACR Tasks (az acr build) is blocked on this subscription with
+      # TasksOperationsNotAllowed, so images are built on the runner instead.
+      - name: Log in to ACR
+        run: az acr login --name ${{ env.ACR_NAME }}
 
-      - name: Build and push Mock image (ACR Tasks)
+      - name: Build and push API image
         run: |
-          az acr build \
-            --registry ${{ env.ACR_NAME }} \
-            --image txv-mock:${{ github.sha }} \
-            --file src/TransactionValidation.Mock/Dockerfile \
+          docker build \
+            --file src/TransactionValidation.Api/Dockerfile \
+            --tag ${{ env.ACR_NAME }}.azurecr.io/txv-api:${{ github.sha }} \
             .
+          docker push ${{ env.ACR_NAME }}.azurecr.io/txv-api:${{ github.sha }}
+
+      - name: Build and push Mock image
+        run: |
+          docker build \
+            --file src/TransactionValidation.Mock/Dockerfile \
+            --tag ${{ env.ACR_NAME }}.azurecr.io/txv-mock:${{ github.sha }} \
+            .
+          docker push ${{ env.ACR_NAME }}.azurecr.io/txv-mock:${{ github.sha }}
 
       - name: Update API Container App revision
         run: |
