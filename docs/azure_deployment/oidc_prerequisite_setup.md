@@ -1,6 +1,6 @@
 # Azure AD OIDC Prerequisite Setup — Runbook
 
-Status: Completed for the `azure-infra` / `azure-dev` dev environment on 2026-09-04.
+Status: Completed for the `azure-infra` / `azure-dev` dev environment on 2026-09-07. The deployed dev environment was validated; the optional repository E2E suite remains blocked because the Mock app has internal-only ingress.
 
 This document records the exact commands run to satisfy the "Prerequisite: one-time Azure AD OIDC setup" checklist in [azure_deployment_plan.md](../implementation/azure_deployment_plan.md), including the expected result for each step. It doubles as a runbook for repeating this setup for a future `staging`/`prod` environment.
 
@@ -77,7 +77,7 @@ az ad sp create --id b5ddd0a1-5d22-434e-a518-1ae33af326f2 -o json
 
 Value captured: service principal object ID = `2eaa30b1-6f9f-4a58-b5c4-f4cb2395ee73`.
 
-## Step 6 — Assign the Contributor role at subscription scope
+## Step 6 — Assign deployment permissions
 
 ```bash
 az role assignment create \
@@ -90,6 +90,22 @@ az role assignment create \
 **Expected result:** JSON confirming the role assignment, with `principalType: ServicePrincipal` and `roleDefinitionId` pointing to the built-in `Contributor` role GUID (`b24988ac-6180-42a0-ab88-20f7382dd24c`).
 
 Subscription scope is required (not resource-group scope) because `infra.yml` runs `az deployment sub create`, which creates the resource group itself — a role scoped only to a resource group that doesn't exist yet would fail.
+
+The Bicep template also creates Azure RBAC assignments for the Container Apps identities. `Contributor` does not include `Microsoft.Authorization/roleAssignments/write`, so grant the deployment service principal `User Access Administrator` on the target resource group as an additional, narrower permission. The resource group must already exist; create it first if this is a new environment:
+
+```bash
+az group create \
+  --name rg-txv-dev \
+  --location eastus
+
+az role assignment create \
+  --assignee b5ddd0a1-5d22-434e-a518-1ae33af326f2 \
+  --role "User Access Administrator" \
+  --scope /subscriptions/31ddc37b-7b65-43a9-b668-0a3796314995/resourceGroups/rg-txv-dev \
+  -o json
+```
+
+**Expected result:** JSON confirming a `User Access Administrator` assignment at `/subscriptions/31ddc37b-7b65-43a9-b668-0a3796314995/resourceGroups/rg-txv-dev`. Keep this assignment resource-group scoped rather than granting it at subscription scope.
 
 ## Step 7 — Add the federated credential for the `azure-infra` environment
 
@@ -236,12 +252,12 @@ gh secret list
 |---|---|
 | App Registration | `txv-github-actions-oidc` (`AZURE_CLIENT_ID = b5ddd0a1-5d22-434e-a518-1ae33af326f2`) |
 | Service principal | object ID `2eaa30b1-6f9f-4a58-b5c4-f4cb2395ee73` |
-| RBAC role | `Contributor` at subscription scope `31ddc37b-7b65-43a9-b668-0a3796314995` |
+| RBAC roles | `Contributor` at subscription scope `31ddc37b-7b65-43a9-b668-0a3796314995`; `User Access Administrator` at resource-group scope `rg-txv-dev` |
 | Federated credentials | `github-azure-infra`, `github-azure-dev`, `github-azure-infra-numeric-subject`, `github-azure-dev-numeric-subject`, `github-infra-pull-request-preview` (all issuer `https://token.actions.githubusercontent.com`, audience `api://AzureADTokenExchange`) |
 | GitHub environments | `azure-infra` (required reviewer: `haudtech`), `azure-dev` |
 | GitHub secrets | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `API_KEY_SECRET_VALUE` |
 
-Both [infra.yml](../../.github/workflows/infra.yml) and [deploy-azure.yml](../../.github/workflows/deploy-azure.yml) can now authenticate via OIDC. Nothing else blocks running them.
+Both [infra.yml](../../.github/workflows/infra.yml) and [deploy-azure.yml](../../.github/workflows/deploy-azure.yml) authenticate via OIDC, and the dev deployment has been validated. The repository E2E suite and the audit-consumer redelivery check still require a runner that can reach the Mock app's internal-only ingress; they are optional follow-up validation, not OIDC prerequisites.
 
 ## Repeating this for a future environment (e.g. `staging`)
 
