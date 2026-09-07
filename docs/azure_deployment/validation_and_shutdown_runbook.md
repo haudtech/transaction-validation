@@ -192,42 +192,69 @@ az servicebus namespace show \
 
 ## 6. Stop the running services without deleting infrastructure
 
-This is the reversible option. It stops the API and Mock Container Apps while retaining the resource group, networking, Service Bus, Redis, Key Vault, and ACR.
+Azure CLI does not provide an `az containerapp stop` command. The reversible app-level operation is to deactivate the active revision for each Container App. This stops serving those revisions while retaining the resource group, networking, Service Bus, Redis, Key Vault, and ACR.
+
+Run Section 1 first in the same shell so `RESOURCE_GROUP`, `API_APP`, and `MOCK_APP` are defined. If those variables are empty, Azure CLI cannot identify the target resources.
 
 Stopping the apps does not remove the infrastructure or eliminate all Azure charges. Use the resource-group deletion procedure below when the dev environment must be fully retired.
 
 ```bash
-az containerapp stop \
+API_REVISION=$(az containerapp revision list \
   --name "$API_APP" \
-  --resource-group "$RESOURCE_GROUP"
+  --resource-group "$RESOURCE_GROUP" \
+  --query "[?properties.active].name | [0]" \
+  -o tsv)
 
-az containerapp stop \
+MOCK_REVISION=$(az containerapp revision list \
   --name "$MOCK_APP" \
-  --resource-group "$RESOURCE_GROUP"
+  --resource-group "$RESOURCE_GROUP" \
+  --query "[?properties.active].name | [0]" \
+  -o tsv)
+
+test -n "$API_REVISION" || { echo "No active API revision found" >&2; exit 1; }
+test -n "$MOCK_REVISION" || { echo "No active Mock revision found" >&2; exit 1; }
+
+az containerapp revision deactivate \
+  --name "$API_APP" \
+  --resource-group "$RESOURCE_GROUP" \
+  --revision "$API_REVISION"
+
+az containerapp revision deactivate \
+  --name "$MOCK_APP" \
+  --resource-group "$RESOURCE_GROUP" \
+  --revision "$MOCK_REVISION"
 ```
 
-Verify they are stopped:
+Verify that the saved revisions are inactive:
 
 ```bash
-for app in "$API_APP" "$MOCK_APP"; do
-  az containerapp show \
-    --name "$app" \
-    --resource-group "$RESOURCE_GROUP" \
-    --query "{name:name, runningStatus:properties.runningStatus}" \
-    -o table
-done
+az containerapp revision show \
+  --name "$API_APP" \
+  --resource-group "$RESOURCE_GROUP" \
+  --revision "$API_REVISION" \
+  --query "{name:name, active:properties.active, health:properties.healthState}" \
+  -o table
+
+az containerapp revision show \
+  --name "$MOCK_APP" \
+  --resource-group "$RESOURCE_GROUP" \
+  --revision "$MOCK_REVISION" \
+  --query "{name:name, active:properties.active, health:properties.healthState}" \
+  -o table
 ```
 
-Start them again with:
+Start them again by activating the saved revisions:
 
 ```bash
-az containerapp start \
+az containerapp revision activate \
   --name "$API_APP" \
-  --resource-group "$RESOURCE_GROUP"
+  --resource-group "$RESOURCE_GROUP" \
+  --revision "$API_REVISION"
 
-az containerapp start \
+az containerapp revision activate \
   --name "$MOCK_APP" \
-  --resource-group "$RESOURCE_GROUP"
+  --resource-group "$RESOURCE_GROUP" \
+  --revision "$MOCK_REVISION"
 ```
 
 Stopping the apps does not stop GitHub Actions from deploying new revisions. Avoid pushes that match the workflow paths, or disable the workflows temporarily:
