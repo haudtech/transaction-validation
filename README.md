@@ -18,6 +18,7 @@ Technology stack
 | Observability | Serilog, OpenTelemetry, optional Azure Monitor exporter |
 | Configuration | `appsettings*.json`, environment variables, `DotNetEnv` |
 | Containerization | Docker, Docker Compose |
+| Azure deployment | GitHub Actions lifecycle: pull-request infrastructure `what-if`, protected merge-to-`main` infrastructure apply, and application image build/push/deployment to Azure Container Apps via OIDC |
 | Architecture | Multi-project solution (`Api`, `Configuration`, `Core`, `Integration`, `Messaging`, `Mock`, `Tests`) |
 | Testing | xUnit, Moq, FluentAssertions, ASP.NET Core integration-host tests (`WebApplicationFactory<Program>`) |
 | Coverage | `coverlet.collector` (XPlat Code Coverage, Cobertura XML) + `dotnet-reportgenerator-globaltool` (HTML/Markdown/Text reports) |
@@ -151,6 +152,8 @@ Repository entrypoint for implementation, workflow, and architecture documentati
 ## Documentation
 
 Start here: [docs/README.md](docs/README.md)
+
+Azure deployment entry point: [docs/azure_deployment/README.md](docs/azure_deployment/README.md)
 
 The documentation set includes architecture, topology, and runtime sequence references for both broker implementations.
 
