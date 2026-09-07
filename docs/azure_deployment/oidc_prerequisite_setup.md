@@ -4,6 +4,17 @@ Status: Completed for the `azure-infra` / `azure-dev` dev environment on 2026-09
 
 This document records the exact commands run to satisfy the "Prerequisite: one-time Azure AD OIDC setup" checklist in [azure_deployment_plan.md](../implementation/azure_deployment_plan.md), including the expected result for each step. It doubles as a runbook for repeating this setup for a future `staging`/`prod` environment.
 
+Replace every placeholder in angle brackets before running a command. The values are intentionally omitted from this reusable guide:
+
+- `<AZURE_SUBSCRIPTION_ID>` — target Azure subscription GUID.
+- `<AZURE_TENANT_ID>` — Microsoft Entra tenant GUID.
+- `<AZURE_CLIENT_ID>` — App Registration application/client ID.
+- `<AZURE_APP_OBJECT_ID>` — App Registration object ID, when needed.
+- `<AZURE_SERVICE_PRINCIPAL_OBJECT_ID>` — service principal object ID, when needed.
+- `<GITHUB_OWNER>/<GITHUB_REPOSITORY>` — repository slug.
+- `<GITHUB_OWNER_ID>` and `<GITHUB_REPOSITORY_ID>` — numeric GitHub owner/repository IDs used by emitted OIDC subjects.
+- `<GITHUB_REVIEWER_ID>` and `<GITHUB_REVIEWER_LOGIN>` — required environment reviewer identity.
+
 Related workflows that depend on this setup:
 
 - [.github/workflows/infra.yml](../../.github/workflows/infra.yml)
@@ -29,13 +40,11 @@ az account show -o json
 
 **Expected result:** JSON containing `id` (subscription ID), `tenantId`, and `user.name`/`user.type`. Record these — they map directly to `AZURE_SUBSCRIPTION_ID` and `AZURE_TENANT_ID`.
 
-Values captured for this environment:
-
 | Value | Result |
 |---|---|
-| `AZURE_SUBSCRIPTION_ID` | `31ddc37b-7b65-43a9-b668-0a3796314995` |
-| `AZURE_TENANT_ID` | `15125a0a-8358-4d0b-b60b-993e7913ff6f` |
-| Signed-in user | `haud.tech@gmail.com` (type: `user`) |
+| `AZURE_SUBSCRIPTION_ID` | `<AZURE_SUBSCRIPTION_ID>` |
+| `AZURE_TENANT_ID` | `<AZURE_TENANT_ID>` |
+| Signed-in user | `<AZURE_SIGNED_IN_USER>` |
 
 ## Step 3 — Confirm GitHub CLI login and exact repo slug
 
@@ -46,9 +55,9 @@ git remote -v
 
 **Expected result:** `gh auth status` shows `✓ Logged in to github.com` with `repo` and `workflow` token scopes (both required to manage secrets/environments). `git remote -v` shows the `origin` URL, from which the `org/repo` slug is read.
 
-Value captured: repo slug = `haudtech/transaction-validation`.
+Repository slug: `<GITHUB_OWNER>/<GITHUB_REPOSITORY>`.
 
-This value feeds the federated credential `subject` claims in Step 7–8, which must be exactly `repo:haudtech/transaction-validation:environment:<env-name>`.
+This value feeds the federated credential `subject` claims in Step 7–8, which must be exactly `repo:<GITHUB_OWNER>/<GITHUB_REPOSITORY>:environment:<env-name>`.
 
 ## Step 4 — Create the Azure AD App Registration
 
@@ -58,32 +67,30 @@ az ad app create --display-name "txv-github-actions-oidc" -o json
 
 **Expected result:** JSON for the new application, including `appId` (this becomes `AZURE_CLIENT_ID`) and `id` (the Azure AD object ID, distinct from `appId`).
 
-Values captured:
-
 | Value | Result |
 |---|---|
-| `AZURE_CLIENT_ID` (`appId`) | `b5ddd0a1-5d22-434e-a518-1ae33af326f2` |
-| App object ID (`id`) | `88d77ed7-4871-4666-96e6-869797edcecc` |
+| `AZURE_CLIENT_ID` (`appId`) | `<AZURE_CLIENT_ID>` |
+| App object ID (`id`) | `<AZURE_APP_OBJECT_ID>` |
 
 ## Step 5 — Create the service principal for the App Registration
 
 App registrations cannot be assigned RBAC roles directly — they need a linked service principal first.
 
 ```bash
-az ad sp create --id b5ddd0a1-5d22-434e-a518-1ae33af326f2 -o json
+az ad sp create --id <AZURE_CLIENT_ID> -o json
 ```
 
 **Expected result:** JSON for the new service principal, including its own `id` (service principal object ID, used as the `--assignee` in Step 6) and `appId` matching the App Registration's client ID.
 
-Value captured: service principal object ID = `2eaa30b1-6f9f-4a58-b5c4-f4cb2395ee73`.
+Service principal object ID: `<AZURE_SERVICE_PRINCIPAL_OBJECT_ID>`.
 
 ## Step 6 — Assign deployment permissions
 
 ```bash
 az role assignment create \
-  --assignee b5ddd0a1-5d22-434e-a518-1ae33af326f2 \
+  --assignee <AZURE_CLIENT_ID> \
   --role Contributor \
-  --scope /subscriptions/31ddc37b-7b65-43a9-b668-0a3796314995 \
+  --scope /subscriptions/<AZURE_SUBSCRIPTION_ID> \
   -o json
 ```
 
@@ -95,27 +102,27 @@ The Bicep template also creates Azure RBAC assignments for the Container Apps id
 
 ```bash
 az group create \
-  --name rg-txv-dev \
+  --name <AZURE_RESOURCE_GROUP> \
   --location eastus
 
 az role assignment create \
-  --assignee b5ddd0a1-5d22-434e-a518-1ae33af326f2 \
+  --assignee <AZURE_CLIENT_ID> \
   --role "User Access Administrator" \
-  --scope /subscriptions/31ddc37b-7b65-43a9-b668-0a3796314995/resourceGroups/rg-txv-dev \
+  --scope /subscriptions/<AZURE_SUBSCRIPTION_ID>/resourceGroups/<AZURE_RESOURCE_GROUP> \
   -o json
 ```
 
-**Expected result:** JSON confirming a `User Access Administrator` assignment at `/subscriptions/31ddc37b-7b65-43a9-b668-0a3796314995/resourceGroups/rg-txv-dev`. Keep this assignment resource-group scoped rather than granting it at subscription scope.
+**Expected result:** JSON confirming a `User Access Administrator` assignment at `/subscriptions/<AZURE_SUBSCRIPTION_ID>/resourceGroups/<AZURE_RESOURCE_GROUP>`. Keep this assignment resource-group scoped rather than granting it at subscription scope.
 
 ## Step 7 — Add the federated credential for the `azure-infra` environment
 
 ```bash
 az ad app federated-credential create \
-  --id b5ddd0a1-5d22-434e-a518-1ae33af326f2 \
+  --id <AZURE_CLIENT_ID> \
   --parameters '{
     "name": "github-azure-infra",
     "issuer": "https://token.actions.githubusercontent.com",
-    "subject": "repo:haudtech/transaction-validation:environment:azure-infra",
+    "subject": "repo:<GITHUB_OWNER>/<GITHUB_REPOSITORY>:environment:azure-infra",
     "audiences": ["api://AzureADTokenExchange"]
   }'
 ```
@@ -128,11 +135,11 @@ Same command, different `name`/`subject`:
 
 ```bash
 az ad app federated-credential create \
-  --id b5ddd0a1-5d22-434e-a518-1ae33af326f2 \
+  --id <AZURE_CLIENT_ID> \
   --parameters '{
     "name": "github-azure-dev",
     "issuer": "https://token.actions.githubusercontent.com",
-    "subject": "repo:haudtech/transaction-validation:environment:azure-dev",
+    "subject": "repo:<GITHUB_OWNER>/<GITHUB_REPOSITORY>:environment:azure-dev",
     "audiences": ["api://AzureADTokenExchange"]
   }'
 ```
@@ -144,27 +151,27 @@ az ad app federated-credential create \
 GitHub emitted numeric owner/repository IDs for the actual workflow assertions, for example:
 
 ```text
-repo:haudtech@110943608/transaction-validation@1333026803:environment:azure-infra
+repo:<GITHUB_OWNER>@<GITHUB_OWNER_ID>/<GITHUB_REPOSITORY>@<GITHUB_REPOSITORY_ID>:environment:azure-infra
 ```
 
 The initial human-readable environment subjects did not match this assertion and the approved `apply` job failed with `AADSTS700213`. Add credentials matching the exact emitted subject for both environments:
 
 ```bash
 az ad app federated-credential create \
-  --id b5ddd0a1-5d22-434e-a518-1ae33af326f2 \
+  --id <AZURE_CLIENT_ID> \
   --parameters '{
     "name": "github-azure-infra-numeric-subject",
     "issuer": "https://token.actions.githubusercontent.com",
-    "subject": "repo:haudtech@110943608/transaction-validation@1333026803:environment:azure-infra",
+    "subject": "repo:<GITHUB_OWNER>@<GITHUB_OWNER_ID>/<GITHUB_REPOSITORY>@<GITHUB_REPOSITORY_ID>:environment:azure-infra",
     "audiences": ["api://AzureADTokenExchange"]
   }'
 
 az ad app federated-credential create \
-  --id b5ddd0a1-5d22-434e-a518-1ae33af326f2 \
+  --id <AZURE_CLIENT_ID> \
   --parameters '{
     "name": "github-azure-dev-numeric-subject",
     "issuer": "https://token.actions.githubusercontent.com",
-    "subject": "repo:haudtech@110943608/transaction-validation@1333026803:environment:azure-dev",
+    "subject": "repo:<GITHUB_OWNER>@<GITHUB_OWNER_ID>/<GITHUB_REPOSITORY>@<GITHUB_REPOSITORY_ID>:environment:azure-dev",
     "audiences": ["api://AzureADTokenExchange"]
   }'
 ```
@@ -177,11 +184,11 @@ The `what-if` job in `infra.yml` does not declare a GitHub Environment. GitHub t
 
 ```bash
 az ad app federated-credential create \
-  --id b5ddd0a1-5d22-434e-a518-1ae33af326f2 \
+  --id <AZURE_CLIENT_ID> \
   --parameters '{
     "name": "github-infra-pull-request-preview",
     "issuer": "https://token.actions.githubusercontent.com",
-    "subject": "repo:haudtech@110943608/transaction-validation@1333026803:pull_request",
+    "subject": "repo:<GITHUB_OWNER>@<GITHUB_OWNER_ID>/<GITHUB_REPOSITORY>@<GITHUB_REPOSITORY_ID>:pull_request",
     "audiences": ["api://AzureADTokenExchange"]
   }'
 ```
@@ -193,9 +200,9 @@ This credential authorizes the preview identity only. The workflow job runs `az 
 ## Step 9 — Create the two GitHub environments
 
 ```bash
-gh api repos/haudtech/transaction-validation/environments/azure-infra -X PUT --silent
-gh api repos/haudtech/transaction-validation/environments/azure-dev -X PUT --silent
-gh api repos/haudtech/transaction-validation/environments -q '.environments[].name'
+gh api repos/<GITHUB_OWNER>/<GITHUB_REPOSITORY>/environments/azure-infra -X PUT --silent
+gh api repos/<GITHUB_OWNER>/<GITHUB_REPOSITORY>/environments/azure-dev -X PUT --silent
+gh api repos/<GITHUB_OWNER>/<GITHUB_REPOSITORY>/environments -q '.environments[].name'
 ```
 
 **Expected result:** the first two commands produce no output on success (`--silent`, HTTP 200/201). The third lists all environments in the repo; `azure-dev` and `azure-infra` should both appear (alongside any pre-existing environments, e.g. `integration`).
@@ -209,25 +216,25 @@ gh api /user -q '.id, .login'
 **Expected result:** your numeric GitHub user ID and login, needed for the next call.
 
 ```bash
-gh api repos/haudtech/transaction-validation/environments/azure-infra -X PUT \
+gh api repos/<GITHUB_OWNER>/<GITHUB_REPOSITORY>/environments/azure-infra -X PUT \
   -f "reviewers[][type]=User" \
-  -F "reviewers[][id]=110943608" \
+  -F "reviewers[][id]=<GITHUB_REVIEWER_ID>" \
   --silent
 
-gh api repos/haudtech/transaction-validation/environments/azure-infra \
+gh api repos/<GITHUB_OWNER>/<GITHUB_REPOSITORY>/environments/azure-infra \
   -q '.protection_rules[].reviewers[].reviewer.login'
 ```
 
-**Expected result:** the `PUT` produces no output on success. The verification `GET` prints the reviewer's login (`haudtech`), confirming the manual-approval gate is active — `infra.yml`'s `apply` job will now pause for approval before running `az deployment sub create`.
+**Expected result:** the `PUT` produces no output on success. The verification `GET` prints `<GITHUB_REVIEWER_LOGIN>`, confirming the manual-approval gate is active — `infra.yml`'s `apply` job will now pause for approval before running `az deployment sub create`.
 
 **Pitfall hit during this run:** including `-f "deployment_branch_policy="` in the same request fails with `HTTP 422: Invalid property /deployment_branch_policy: "" is not of type object` — that field must be omitted entirely (not set to an empty string) when not configuring branch restrictions.
 
 ## Step 11 — Store the three identifier secrets
 
 ```bash
-gh secret set AZURE_CLIENT_ID -b "b5ddd0a1-5d22-434e-a518-1ae33af326f2"
-gh secret set AZURE_TENANT_ID -b "15125a0a-8358-4d0b-b60b-993e7913ff6f"
-gh secret set AZURE_SUBSCRIPTION_ID -b "31ddc37b-7b65-43a9-b668-0a3796314995"
+gh secret set AZURE_CLIENT_ID -b "<AZURE_CLIENT_ID>"
+gh secret set AZURE_TENANT_ID -b "<AZURE_TENANT_ID>"
+gh secret set AZURE_SUBSCRIPTION_ID -b "<AZURE_SUBSCRIPTION_ID>"
 gh secret list
 ```
 
@@ -250,11 +257,11 @@ gh secret list
 
 | Item | Value / Status |
 |---|---|
-| App Registration | `txv-github-actions-oidc` (`AZURE_CLIENT_ID = b5ddd0a1-5d22-434e-a518-1ae33af326f2`) |
-| Service principal | object ID `2eaa30b1-6f9f-4a58-b5c4-f4cb2395ee73` |
-| RBAC roles | `Contributor` at subscription scope `31ddc37b-7b65-43a9-b668-0a3796314995`; `User Access Administrator` at resource-group scope `rg-txv-dev` |
+| App Registration | `txv-github-actions-oidc` (`AZURE_CLIENT_ID = <AZURE_CLIENT_ID>`) |
+| Service principal | object ID `<AZURE_SERVICE_PRINCIPAL_OBJECT_ID>` |
+| RBAC roles | `Contributor` at subscription scope `<AZURE_SUBSCRIPTION_ID>`; `User Access Administrator` at resource-group scope `<AZURE_RESOURCE_GROUP>` |
 | Federated credentials | `github-azure-infra`, `github-azure-dev`, `github-azure-infra-numeric-subject`, `github-azure-dev-numeric-subject`, `github-infra-pull-request-preview` (all issuer `https://token.actions.githubusercontent.com`, audience `api://AzureADTokenExchange`) |
-| GitHub environments | `azure-infra` (required reviewer: `haudtech`), `azure-dev` |
+| GitHub environments | `azure-infra` (required reviewer: `<GITHUB_REVIEWER_LOGIN>`), `azure-dev` |
 | GitHub secrets | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `API_KEY_SECRET_VALUE` |
 
 Both [infra.yml](../../.github/workflows/infra.yml) and [deploy-azure.yml](../../.github/workflows/deploy-azure.yml) authenticate via OIDC, and the dev deployment has been validated. The repository E2E suite and the audit-consumer redelivery check still require a runner that can reach the Mock app's internal-only ingress; they are optional follow-up validation, not OIDC prerequisites.
