@@ -72,6 +72,7 @@ New `infra/bicep/` with modules:
 - [x] `keyvault.bicep` — secrets (API key, Redis connection string)
 - [x] `containerapps.bicep` — Log Analytics, ACR, Container Apps environment, `txv-api` (external HTTPS-only ingress), `txv-mock` (internal-only ingress), system-assigned managed identities
 - [x] Role assignments: `Azure Service Bus Data Sender` (API), `Azure Service Bus Data Receiver` (Mock), `Key Vault Secrets User` (API), `AcrPull` (both apps)
+- [x] Use **user-assigned** managed identities (one per app) rather than system-assigned. With system-assigned identities the role assignments can only be declared after the app exists (they need its `principalId`), but Container Apps provisions the first revision immediately — so the image pull ran before `AcrPull` was granted and failed with `401 UNAUTHORIZED`, surfacing as `ContainerAppOperationError: Operation expired`. User-assigned identities are created first, granted their roles, and only then referenced by the apps via `dependsOn`. Each app sets `AZURE_CLIENT_ID` so `DefaultAzureCredential` selects the right identity, and the per-app least-privilege split is preserved.
 - [x] `main.bicep` (subscription-scope entry point, creates the resource group and wires all five modules) + `main.parameters.dev.json`
 - [x] Verified with `az deployment sub what-if` against a real subscription — confirmed the template is valid and produces the expected resource plan.
 
@@ -100,6 +101,9 @@ Status: Done
   - `github-azure-infra` → subject `repo:haudtech/transaction-validation:environment:azure-infra`
   - `github-azure-dev` → subject `repo:haudtech/transaction-validation:environment:azure-dev`
   - both: issuer `https://token.actions.githubusercontent.com`, audience `api://AzureADTokenExchange`
+- [x] Added `github-infra-pull-request-preview` for the `infra.yml` `what-if` job, which has no GitHub Environment and presents the repository's `pull_request` OIDC subject. This resolved the `AADSTS700213` subject-mismatch failure on infrastructure-preview runs.
+- [x] Added `github-azure-infra-numeric-subject` and `github-azure-dev-numeric-subject` after GitHub emitted numeric owner/repository IDs in the approved apply assertion. This resolved the `AADSTS700213` mismatch for `environment:azure-infra`; the apply job was rerun and is awaiting the existing manual approval gate.
+- [x] Granted the deployment service principal `User Access Administrator` scoped to `rg-txv-dev`. `Contributor` alone excludes `Microsoft.Authorization/roleAssignments/write`, so the apply failed while creating the runtime role assignments in `containerapps.bicep`. Scoped to the resource group rather than the subscription to limit the added privilege.
 - [x] Created the `azure-infra` and `azure-dev` GitHub environments and configured `haudtech` as a required reviewer on `azure-infra` (manual approval gate before real infra changes apply).
 - [x] Stored `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` (`15125a0a-8358-4d0b-b60b-993e7913ff6f`), `AZURE_SUBSCRIPTION_ID` (`31ddc37b-7b65-43a9-b668-0a3796314995`) as GitHub repository secrets.
 - [x] Generated a random `API_KEY_SECRET_VALUE` (`openssl rand -base64 32`) and stored it as a GitHub secret directly from the command that generated it — the raw value was never printed to the terminal or chat.
