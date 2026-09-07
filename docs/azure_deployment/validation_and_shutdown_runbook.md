@@ -244,7 +244,30 @@ gh workflow enable infra.yml
 gh workflow enable deploy-azure.yml
 ```
 
-## 7. Delete the complete dev environment
+## 7. Choose the lowest-cost pause option
+
+Azure does not provide a single pause or suspend operation for every resource in a subscription or resource group. Deactivating the Container App revisions stops application traffic, but it does not stop billing for managed resources that remain provisioned.
+
+For this deployment, the following resources can continue to incur charges after the API and Mock revisions are deactivated:
+
+- Premium Azure Service Bus namespace
+- Azure Cache for Redis
+- Private endpoints and related networking
+- Azure Container Registry storage
+- Log Analytics workspace storage and ingestion
+- Any other provisioned resource with a paid tier
+
+Use the following choices:
+
+| Goal | Action | Trade-off |
+|---|---|---|
+| Brief pause with fast recovery | Deactivate the API and Mock revisions in Section 6 | Keeps the infrastructure and its ongoing charges |
+| Reduce some compute cost while retaining infrastructure | Deactivate revisions and review each resource's SKU/scale settings | Requires resource-specific changes; data-plane services may still charge |
+| Lowest cost for a disposable dev environment | Delete the complete resource group in Section 8 | Destructive: removes resources, data, private endpoints, identities, and ACR images |
+
+There is no resource-group-level command that pauses all billing. Stopping or disabling the subscription is not an appropriate operational substitute because it affects unrelated resources and does not provide a normal application lifecycle.
+
+## 8. Delete the complete dev environment
 
 Use this only when the entire dev environment should be removed. This deletes the Container Apps, private endpoints, VNet, Service Bus, Redis, Key Vault, ACR, Log Analytics, managed identities, and role assignments in the resource group. It is destructive and cannot be undone.
 
@@ -274,7 +297,7 @@ az group exists --name "$RESOURCE_GROUP"
 
 The command returns `false` after deletion completes. Do not run the infrastructure workflow again unless you intend to recreate the environment and still have the required GitHub secrets and Azure RBAC permissions.
 
-## 8. Local Docker shutdown is separate
+## 9. Local Docker shutdown is separate
 
 The Azure commands above do not stop local Docker services. To stop the local RabbitMQ/Redis test stack from the repository root:
 

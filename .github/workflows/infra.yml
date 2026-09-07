@@ -47,9 +47,9 @@ jobs:
             --parameters apiKeySecretValue="${{ secrets.API_KEY_SECRET_VALUE }}"
 
   apply:
-    # Real change; only on merge to main. Gate this with required reviewers on the
-    # "azure-infra" GitHub environment (Settings > Environments) for a manual approval step.
-    if: github.event_name == 'push'
+    # Real change on a merge to main or an explicit recovery dispatch. Gate this
+    # with required reviewers on the "azure-infra" GitHub environment.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: azure-infra
     steps:
