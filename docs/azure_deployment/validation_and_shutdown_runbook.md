@@ -4,16 +4,26 @@ This runbook validates the deployed `dev` environment and explains how to stop i
 
 The commands below use the deployment outputs instead of hardcoding the API hostname. Run them from a shell with Azure CLI installed and authenticated.
 
+Replace the placeholders in angle brackets before running a command:
+
+- `<AZURE_SUBSCRIPTION_ID>` — target Azure subscription GUID.
+- `<AZURE_RESOURCE_GROUP>` — deployed resource-group name.
+- `<AZURE_DEPLOYMENT_NAME>` — subscription deployment name.
+- `<AZURE_API_APP_NAME>` and `<AZURE_MOCK_APP_NAME>` — Container App names.
+- `<AZURE_SERVICE_BUS_NAMESPACE>` — deployed Service Bus namespace name.
+
+The `API_KEY` variable is intentionally read at runtime and is never included in this document.
+
 ## 1. Set the deployment context
 
 ```bash
 az login
-az account set --subscription 31ddc37b-7b65-43a9-b668-0a3796314995
+az account set --subscription <AZURE_SUBSCRIPTION_ID>
 
-RESOURCE_GROUP=rg-txv-dev
-DEPLOYMENT_NAME=txv-infra-dev
-API_APP=txv-api-dev
-MOCK_APP=txv-mock-dev
+RESOURCE_GROUP=<AZURE_RESOURCE_GROUP>
+DEPLOYMENT_NAME=<AZURE_DEPLOYMENT_NAME>
+API_APP=<AZURE_API_APP_NAME>
+MOCK_APP=<AZURE_MOCK_APP_NAME>
 
 API_HOST=$(az deployment sub show \
   --name "$DEPLOYMENT_NAME" \
@@ -24,7 +34,7 @@ API_URL="https://${API_HOST}"
 echo "API: ${API_URL}"
 ```
 
-Expected result: the API hostname is printed, for example `txv-api-dev....eastus.azurecontainerapps.io`. Do not expose API keys or secret values in shell history, logs, or chat.
+Expected result: the deployed API hostname is printed. Do not expose API keys or secret values in shell history, logs, or chat.
 
 To inspect all deployment outputs without revealing secrets:
 
@@ -174,7 +184,7 @@ az resource list \
   -o table
 
 az servicebus namespace show \
-  --name sb-txv-dev-001 \
+  --name <AZURE_SERVICE_BUS_NAMESPACE> \
   --resource-group "$RESOURCE_GROUP" \
   --query "{name:name, status:status, sku:sku.name}" \
   -o table
