@@ -44,12 +44,16 @@ sequenceDiagram
     Entra-->>CLI: Service principal object ID
 
     Dev->>CLI: az role assignment create --role Contributor
-    CLI->>Azure: Grant service principal deployment permission
-    Azure-->>CLI: Role assignment created
+    CLI->>Azure: Grant subscription deployment permission
+    Azure-->>CLI: Contributor assignment created
+    Dev->>CLI: az role assignment create --role User Access Administrator
+    CLI->>Azure: Grant resource-group role-assignment permission
+    Azure-->>CLI: User Access Administrator assignment created
 
     Dev->>CLI: az ad app federated-credential create
-    CLI->>Entra: Trust GitHub azure-infra token subject
-    CLI->>Entra: Trust GitHub azure-dev token subject
+    CLI->>Entra: Trust numeric azure-infra environment subject
+    CLI->>Entra: Trust numeric azure-dev environment subject
+    CLI->>Entra: Trust numeric pull_request subject for what-if
     Entra-->>CLI: Federated credentials created
 
     Dev->>GitHub: Create azure-infra and azure-dev environments
@@ -63,10 +67,11 @@ sequenceDiagram
 ```mermaid
 flowchart LR
     App["App Registration<br/>txv-github-actions-oidc"]
-    App --> FederationInfra["Federated credential<br/>repo:haudtech/transaction-validation<br/>environment:azure-infra"]
-    App --> FederationDev["Federated credential<br/>repo:haudtech/transaction-validation<br/>environment:azure-dev"]
+    App --> FederationInfra["Federated credential<br/>repo:haudtech@110943608/transaction-validation@1333026803<br/>environment:azure-infra"]
+    App --> FederationDev["Federated credential<br/>repo:haudtech@110943608/transaction-validation@1333026803<br/>environment:azure-dev"]
+    App --> FederationPreview["Federated credential<br/>repo:haudtech@110943608/transaction-validation@1333026803:pull_request"]
     App --> SP["Service principal<br/>tenant-local identity"]
-    SP --> RBAC["Contributor role<br/>Azure subscription"]
+    SP --> RBAC["Contributor<br/>subscription<br/>User Access Administrator<br/>rg-txv-dev"]
     GitHub["GitHub repository"] --> Environments["azure-infra + azure-dev<br/>deployment environments"]
     Environments --> FederationInfra
     Environments --> FederationDev
@@ -80,7 +85,7 @@ flowchart LR
 flowchart TB
     PR["Pull request changes infra/bicep/**"] --> WhatIf["GitHub Actions: infra.yml what-if job"]
     WhatIf --> LoginPreview["azure/login@v2 requests GitHub OIDC token"]
-    LoginPreview --> EntraPreview["Entra validates azure-infra federated credential"]
+    LoginPreview --> EntraPreview["Entra validates pull_request federated credential"]
     EntraPreview --> Preview["az deployment sub what-if"]
     Preview --> PRResult["Preview changes only<br/>No Azure resource changes"]
 
@@ -114,9 +119,11 @@ sequenceDiagram
     GH->>ARM: Read txv-infra-dev deployment outputs
     ARM-->>GH: Resource group, ACR, API, Mock names
 
-    GH->>ACR: az acr build API Dockerfile
+    GH->>GH: docker build API image on runner
+    GH->>ACR: docker push txv-api:git-sha
     ACR-->>GH: txv-api:git-sha pushed
-    GH->>ACR: az acr build Mock Dockerfile
+    GH->>GH: docker build Mock image on runner
+    GH->>ACR: docker push txv-mock:git-sha
     ACR-->>GH: txv-mock:git-sha pushed
 
     GH->>ARM: Update txv-api to txv-api:git-sha
@@ -138,13 +145,14 @@ The GitHub workflow identity is not the same identity as the running Container A
 flowchart LR
     GH["GitHub Actions service principal"]
     GH -->|"Contributor: deploy/update"| Subscription["Azure subscription"]
+    GH -->|"User Access Administrator: create runtime role assignments"| ResourceGroup["rg-txv-dev"]
 
-    API["txv-api managed identity"]
+    API["txv-api user-assigned managed identity"]
     API -->|"Service Bus Data Sender"| SB["Azure Service Bus"]
     API -->|"Key Vault Secrets User"| KV["Azure Key Vault"]
     API -->|"AcrPull"| ACR["Azure Container Registry"]
 
-    Mock["txv-mock managed identity"]
+    Mock["txv-mock user-assigned managed identity"]
     Mock -->|"Service Bus Data Receiver"| SB
     Mock -->|"AcrPull"| ACR
 
@@ -169,12 +177,12 @@ flowchart TD
 
 | Use case | Trigger | Identity used | Required control | Result |
 |---|---|---|---|---|
-| Preview Bicep | Pull request modifies `infra/bicep/**` | GitHub service principal through `azure-infra` | Matching federated credential + Contributor | `what-if` reports proposed changes only |
-| Apply Bicep | Merge infra change to `main` or manual dispatch | GitHub service principal through `azure-infra` | OIDC + Contributor + required reviewer approval | Azure resources are created/updated |
-| Deploy application image | Push to `main` modifies `src/**` or manual dispatch | GitHub service principal through `azure-dev` | OIDC + permission to build/push/update | ACR builds tagged images; apps receive new revisions |
-| API sends a message | Accepted transaction request | `txv-api` system-assigned managed identity | Service Bus Data Sender | Azure Service Bus accepts topic message |
-| Mock consumes a message | Service Bus delivery | `txv-mock` system-assigned managed identity | Service Bus Data Receiver | Consumer reads/completes subscription message |
-| API reads its API key / Redis config | Container App startup | `txv-api` managed identity | Key Vault Secrets User | Key Vault-backed secret becomes Container App config |
+| Preview Bicep | Pull request modifies `infra/bicep/**` | GitHub service principal without a GitHub Environment | Matching `pull_request` federated credential + Contributor | `what-if` reports proposed changes only |
+| Apply Bicep | Push to `main` after an infra change | GitHub service principal through `azure-infra` | OIDC + Contributor + User Access Administrator + required reviewer approval | Azure resources are created/updated |
+| Deploy application image | Push to `main` modifies `src/**` or manual dispatch | GitHub service principal through `azure-dev` | OIDC + permission to build/push/update | Runner-built images are pushed to ACR; apps receive new revisions |
+| API sends a message | Accepted transaction request | `txv-api` user-assigned managed identity | Service Bus Data Sender | Azure Service Bus accepts topic message |
+| Mock consumes a message | Service Bus delivery | `txv-mock` user-assigned managed identity | Service Bus Data Receiver | Consumer reads/completes subscription message |
+| API reads its API key / Redis config | Container App startup | `txv-api` user-assigned managed identity | Key Vault Secrets User | Key Vault-backed secret becomes Container App config |
 | App pulls its image | Revision startup/scale out | API or Mock managed identity | AcrPull | ACR serves the required tagged image |
 
 ## 8. What must match exactly
@@ -183,8 +191,9 @@ OIDC federation is strict. These values must agree or the workflow login fails:
 
 | GitHub workflow / environment | Entra federated credential |
 |---|---|
-| `environment: azure-infra` in `infra.yml` | subject ending `environment:azure-infra` |
-| `environment: azure-dev` in `deploy-azure.yml` | subject ending `environment:azure-dev` |
+| `environment: azure-infra` in `infra.yml` apply job | numeric subject ending `environment:azure-infra` |
+| No Environment in `infra.yml` what-if job | numeric subject ending `pull_request` |
+| `environment: azure-dev` in `deploy-azure.yml` | numeric subject ending `environment:azure-dev` |
 | Repository `haudtech/transaction-validation` | subject beginning `repo:haudtech/transaction-validation:` |
 | `permissions: id-token: write` | GitHub must be allowed to mint an OIDC token |
 | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` secrets | Existing Entra application and target Azure subscription |
@@ -192,9 +201,11 @@ OIDC federation is strict. These values must agree or the workflow login fails:
 ## 9. Operational checklist
 
 - [x] App Registration and service principal exist.
-- [x] `azure-infra` and `azure-dev` federated credentials exist with matching GitHub subjects.
+- [x] `azure-infra`, `azure-dev`, and pull-request preview federated credentials exist with matching numeric GitHub subjects.
+- [x] Service principal has `Contributor` at subscription scope and `User Access Administrator` at `rg-txv-dev` scope.
 - [x] GitHub Environments exist; `azure-infra` requires reviewer approval.
 - [x] Required GitHub repository secrets exist.
-- [ ] Run `infra.yml` successfully through its approved apply job.
-- [ ] Run `deploy-azure.yml` successfully and confirm both revisions pull their tagged ACR images.
-- [ ] Complete deployed-environment validation in [azure_deployment_plan.md](../implementation/azure_deployment_plan.md).
+- [x] Run `infra.yml` successfully through its approved apply job.
+- [x] Run `deploy-azure.yml` successfully and confirm both revisions pull their tagged ACR images.
+- [x] Complete deployed-environment validation in [azure_deployment_plan.md](../implementation/azure_deployment_plan.md).
+- [ ] Run the repository E2E suite and audit-consumer redelivery check from a runner that can reach the Mock app's internal-only ingress.

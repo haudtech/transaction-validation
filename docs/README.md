@@ -42,6 +42,10 @@ This folder is the central entry point for the project’s technical and enginee
 - Integration workflow details: [workflow_actions/github/integration_workflow.md](workflow_actions/github/integration_workflow.md)
 - Workflow case studies: [workflow_actions/github/workflow_case_studies.md](workflow_actions/github/workflow_case_studies.md)
 
+### Azure deployment
+- Azure deployment documentation: [azure_deployment/README.md](azure_deployment/README.md)
+- Validate and stop the deployed environment: [azure_deployment/validation_and_shutdown_runbook.md](azure_deployment/validation_and_shutdown_runbook.md)
+
 ---
 
 ## Recommended reading order
