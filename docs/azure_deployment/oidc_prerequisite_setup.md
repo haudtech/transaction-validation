@@ -123,6 +123,57 @@ az ad app federated-credential create \
 
 **Expected result:** same shape as Step 7, with `subject` ending in `environment:azure-dev`. This covers `deploy-azure.yml`.
 
+### GitHub numeric subject format
+
+GitHub emitted numeric owner/repository IDs for the actual workflow assertions, for example:
+
+```text
+repo:haudtech@110943608/transaction-validation@1333026803:environment:azure-infra
+```
+
+The initial human-readable environment subjects did not match this assertion and the approved `apply` job failed with `AADSTS700213`. Add credentials matching the exact emitted subject for both environments:
+
+```bash
+az ad app federated-credential create \
+  --id b5ddd0a1-5d22-434e-a518-1ae33af326f2 \
+  --parameters '{
+    "name": "github-azure-infra-numeric-subject",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subject": "repo:haudtech@110943608/transaction-validation@1333026803:environment:azure-infra",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+
+az ad app federated-credential create \
+  --id b5ddd0a1-5d22-434e-a518-1ae33af326f2 \
+  --parameters '{
+    "name": "github-azure-dev-numeric-subject",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subject": "repo:haudtech@110943608/transaction-validation@1333026803:environment:azure-dev",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+```
+
+**Expected result:** both commands return a federated-credential record. Always copy the subject shown in an `AADSTS700213` workflow error rather than assuming a human-readable repository format.
+
+## Step 8a — Add the federated credential for pull-request infrastructure previews
+
+The `what-if` job in `infra.yml` does not declare a GitHub Environment. GitHub therefore emits a `pull_request` subject rather than the `environment:azure-infra` subject used by the approved apply job. Entra ID requires an exact subject match, so the preview requires its own federated credential.
+
+```bash
+az ad app federated-credential create \
+  --id b5ddd0a1-5d22-434e-a518-1ae33af326f2 \
+  --parameters '{
+    "name": "github-infra-pull-request-preview",
+    "issuer": "https://token.actions.githubusercontent.com",
+    "subject": "repo:haudtech@110943608/transaction-validation@1333026803:pull_request",
+    "audiences": ["api://AzureADTokenExchange"]
+  }'
+```
+
+**Expected result:** JSON for `github-infra-pull-request-preview` with the exact `pull_request` subject. The numeric IDs in this subject are GitHub's stable owner and repository identifiers; use the subject reported in `AADSTS700213` if the repository is transferred or the workflow reports a different subject.
+
+This credential authorizes the preview identity only. The workflow job runs `az deployment sub what-if`, not `az deployment sub create`; the real infrastructure apply remains protected by the `azure-infra` Environment approval gate.
+
 ## Step 9 — Create the two GitHub environments
 
 ```bash
@@ -186,7 +237,7 @@ gh secret list
 | App Registration | `txv-github-actions-oidc` (`AZURE_CLIENT_ID = b5ddd0a1-5d22-434e-a518-1ae33af326f2`) |
 | Service principal | object ID `2eaa30b1-6f9f-4a58-b5c4-f4cb2395ee73` |
 | RBAC role | `Contributor` at subscription scope `31ddc37b-7b65-43a9-b668-0a3796314995` |
-| Federated credentials | `github-azure-infra`, `github-azure-dev` (both issuer `https://token.actions.githubusercontent.com`, audience `api://AzureADTokenExchange`) |
+| Federated credentials | `github-azure-infra`, `github-azure-dev`, `github-azure-infra-numeric-subject`, `github-azure-dev-numeric-subject`, `github-infra-pull-request-preview` (all issuer `https://token.actions.githubusercontent.com`, audience `api://AzureADTokenExchange`) |
 | GitHub environments | `azure-infra` (required reviewer: `haudtech`), `azure-dev` |
 | GitHub secrets | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `API_KEY_SECRET_VALUE` |
 

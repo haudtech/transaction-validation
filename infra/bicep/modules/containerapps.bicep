@@ -55,6 +55,71 @@ resource acr 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' = {
   }
 }
 
+// User-assigned identities are created before the apps so their ACR/Key Vault roles already exist when
+// the first revision provisions. A system-assigned identity cannot: its role assignments depend on the
+// app, but the app's first image pull happens before those assignments can be created.
+resource apiIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: 'id-${apiAppName}'
+  location: location
+  tags: tags
+}
+
+resource mockIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: 'id-${mockAppName}'
+  location: location
+  tags: tags
+}
+
+resource apiServiceBusSenderRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(serviceBusNamespaceId, apiIdentity.id, serviceBusDataSenderRoleId)
+  scope: existingServiceBusNamespace
+  properties: {
+    principalId: apiIdentity.properties.principalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', serviceBusDataSenderRoleId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource mockServiceBusReceiverRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(serviceBusNamespaceId, mockIdentity.id, serviceBusDataReceiverRoleId)
+  scope: existingServiceBusNamespace
+  properties: {
+    principalId: mockIdentity.properties.principalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', serviceBusDataReceiverRoleId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource apiKeyVaultSecretsUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(keyVaultId, apiIdentity.id, keyVaultSecretsUserRoleId)
+  scope: existingKeyVault
+  properties: {
+    principalId: apiIdentity.properties.principalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsUserRoleId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource apiAcrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(acr.id, apiIdentity.id, acrPullRoleId)
+  scope: acr
+  properties: {
+    principalId: apiIdentity.properties.principalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPullRoleId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource mockAcrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(acr.id, mockIdentity.id, acrPullRoleId)
+  scope: acr
+  properties: {
+    principalId: mockIdentity.properties.principalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPullRoleId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
 resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' = {
   name: environmentName
   location: location
@@ -79,7 +144,10 @@ resource mockApp 'Microsoft.App/containerApps@2024-03-01' = {
   location: location
   tags: tags
   identity: {
-    type: 'SystemAssigned'
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${mockIdentity.id}': {}
+    }
   }
   properties: {
     managedEnvironmentId: containerAppsEnvironment.id
@@ -92,7 +160,7 @@ resource mockApp 'Microsoft.App/containerApps@2024-03-01' = {
       registries: [
         {
           server: acr.properties.loginServer
-          identity: 'system'
+          identity: mockIdentity.id
         }
       ]
     }
@@ -104,6 +172,8 @@ resource mockApp 'Microsoft.App/containerApps@2024-03-01' = {
           env: [
             { name: 'ASPNETCORE_ENVIRONMENT', value: 'Production' }
             { name: 'MESSAGING__BROKERTYPE', value: 'AzureServiceBus' }
+            // DefaultAzureCredential requires this to select the user-assigned identity.
+            { name: 'AZURE_CLIENT_ID', value: mockIdentity.properties.clientId }
             { name: 'SERVICEBUSCONSUMER__NAMESPACE', value: serviceBusNamespaceFqdn }
             { name: 'SERVICEBUSAUDITCONSUMER__NAMESPACE', value: serviceBusNamespaceFqdn }
             { name: 'SERVICEBUSCONSUMER__ENABLED', value: 'true' }
@@ -121,6 +191,10 @@ resource mockApp 'Microsoft.App/containerApps@2024-03-01' = {
       }
     }
   }
+  dependsOn: [
+    mockAcrPullRoleAssignment
+    mockServiceBusReceiverRoleAssignment
+  ]
 }
 
 resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
@@ -128,7 +202,10 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
   location: location
   tags: tags
   identity: {
-    type: 'SystemAssigned'
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${apiIdentity.id}': {}
+    }
   }
   properties: {
     managedEnvironmentId: containerAppsEnvironment.id
@@ -142,19 +219,19 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
       registries: [
         {
           server: acr.properties.loginServer
-          identity: 'system'
+          identity: apiIdentity.id
         }
       ]
       secrets: [
         {
           name: 'security-api-key'
           keyVaultUrl: '${keyVaultUri}secrets/Security--ApiKey'
-          identity: 'system'
+          identity: apiIdentity.id
         }
         {
           name: 'redis-connection-string'
           keyVaultUrl: '${keyVaultUri}secrets/Redis--ConnectionString'
-          identity: 'system'
+          identity: apiIdentity.id
         }
       ]
     }
@@ -166,6 +243,8 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           env: [
             { name: 'ASPNETCORE_ENVIRONMENT', value: 'Production' }
             { name: 'MESSAGING__BROKERTYPE', value: 'AzureServiceBus' }
+            // DefaultAzureCredential requires this to select the user-assigned identity.
+            { name: 'AZURE_CLIENT_ID', value: apiIdentity.properties.clientId }
             { name: 'SERVICEBUSPUBLISHER__NAMESPACE', value: serviceBusNamespaceFqdn }
             { name: 'PARTNERVERIFICATION__BASEURL', value: 'http://${mockApp.properties.configuration.ingress.fqdn}/' }
             { name: 'SECURITY__APIKEY', secretRef: 'security-api-key' }
@@ -183,58 +262,11 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
       }
     }
   }
-}
-
-// Role assignments below depend on apiApp/mockApp's system-assigned identity (created above);
-// the initial revision may need to re-resolve Key Vault/ACR secrets once these propagate.
-resource apiServiceBusSenderRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(serviceBusNamespaceId, apiApp.id, serviceBusDataSenderRoleId)
-  scope: existingServiceBusNamespace
-  properties: {
-    principalId: apiApp.identity.principalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', serviceBusDataSenderRoleId)
-    principalType: 'ServicePrincipal'
-  }
-}
-
-resource mockServiceBusReceiverRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(serviceBusNamespaceId, mockApp.id, serviceBusDataReceiverRoleId)
-  scope: existingServiceBusNamespace
-  properties: {
-    principalId: mockApp.identity.principalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', serviceBusDataReceiverRoleId)
-    principalType: 'ServicePrincipal'
-  }
-}
-
-resource apiKeyVaultSecretsUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(keyVaultId, apiAppName, keyVaultSecretsUserRoleId)
-  scope: existingKeyVault
-  properties: {
-    principalId: apiApp.identity.principalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsUserRoleId)
-    principalType: 'ServicePrincipal'
-  }
-}
-
-resource apiAcrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(acr.id, apiAppName, acrPullRoleId)
-  scope: acr
-  properties: {
-    principalId: apiApp.identity.principalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPullRoleId)
-    principalType: 'ServicePrincipal'
-  }
-}
-
-resource mockAcrPullRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(acr.id, mockAppName, acrPullRoleId)
-  scope: acr
-  properties: {
-    principalId: mockApp.identity.principalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPullRoleId)
-    principalType: 'ServicePrincipal'
-  }
+  dependsOn: [
+    apiAcrPullRoleAssignment
+    apiKeyVaultSecretsUserRoleAssignment
+    apiServiceBusSenderRoleAssignment
+  ]
 }
 
 output apiFqdn string = apiApp.properties.configuration.ingress.fqdn
