@@ -15,6 +15,66 @@ Replace every placeholder in angle brackets before running a command. The values
 - `<GITHUB_OWNER_ID>` and `<GITHUB_REPOSITORY_ID>` — numeric GitHub owner/repository IDs used by emitted OIDC subjects.
 - `<GITHUB_REVIEWER_ID>` and `<GITHUB_REVIEWER_LOGIN>` — required environment reviewer identity.
 
+## Which steps are required again?
+
+If only the Azure resource group was deleted, do **not** repeat this entire runbook. The Entra App Registration, service principal, federated credentials, GitHub environments, GitHub secrets, and subscription-level `Contributor` assignment are outside the resource group and should still exist.
+
+Before triggering the infrastructure workflow again, verify or recreate only:
+
+1. The target resource group, because it was deleted. `main.bicep` declares the resource group, but it must exist before a resource-group-scoped role can be assigned.
+2. The `User Access Administrator` assignment for the deployment service principal at the target resource-group scope, because that assignment was deleted with the resource group.
+3. The GitHub OIDC secrets and environment protection rules, if they were changed or deleted independently.
+
+Then follow the recovery procedure below, run the infrastructure workflow, and approve the `azure-infra` environment. Complete Steps 1–12 in full only for a new repository, a new Azure tenant/subscription, or an environment whose OIDC setup was also removed.
+
+### Recovery after resource-group deletion
+
+Replace the placeholders before running these commands. Run them after the resource-group deletion has completed:
+
+```bash
+SUBSCRIPTION_ID=<AZURE_SUBSCRIPTION_ID>
+CLIENT_ID=<AZURE_CLIENT_ID>
+RESOURCE_GROUP=<AZURE_RESOURCE_GROUP>
+LOCATION=<AZURE_LOCATION>
+
+az account set --subscription "$SUBSCRIPTION_ID"
+
+az group create \
+  --name "$RESOURCE_GROUP" \
+  --location "$LOCATION"
+
+az role assignment create \
+  --assignee "$CLIENT_ID" \
+  --role "User Access Administrator" \
+  --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP"
+```
+
+Verify the existing non-resource-group prerequisites before dispatching the workflow:
+
+```bash
+az ad app show --id "$CLIENT_ID" --query "{appId:appId, displayName:displayName}" -o table
+az role assignment list \
+  --assignee "$CLIENT_ID" \
+  --scope "/subscriptions/$SUBSCRIPTION_ID" \
+  --role Contributor \
+  -o table
+
+gh secret list
+gh api "repos/<GITHUB_OWNER>/<GITHUB_REPOSITORY>/environments" \
+  -q '.environments[].name'
+```
+
+The expected GitHub output includes the four repository secrets and the `azure-infra` / `azure-dev` environments. The App Registration and subscription-level `Contributor` assignment must also be present.
+
+Dispatch the infrastructure workflow from `main`:
+
+```bash
+gh workflow run infra.yml --ref main
+gh run list --workflow infra.yml --limit 1
+```
+
+Approve the `azure-infra` environment when the run pauses. The workflow recreates the remaining Azure resources through `main.bicep`. After it succeeds, dispatch `deploy-azure.yml` or push an application change to `main` to build and deploy the API and Mock images.
+
 Related workflows that depend on this setup:
 
 - [.github/workflows/infra.yml](../../.github/workflows/infra.yml)
