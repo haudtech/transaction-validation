@@ -62,4 +62,40 @@ public class ApiExceptionHandlerTests
         result.Should().BeTrue();
         context.Response.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
     }
+
+    [Fact]
+    public async Task TryHandleAsync_WhenConflictException_Maps409ProblemDetails()
+    {
+        var handler = new ApiExceptionHandler();
+        var context = new DefaultHttpContext();
+
+        var result = await handler.TryHandleAsync(context, new ConflictException("duplicate"), CancellationToken.None);
+
+        result.Should().BeTrue();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status409Conflict);
+    }
+
+    [Fact]
+    public async Task TryHandleAsync_WhenUnauthorizedException_Maps401ProblemDetails()
+    {
+        var handler = new ApiExceptionHandler();
+        var context = new DefaultHttpContext();
+
+        var result = await handler.TryHandleAsync(context, new UnauthorizedAccessException("invalid key"), CancellationToken.None);
+
+        result.Should().BeTrue();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+    }
+
+    [Fact]
+    public async Task TryHandleAsync_WhenExceptionIsUnknown_Maps500ProblemDetails()
+    {
+        var handler = new ApiExceptionHandler();
+        var context = new DefaultHttpContext();
+
+        var result = await handler.TryHandleAsync(context, new InvalidOperationException("unexpected"), CancellationToken.None);
+
+        result.Should().BeTrue();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status500InternalServerError);
+    }
 }

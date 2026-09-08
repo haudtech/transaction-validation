@@ -51,6 +51,24 @@
 			"group": "build"
 		},
 		{
+			"label": "quality:full",
+			"type": "shell",
+			"command": "echo",
+			"args": [
+				"Running full quality workflow: format -> build -> coverage"
+			],
+			"dependsOn": [
+				"format:verify",
+				"build",
+				"test:coverage:full"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "build"
+		},
+		{
 			"label": "test:integration",
 			"type": "shell",
 			"command": "dotnet",
@@ -85,6 +103,18 @@
 			"group": "test"
 		},
 		{
+			"label": "test:coverage:unit:clean",
+			"type": "shell",
+			"command": "rm",
+			"args": [
+				"-rf",
+				"${workspaceFolder}/TestResults/coverage/unit",
+				"${workspaceFolder}/TestResults/coverage/report"
+			],
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
 			"label": "test:coverage:unit",
 			"type": "shell",
 			"command": "dotnet",
@@ -95,23 +125,64 @@
 				"${workspaceFolder}/tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj",
 				"--filter",
 				"\"Category!=Integration&Category!=E2E\"",
+				"--settings",
+				"${workspaceFolder}/coverage.unit.runsettings",
 				"--collect",
 				"XPlat Code Coverage",
 				"--results-directory",
-				"${workspaceFolder}/TestResults/coverage"
+				"${workspaceFolder}/TestResults/coverage/unit"
 			],
 			"problemMatcher": [
 				"$msCompile"
 			],
+			"dependsOn": "test:coverage:unit:clean",
+			"dependsOrder": "sequence",
 			"group": "test"
 		},
 		{
-			"label": "test:coverage:report",
+			"label": "test:coverage:integration:clean",
+			"type": "shell",
+			"command": "rm",
+			"args": [
+				"-rf",
+				"${workspaceFolder}/TestResults/coverage/integration",
+				"${workspaceFolder}/TestResults/coverage/integration-report"
+			],
+			"problemMatcher": [],
+			"group": "test"
+		},
+		{
+			"label": "test:coverage:integration",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"--nologo",
+				"-m:1",
+				"${workspaceFolder}/tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj",
+				"--filter",
+				"\"Category=Integration\"",
+				"--settings",
+				"${workspaceFolder}/coverage.integration.runsettings",
+				"--collect",
+				"XPlat Code Coverage",
+				"--results-directory",
+				"${workspaceFolder}/TestResults/coverage/integration"
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"dependsOn": "test:coverage:integration:clean",
+			"dependsOrder": "sequence",
+			"group": "test"
+		},
+		{
+			"label": "test:coverage:integration:report",
 			"type": "shell",
 			"command": "/bin/zsh",
 			"args": [
 				"-lc",
-				"dotnet tool restore && dotnet tool run reportgenerator -reports:\"${workspaceFolder}/TestResults/coverage/**/coverage.cobertura.xml\" -targetdir:\"${workspaceFolder}/TestResults/coverage/report\" -reporttypes:\"Html;MarkdownSummary;TextSummary\""
+				"dotnet tool restore && dotnet tool run reportgenerator -reports:\"${workspaceFolder}/TestResults/coverage/integration/**/coverage.cobertura.xml\" -targetdir:\"${workspaceFolder}/TestResults/coverage/integration-report\" -reporttypes:\"Html;MarkdownSummary;TextSummary\""
 			],
 			"problemMatcher": [
 				"$msCompile"
@@ -119,15 +190,76 @@
 			"group": "test"
 		},
 		{
-			"label": "test:coverage",
+			"label": "test:coverage:integration:full",
 			"type": "shell",
 			"command": "echo",
 			"args": [
-				"Running sequenced coverage tasks: collect -> report"
+				"Running integration coverage tasks: collect -> report"
+			],
+			"dependsOn": [
+				"test:coverage:integration",
+				"test:coverage:integration:report"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		},
+		{
+			"label": "test:coverage:unit:report",
+			"type": "shell",
+			"command": "/bin/zsh",
+			"args": [
+				"-lc",
+				"dotnet tool restore && dotnet tool run reportgenerator -reports:\"${workspaceFolder}/TestResults/coverage/unit/**/coverage.cobertura.xml\" -targetdir:\"${workspaceFolder}/TestResults/coverage/report\" -assemblyfilters:\"+TransactionValidation.*;-TransactionValidation.Mock\" -classfilters:\"-Program;-TransactionValidation.Messaging.RabbitMqClientAdapter;-TransactionValidation.Messaging.RabbitMqTopologyInitializer;-TransactionValidation.Messaging.ServiceBusClientFactory;-TransactionValidation.Messaging.ServiceBusMessageSender;-TransactionValidation.Configuration.Options.RabbitMqOptions;-TransactionValidation.Configuration.Options.SerilogOptions\" -reporttypes:\"Html;MarkdownSummary;TextSummary\""
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		},
+		{
+			"label": "test:coverage:unit:full",
+			"type": "shell",
+			"command": "echo",
+			"args": [
+				"Running unit coverage tasks: clean -> collect -> report"
 			],
 			"dependsOn": [
 				"test:coverage:unit",
-				"test:coverage:report"
+				"test:coverage:unit:report"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		},
+		{
+			"label": "test:coverage:combined:report",
+			"type": "shell",
+			"command": "/bin/zsh",
+			"args": [
+				"-lc",
+				"dotnet tool restore && dotnet tool run reportgenerator -reports:\"${workspaceFolder}/TestResults/coverage/unit/**/coverage.cobertura.xml;${workspaceFolder}/TestResults/coverage/integration/**/coverage.cobertura.xml\" -targetdir:\"${workspaceFolder}/TestResults/coverage/combined-report\" -assemblyfilters:\"+TransactionValidation.*;-TransactionValidation.Mock\" -classfilters:\"-Program;-TransactionValidation.Messaging.RabbitMqClientAdapter;-TransactionValidation.Messaging.RabbitMqTopologyInitializer;-TransactionValidation.Messaging.ServiceBusClientFactory;-TransactionValidation.Messaging.ServiceBusMessageSender;-TransactionValidation.Configuration.Options.RabbitMqOptions;-TransactionValidation.Configuration.Options.SerilogOptions\" -reporttypes:\"Html;MarkdownSummary;TextSummary\""
+			],
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "test"
+		},
+		{
+			"label": "test:coverage:full",
+			"type": "shell",
+			"command": "echo",
+			"args": [
+				"Running complete coverage workflow: unit -> integration -> combined report"
+			],
+			"dependsOn": [
+				"test:coverage:unit:full",
+				"test:coverage:integration:full",
+				"test:coverage:combined:report"
 			],
 			"dependsOrder": "sequence",
 			"problemMatcher": [

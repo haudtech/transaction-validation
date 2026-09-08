@@ -24,6 +24,8 @@ Technology stack
 | Coverage | `coverlet.collector` (XPlat Code Coverage, Cobertura XML) + `dotnet-reportgenerator-globaltool` (HTML/Markdown/Text reports) |
 | Quality gates | Split CI workflows for unit and integration tests with explicit category filters |
 
+Docker Compose includes Redis for the distributed idempotency store. The API connects to `redis:6379` inside the Compose network; when the API runs on the host, use `localhost:6379` instead.
+
 ## Supported broker modes
 
 The solution supports two runtime messaging modes:
@@ -111,7 +113,11 @@ sequenceDiagram
 
 The main task entrypoints are:
 
-- `test:coverage` — collects unit coverage and generates HTML/Markdown/Text reports
+- `test:coverage:unit:full` — collects unit coverage and generates the filtered business-logic HTML/Markdown/Text report
+- `test:coverage:integration:full` — collects integration coverage and generates the separate API-host report
+- `test:coverage:combined:report` — combines the latest unit and integration reports using the same business-logic scope
+- `test:coverage:full` — runs unit coverage, integration coverage, and the combined report in sequence
+- `quality:full` — runs format verification, solution build, and the complete coverage workflow in sequence
 - `test:integration:trx` — runs integration tests and generates the TRX-based summary report
 - `test:e2e` — brings up Docker services, runs the E2E suite, and tears the environment down
 
@@ -123,7 +129,12 @@ dotnet build --nologo -m:1 TransactionValidation.sln
 # run the main VS Code task flow
 # from the Command Palette: Tasks: Run Task
 # then choose one of:
-#   test:coverage
+#   test:coverage:unit:full
+#   test:coverage:integration:full
+#   test:coverage:e2e:full
+#   test:coverage:combined:report
+#   test:coverage:full
+#   quality:full
 #   test:integration:trx
 #   test:e2e
 ```

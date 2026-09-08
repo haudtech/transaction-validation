@@ -11,6 +11,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       SECURITY__APIKEY: ${SECURITY__APIKEY:-local-dev-api-key}
+      REDIS__CONNECTIONSTRING: ${REDIS__CONNECTIONSTRING:-redis:6379,abortConnect=false}
       MESSAGING__BROKERTYPE: ${MESSAGING__BROKERTYPE:-RabbitMq}
       RABBITMQ__HOSTNAME: ${RABBITMQ__HOSTNAME:-rabbitmq}
       RABBITMQ__PORT: ${RABBITMQ__PORT:-5672}
@@ -25,6 +26,8 @@ services:
       PARTNERVERIFICATION__BASEURL: ${PARTNERVERIFICATION__BASEURL:-http://mock:8080/}
       APPLICATIONINSIGHTS__CONNECTIONSTRING: ${APPLICATIONINSIGHTS__CONNECTIONSTRING:-}
     depends_on:
+      redis:
+        condition: service_healthy
       rabbitmq:
         condition: service_started
       mock:
@@ -84,3 +87,17 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ__USERNAME:-guest}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ__PASSWORD:-guest}
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  redis-data:

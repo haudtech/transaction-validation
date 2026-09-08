@@ -17,23 +17,48 @@ internal sealed class ApiHostTestFactory : WebApplicationFactory<Program>
 
     private readonly IPartnerVerifier _partnerVerifier;
     private readonly IMessagePublisher _messagePublisher;
+    private readonly bool _useAzureServiceBus;
+    private readonly string? _environmentName;
 
-    public ApiHostTestFactory(IPartnerVerifier? partnerVerifier = null, IMessagePublisher? messagePublisher = null)
+    public ApiHostTestFactory(
+        IPartnerVerifier? partnerVerifier = null,
+        IMessagePublisher? messagePublisher = null,
+        bool useAzureServiceBus = false,
+        string? environmentName = null)
     {
         _partnerVerifier = partnerVerifier ?? new AlwaysVerifiedPartnerVerifier();
         _messagePublisher = messagePublisher ?? new NoOpMessagePublisher();
+        _useAzureServiceBus = useAzureServiceBus;
+        _environmentName = environmentName;
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        if (!string.IsNullOrWhiteSpace(_environmentName))
+        {
+            builder.UseEnvironment(_environmentName);
+        }
+
         builder.ConfigureAppConfiguration((_, config) =>
         {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
+            var settings = new Dictionary<string, string?>
             {
                 ["Security:ApiKey"] = ApiKey,
                 ["Security:Enabled"] = "true",
                 ["Security:HeaderName"] = "X-API-Key"
-            });
+            };
+
+            if (_useAzureServiceBus)
+            {
+                settings["Messaging:BrokerType"] = "AzureServiceBus";
+                settings["ServiceBusPublisher:ConnectionString"] = "Endpoint=sb://integration.test/;";
+                settings["ServiceBusPublisher:TopicName"] = "partner.transactions";
+                settings["ServiceBusPublisher:Subject"] = "partner.transaction.accepted";
+                settings["ServiceBusPublisher:RoutingKey"] = "partner.transaction.accepted";
+                settings["ServiceBusPublisher:EventType"] = "PartnerTransactionAccepted";
+            }
+
+            config.AddInMemoryCollection(settings);
         });
 
         builder.ConfigureServices(services =>

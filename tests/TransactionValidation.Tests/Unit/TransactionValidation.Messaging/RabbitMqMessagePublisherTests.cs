@@ -73,6 +73,19 @@ public sealed class RabbitMqMessagePublisherTests
         await action.Should().ThrowAsync<ConflictException>();
     }
 
+    [Fact]
+    public async Task PublishAsync_WhenEnvelopeIsNull_ThrowsArgumentNullException()
+    {
+        var sut = new RabbitMqMessagePublisher(
+            "partner.transactions",
+            Moq.Mock.Of<IRabbitMqClientAdapter>(),
+            Moq.Mock.Of<IMessageRoutingKeyResolver>());
+
+        var action = async () => await sut.PublishAsync(null!, CancellationToken.None);
+
+        await action.Should().ThrowAsync<ArgumentNullException>();
+    }
+
     private static TransactionEnvelope CreateEnvelope()
     {
         return new TransactionEnvelope
