@@ -109,34 +109,30 @@ sequenceDiagram
 	end
 ```
 
-### Main verification tasks
 
-The main task entrypoints are:
+## Coverage and Test Reports
 
-- `test:coverage:unit:full` — collects unit coverage and generates the filtered business-logic HTML/Markdown/Text report
-- `test:coverage:integration:full` — collects integration coverage and generates the separate API-host report
-- `test:coverage:combined:report` — combines the latest unit and integration reports using the same business-logic scope
-- `test:coverage:full` — runs unit coverage, integration coverage, and the combined report in sequence
-- `quality:full` — runs format verification, solution build, and the complete coverage workflow in sequence
-- `test:integration:trx` — runs integration tests and generates the TRX-based summary report
-- `test:e2e` — brings up Docker services, runs the E2E suite, and tears the environment down
+Coverage is separated by test level. Unit and integration tests produce Cobertura-based coverage reports; E2E remains a runtime validation workflow and produces TRX results rather than a coverage report.
 
-Quick local run
+| Goal | Task | Scope | Output |
+|---|---|---|---|
+| Unit coverage | `test:coverage:unit:full` | Business and application logic | `TestResults/coverage/report` |
+| Integration coverage | `test:coverage:integration:full` | API host, middleware, health checks, and component boundaries | `TestResults/coverage/integration-report` |
+| Combined coverage | `test:coverage:full` | Unit and integration Cobertura data with business-logic filters | `TestResults/coverage/combined-report` |
+| E2E runtime validation | `test:e2e` | Docker, Redis, RabbitMQ, API, Mock, and network behavior | `TestResults/e2e/e2e-tests.trx` |
+| Full quality workflow | `quality:full` | Format verification, build, and complete coverage | Coverage reports plus build/format results |
+
+The combined report is the authoritative overall coverage result. Do not average unit and integration percentages manually.
+
+E2E is intentionally separate from `test:coverage:full`: it validates the real container and broker runtime but is not collected as Cobertura coverage.
+
+The separate `test:integration:trx` task should only be run when a dedicated integration TRX/Markdown execution report is required, because it executes the integration tests independently from coverage.
+
+## Quick local run
+
 ```bash
 # build the solution
 dotnet build --nologo -m:1 TransactionValidation.sln
-
-# run the main VS Code task flow
-# from the Command Palette: Tasks: Run Task
-# then choose one of:
-#   test:coverage:unit:full
-#   test:coverage:integration:full
-#   test:coverage:e2e:full
-#   test:coverage:combined:report
-#   test:coverage:full
-#   quality:full
-#   test:integration:trx
-#   test:e2e
 ```
 
 Environment setup
