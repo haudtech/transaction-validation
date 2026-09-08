@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
+using TransactionValidation.Api.Idempotency;
 using TransactionValidation.Core.Interfaces;
 
 namespace TransactionValidation.Tests.Integration.TransactionValidation.Api.Support;
@@ -45,7 +46,8 @@ internal sealed class ApiHostTestFactory : WebApplicationFactory<Program>
             {
                 ["Security:ApiKey"] = ApiKey,
                 ["Security:Enabled"] = "true",
-                ["Security:HeaderName"] = "X-API-Key"
+                ["Security:HeaderName"] = "X-API-Key",
+                ["Redis:ConnectionString"] = string.Empty
             };
 
             if (_useAzureServiceBus)
@@ -65,9 +67,13 @@ internal sealed class ApiHostTestFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<IPartnerVerifier>();
             services.RemoveAll<IMessagePublisher>();
+            services.RemoveAll<StackExchange.Redis.IConnectionMultiplexer>();
+            services.RemoveAll<IIdempotencyStore>();
 
             services.AddSingleton(_partnerVerifier);
             services.AddSingleton(_messagePublisher);
+            services.AddSingleton<IIdempotencyStore>(_ =>
+                new InMemoryIdempotencyStore(TimeSpan.FromMinutes(15)));
         });
     }
 }
