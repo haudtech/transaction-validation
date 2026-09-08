@@ -40,6 +40,8 @@ public sealed class RabbitMqMessagePublisher : IMessagePublisher
     /// <exception cref="ConflictException">Thrown when broker publish confirmation is not received.</exception>
     public async Task PublishAsync(TransactionEnvelope envelope, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(envelope);
+
         var payload = JsonSerializer.Serialize(envelope);
         var routingKey = _routingKeyResolver.Resolve(envelope);
         var headers = new Dictionary<string, object>

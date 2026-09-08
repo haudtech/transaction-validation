@@ -76,6 +76,31 @@ public sealed class PartnerVerifierClientTests
     }
 
     [Fact]
+    public async Task VerifyAsync_WhenMockEndpointReturnsInternalServerError_ThrowsUpstreamServiceUnavailableException()
+    {
+        var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
+        var sut = new PartnerVerifierClient(httpClient);
+
+        var action = async () => await sut.VerifyAsync("partner-unavailable", CancellationToken.None);
+
+        await action.Should().ThrowAsync<UpstreamServiceUnavailableException>();
+    }
+
+    [Fact]
+    public async Task VerifyAsync_WhenMockEndpointReturnsUnexpectedClientError_ThrowsServiceUnavailableException()
+    {
+        var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.BadRequest));
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
+        var sut = new PartnerVerifierClient(httpClient);
+
+        var action = async () => await sut.VerifyAsync("partner-invalid", CancellationToken.None);
+
+        await action.Should().ThrowAsync<UpstreamServiceUnavailableException>()
+            .WithMessage("*400*");
+    }
+
+    [Fact]
     public async Task VerifyAsync_WhenForceTimeoutProvided_AppendsForceTimeoutQuery()
     {
         Uri? capturedRequestUri = null;
@@ -92,6 +117,44 @@ public sealed class PartnerVerifierClientTests
 
         capturedRequestUri.Should().NotBeNull();
         capturedRequestUri!.Query.Should().Contain("forceTimeout=true");
+    }
+
+    [Fact]
+    public async Task VerifyAsync_WhenForceTimeoutIsFalse_AppendsFalseQueryValue()
+    {
+        Uri? capturedRequestUri = null;
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            capturedRequestUri = request.RequestUri;
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
+        var sut = new PartnerVerifierClient(httpClient);
+
+        await sut.VerifyAsync("partner-123", CancellationToken.None, false);
+
+        capturedRequestUri.Should().NotBeNull();
+        capturedRequestUri!.Query.Should().Contain("forceTimeout=false");
+    }
+
+    [Fact]
+    public async Task VerifyAsync_WhenPartnerIdContainsReservedCharacters_EscapesRequestPath()
+    {
+        Uri? capturedRequestUri = null;
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            capturedRequestUri = request.RequestUri;
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
+        var sut = new PartnerVerifierClient(httpClient);
+
+        await sut.VerifyAsync("partner/123", CancellationToken.None);
+
+        capturedRequestUri.Should().NotBeNull();
+        capturedRequestUri!.AbsolutePath.Should().Contain("partner%2F123");
     }
 
     [Fact]

@@ -48,6 +48,21 @@ public sealed class PartnerTransactionsControllerTests
     }
 
     [Fact]
+    public async Task CreateAsync_WhenRequestIsNull_ThrowsBadRequestException()
+    {
+        var sut = CreateSut(
+            new PartnerTransactionRequestValidator(),
+            Moq.Mock.Of<IPartnerVerifier>(),
+            Moq.Mock.Of<IMessagePublisher>(),
+            Moq.Mock.Of<IIdempotencyStore>());
+
+        var action = async () => await sut.CreateAsync(null!, CancellationToken.None);
+
+        await action.Should().ThrowAsync<BadRequestException>()
+            .WithMessage("request body is required.");
+    }
+
+    [Fact]
     public async Task CreateAsync_WhenPartnerVerificationFails_PropagatesNotFoundException()
     {
         var partnerVerifier = new Mock<IPartnerVerifier>();

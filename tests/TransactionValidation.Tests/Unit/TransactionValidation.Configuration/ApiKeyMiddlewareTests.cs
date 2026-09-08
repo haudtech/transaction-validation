@@ -41,4 +41,47 @@ public class ApiKeyMiddlewareTests
 
         called.Should().BeTrue();
     }
+
+    [Fact]
+    public async Task InvokeAsync_WhenApiKeyProtectionIsDisabled_InvokesNext()
+    {
+        var called = false;
+        var options = MicrosoftOptions.Create(new ApiKeyOptions { Enabled = false, ApiKey = "abc123", HeaderName = "X-API-Key" });
+        var middleware = new ApiKeyMiddleware(_ => { called = true; return Task.CompletedTask; });
+        var context = new DefaultHttpContext();
+
+        await middleware.InvokeAsync(context, options);
+
+        called.Should().BeTrue();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_WhenHealthCheckHasNoApiKey_InvokesNext()
+    {
+        var called = false;
+        var options = MicrosoftOptions.Create(new ApiKeyOptions { Enabled = true, ApiKey = "abc123", HeaderName = "X-API-Key" });
+        var middleware = new ApiKeyMiddleware(_ => { called = true; return Task.CompletedTask; });
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/healthz";
+
+        await middleware.InvokeAsync(context, options);
+
+        called.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task InvokeAsync_WhenApiKeyIsWrong_ReturnsUnauthorizedWithoutInvokingNext()
+    {
+        var called = false;
+        var options = MicrosoftOptions.Create(new ApiKeyOptions { Enabled = true, ApiKey = "abc123", HeaderName = "X-API-Key" });
+        var middleware = new ApiKeyMiddleware(_ => { called = true; return Task.CompletedTask; });
+        var context = new DefaultHttpContext();
+        context.Request.Headers["X-API-Key"] = "wrong";
+
+        await middleware.InvokeAsync(context, options);
+
+        context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
+        called.Should().BeFalse();
+    }
 }

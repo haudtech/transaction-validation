@@ -6,8 +6,6 @@ using Microsoft.Extensions.Options;
 
 using Serilog;
 
-using StackExchange.Redis;
-
 using TransactionValidation.Api.HealthChecks;
 using TransactionValidation.Api.Idempotency;
 using TransactionValidation.Configuration.Extensions;
@@ -33,7 +31,7 @@ builder.Services.AddConfiguredBroker(
     AddRabbitMqMessagingServices,
     AddAzureServiceBusMessagingServices);
 
-AddIdempotencyStore(builder.Services, builder.Configuration);
+IdempotencyStoreRegistration.Add(builder.Services, builder.Configuration);
 
 builder.Services.AddHealthChecks()
     .AddCheck<MessagingHealthCheck>("messaging")
@@ -62,32 +60,6 @@ app.Run();
 /// </summary>
 public partial class Program
 {
-    // Distributed store required once the API scales beyond a single replica; falls back to in-memory when Redis is not configured.
-    private static void AddIdempotencyStore(IServiceCollection services, IConfiguration configuration)
-    {
-        var redisOptions = configuration.GetSection(RedisOptions.SectionName).Get<RedisOptions>() ?? new RedisOptions();
-
-        if (string.IsNullOrWhiteSpace(redisOptions.ConnectionString))
-        {
-            services.AddSingleton<IIdempotencyStore>(sp =>
-            {
-                var options = sp.GetRequiredService<IdempotencyOptions>();
-                var idempotencyWindowMinutes = Math.Clamp(options.WindowMinutes, 10, 15);
-                return new InMemoryIdempotencyStore(TimeSpan.FromMinutes(idempotencyWindowMinutes));
-            });
-            return;
-        }
-
-        services.AddSingleton<IConnectionMultiplexer>(_ => ConnectionMultiplexer.Connect(redisOptions.ConnectionString));
-        services.AddSingleton<IIdempotencyStore>(sp =>
-        {
-            var options = sp.GetRequiredService<IdempotencyOptions>();
-            var idempotencyWindowMinutes = Math.Clamp(options.WindowMinutes, 10, 15);
-            var connectionMultiplexer = sp.GetRequiredService<IConnectionMultiplexer>();
-            return new RedisIdempotencyStore(connectionMultiplexer, TimeSpan.FromMinutes(idempotencyWindowMinutes));
-        });
-    }
-
     private static void AddRabbitMqMessagingServices(IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
@@ -139,40 +111,7 @@ public partial class Program
         services.AddSingleton(sp =>
         {
             var options = sp.GetRequiredService<IOptions<ServiceBusPublisherOptions>>().Value;
-
-            var missingProperties = new List<string>();
-            if (string.IsNullOrWhiteSpace(options.ConnectionString) && string.IsNullOrWhiteSpace(options.Namespace))
-            {
-                missingProperties.Add($"{nameof(ServiceBusPublisherOptions.ConnectionString)} or {nameof(ServiceBusPublisherOptions.Namespace)}");
-            }
-
-            if (string.IsNullOrWhiteSpace(options.TopicName))
-            {
-                missingProperties.Add(nameof(ServiceBusPublisherOptions.TopicName));
-            }
-
-            if (string.IsNullOrWhiteSpace(options.Subject))
-            {
-                missingProperties.Add(nameof(ServiceBusPublisherOptions.Subject));
-            }
-
-            if (string.IsNullOrWhiteSpace(options.RoutingKey))
-            {
-                missingProperties.Add(nameof(ServiceBusPublisherOptions.RoutingKey));
-            }
-
-            if (string.IsNullOrWhiteSpace(options.EventType))
-            {
-                missingProperties.Add(nameof(ServiceBusPublisherOptions.EventType));
-            }
-
-            if (missingProperties.Count > 0)
-            {
-                throw new InvalidOperationException(
-                    $"Azure Service Bus publisher configuration is incomplete. Missing values: {string.Join(", ", missingProperties)}");
-            }
-
-            return options;
+            return ServiceBusPublisherOptionsValidator.Validate(options);
         });
 
         services.AddSingleton<IServiceBusMessageSender>(sp =>

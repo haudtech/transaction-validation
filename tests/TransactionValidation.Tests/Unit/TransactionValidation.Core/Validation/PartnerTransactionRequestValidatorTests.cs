@@ -60,14 +60,69 @@ public class PartnerTransactionRequestValidatorTests
             && e.ErrorMessage == "timestamp is required.");
     }
 
-    private static PartnerTransactionRequest CreateValidRequest(string currency = "EUR", DateTime? timestamp = null)
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void Validate_WhenPartnerIdIsMissing_ReturnsPartnerIdError(string? partnerId)
+    {
+        var request = CreateValidRequest(partnerId: partnerId);
+
+        var result = validator.Validate(request);
+
+        result.Errors.Should().ContainSingle(error => error.PropertyName == nameof(PartnerTransactionRequest.PartnerId));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Validate_WhenAmountIsNotPositive_ReturnsAmountError(decimal amount)
+    {
+        var request = CreateValidRequest(amount: amount);
+
+        var result = validator.Validate(request);
+
+        result.Errors.Should().ContainSingle(error =>
+            error.PropertyName == nameof(PartnerTransactionRequest.Amount)
+            && error.ErrorMessage == "amount must be greater than zero.");
+    }
+
+    [Fact]
+    public void Validate_WhenTransactionReferenceIsMissing_ReturnsReferenceError()
+    {
+        var request = CreateValidRequest(transactionReference: " ");
+
+        var result = validator.Validate(request);
+
+        result.Errors.Should().ContainSingle(error => error.PropertyName == nameof(PartnerTransactionRequest.TransactionReference));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("US")]
+    public void Validate_WhenCurrencyIsMissingOrMalformed_ReturnsCurrencyError(string? currency)
+    {
+        var request = CreateValidRequest(currency: currency);
+
+        var result = validator.Validate(request);
+
+        result.Errors.Should().Contain(error => error.PropertyName == nameof(PartnerTransactionRequest.Currency));
+    }
+
+    private static PartnerTransactionRequest CreateValidRequest(
+        string? partnerId = "partner-123",
+        string? transactionReference = "txn-001",
+        decimal amount = 250.00m,
+        string? currency = "EUR",
+        DateTime? timestamp = null)
     {
         return new PartnerTransactionRequest
         {
-            PartnerId = "partner-123",
-            TransactionReference = "txn-001",
-            Amount = 250.00m,
-            Currency = currency,
+            PartnerId = partnerId!,
+            TransactionReference = transactionReference!,
+            Amount = amount,
+            Currency = currency!,
             Timestamp = timestamp ?? DateTime.UtcNow
         };
     }

@@ -42,6 +42,16 @@ public sealed class PartnerTransactionRoutingKeyResolverTests
         result.Should().Be("custom.transaction.accepted");
     }
 
+    [Fact]
+    public void Resolve_WhenEnvelopeIsNull_ThrowsArgumentNullException()
+    {
+        var resolver = new PartnerTransactionRoutingKeyResolver("partner.transaction");
+
+        var action = () => resolver.Resolve(null!);
+
+        action.Should().Throw<ArgumentNullException>();
+    }
+
     private static TransactionEnvelope CreateEnvelope(bool partnerVerified)
     {
         return new TransactionEnvelope

@@ -22,6 +22,7 @@ This folder is the central entry point for the project’s technical and enginee
 - Messaging exchange migration plan: [implementation/messaging_exchange_migration_plan.md](implementation/messaging_exchange_migration_plan.md)
 - Scaffold and conventions: [implementation/implementation_scaffold.md](implementation/implementation_scaffold.md)
 - E2E smoke matrix (runtime confidence layer): [test/e2e_smoke_matrix.md](test/e2e_smoke_matrix.md)
+- Test execution and coverage guide: [test/test_execution_and_coverage_guide.md](test/test_execution_and_coverage_guide.md)
 - Repo-specific architecture rules: [implementation/repo_architecture_rules.md](implementation/repo_architecture_rules.md)
 - Shared engineering principles: [implementation/shared_engineering_principles.md](implementation/shared_engineering_principles.md)
 - Prerequisites: [implementation/Prerequisites/README.md](implementation/Prerequisites/README.md)
