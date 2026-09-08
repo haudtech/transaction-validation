@@ -2,7 +2,9 @@
 
 A lightweight Backend-For-Frontend (BFF) to mediate partner integrations for transaction verification and routing.
 
-Technology stack
+## Technology Stack
+
+### Coding and Runtime
 
 | Area | Stack |
 |---|---|
@@ -11,18 +13,38 @@ Technology stack
 | API documentation | Swagger / OpenAPI (`Swashbuckle.AspNetCore`) |
 | Validation | FluentValidation |
 | Security | API key authentication (`X-API-Key` middleware) |
-| Idempotency | `Idempotency-Key` support with in-memory TTL dedupe, cached `202 Accepted` replay for same key+payload, and conflict on key reuse with different payload (`partnerId|transactionReference` fallback) |
+| Idempotency | `Idempotency-Key` support with in-memory or Redis-backed TTL dedupe, cached `202 Accepted` replay, and conflict on payload mismatch |
 | Error handling | ASP.NET Core `IExceptionHandler` + RFC 7807 `ProblemDetails` mapping |
 | Resilience | `Microsoft.Extensions.Http.Resilience` (Polly-based pipelines) |
-| Messaging | RabbitMQ (`RabbitMQ.Client`) or Azure Service Bus (`Azure.Messaging.ServiceBus`), selected at runtime via `MESSAGING__BROKERTYPE` |
+| Messaging | RabbitMQ (`RabbitMQ.Client`) or Azure Service Bus (`Azure.Messaging.ServiceBus`), selected by `MESSAGING__BROKERTYPE` |
 | Observability | Serilog, OpenTelemetry, optional Azure Monitor exporter |
 | Configuration | `appsettings*.json`, environment variables, `DotNetEnv` |
-| Containerization | Docker, Docker Compose |
-| Azure deployment | GitHub Actions lifecycle: pull-request infrastructure `what-if`, protected merge-to-`main` infrastructure apply, and application image build/push/deployment to Azure Container Apps via OIDC |
 | Architecture | Multi-project solution (`Api`, `Configuration`, `Core`, `Integration`, `Messaging`, `Mock`, `Tests`) |
-| Testing | xUnit, Moq, FluentAssertions, ASP.NET Core integration-host tests (`WebApplicationFactory<Program>`) |
-| Coverage | `coverlet.collector` (XPlat Code Coverage, Cobertura XML) + `dotnet-reportgenerator-globaltool` (HTML/Markdown/Text reports) |
-| Quality gates | Split CI workflows for unit and integration tests with explicit category filters |
+
+### Testing and Quality
+
+| Area | Stack / Practice |
+|---|---|
+| Unit testing | xUnit, Moq, FluentAssertions |
+| Integration testing | ASP.NET Core `WebApplicationFactory<Program>` |
+| E2E testing | Docker Compose runtime smoke tests |
+| Coverage collection | `coverlet.collector` with Cobertura XML |
+| Coverage reporting | `dotnet-reportgenerator-globaltool` with HTML, Markdown, and text reports |
+| Coverage target | At least 80% for filtered business and application logic |
+| Quality gates | Format verification, solution build, unit tests, and split unit/integration coverage workflows |
+
+### Deployment and Operations
+
+| Area | Stack / Practice |
+|---|---|
+| Containerization | Docker, Docker Compose |
+| Local infrastructure | RabbitMQ and Redis |
+| Cloud messaging | Azure Service Bus |
+| Distributed idempotency | Azure Cache for Redis |
+| Cloud runtime | Azure Container Apps |
+| Infrastructure as code | Bicep |
+| CI/CD | GitHub Actions with OIDC |
+| Secrets and identity | Azure Key Vault and managed identities |
 
 Docker Compose includes Redis for the distributed idempotency store. The API connects to `redis:6379` inside the Compose network; when the API runs on the host, use `localhost:6379` instead.
 
