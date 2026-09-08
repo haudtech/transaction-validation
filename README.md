@@ -169,14 +169,15 @@ Docker compose run
 docker compose up --build
 ```
 
-Service endpoints when compose is running:
+Service endpoints when Compose is running:
 
-- API: http://localhost:5000
-- Mock partner verification API and consumer observations: http://localhost:5002
-- RabbitMQ management (when RabbitMQ is selected): http://localhost:15672
-- Azure Service Bus endpoint depends on the configured namespace and connection settings
+- API: `http://localhost:${API_HOST_PORT:-5000}`
+- Mock partner verification API and consumer observations: `http://localhost:5002`
+- RabbitMQ management: `http://localhost:15672`
+- Redis: internal Compose service at `redis:6379`
+- Azure Service Bus: configured remotely through the selected namespace/connection string
 
-Repository entrypoint for implementation, workflow, and architecture documentation.
+The repository README is the entry point for implementation, workflow, and architecture documentation.
 
 ## Documentation
 
