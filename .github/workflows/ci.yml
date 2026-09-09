@@ -36,10 +36,17 @@ jobs:
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
-      - name: Test (unit only)
+      - name: Test (unit, with coverage)
         run: |
           # Run only unit tests; integration tests are skipped by default (marked with Trait/Category)
-          dotnet test tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj --configuration Release --verbosity normal --filter "Category!=Integration&Category!=E2E"
+          # Same runsettings as local test:coverage:unit task pins Cobertura output for the Codecov upload below
+          dotnet test tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj --configuration Release --verbosity normal --filter "Category!=Integration&Category!=E2E" --settings ./coverage.unit.runsettings --results-directory ./coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage/**/coverage.cobertura.xml
+          fail_ci_if_error: false
 
       - name: Verify formatting
         run: dotnet format TransactionValidation.sln --verify-no-changes --verbosity diagnostic
