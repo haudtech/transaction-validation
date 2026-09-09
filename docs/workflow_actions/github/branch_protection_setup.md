@@ -23,7 +23,7 @@ A single **Repository Ruleset** named `main` (id `20794465`), `enforcement: acti
 | `non_fast_forward` | Blocks force pushes |
 | `deletion` | Blocks deleting `main` |
 | `creation` | Blocks creating matching refs outside rules |
-| `code_coverage` | Code coverage reporting rule |
+| `code_coverage` | Coverage restriction rule present; thresholds are **not** set here (see coverage gate note below) |
 
 The key settings for the goal: `bypass_actors: []` (empty) + `required_status_checks` with both check contexts + `strict_required_status_checks_policy: true`.
 
@@ -35,6 +35,15 @@ The required checks map to workflow job names:
 - `integration` → job `integration` in [integration.yml](../../../.github/workflows/integration.yml) (workflow name `Integration Tests`, shown as `Integration Tests / integration`)
 
 Important: the ruleset stores the **job name** as the check context (`build`, `integration`), not the display string (`CI / build (pull_request)`). Getting this wrong causes required checks to stay in "Expected — Waiting for status to be reported" forever even though the same-named checks succeed.
+
+### Coverage gate
+
+Coverage gating is enforced through **Codecov status checks**, not the ruleset's `code_coverage` rule parameters (those are not settable via the public REST API and were left unset):
+
+- CI uploads the Cobertura unit-coverage report to Codecov on every PR; scope and thresholds live in `codecov.yml` (project target 80%, threshold 3%; exclusions mirror the local report filters in `.vscode/tasks.json`, so Codecov's ~87.5% matches the local number).
+- Codecov posts `codecov/project` and `codecov/patch` status checks on the PR; `codecov/project` fails when project coverage drops below the target ± threshold.
+- Once `codecov/project` is observed on a PR, add it to `required_status_checks` alongside `build` and `integration` so a failing coverage check blocks merge.
+- Prerequisites: the `CODECOV_TOKEN` repo secret **and** the Codecov GitHub App installed on the repo — a token alone enables uploads and comments but not status checks (see case study 6 in [workflow_case_studies.md](workflow_case_studies.md)).
 
 ### Who can merge
 

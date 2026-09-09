@@ -120,11 +120,37 @@ This document captures real workflow failures that occurred in this repository a
 
 ---
 
+## Case Study 6: Codecov uploads succeeded but no coverage status checks appeared on the PR
+
+### Symptoms
+- CI upload step succeeded (report queued and processed, Codecov showed 87.59% for the commit), but the PR checks list showed only `build` and `integration` — no `codecov/project` or `codecov/patch` status.
+
+### Root cause
+- Two separate gaps, both invisible from the workflow run's green status:
+  1. **Tokenless upload.** The first upload ran with `Token length: 0`. Tokenless uploads to public repos store the report but Codecov has no credentials to post commit statuses back to GitHub.
+  2. **GitHub App not installed.** Even after adding the `CODECOV_TOKEN` secret (log then showed `Token length: 36`), statuses still did not appear because the Codecov GitHub App was not installed on the repository. The token enables uploads and PR comments; the GitHub App is what creates status checks. Codecov's own PR comment says this: "Please install the codecov app to ensure uploads and comments are reliably processed."
+
+### Fix applied
+- Added the `CODECOV_TOKEN` repository secret and passed it to the upload step (`token: ${{ secrets.CODECOV_TOKEN }}`).
+- Installed the Codecov GitHub App on the repository (https://github.com/apps/codecov/installations/new).
+- Also set `disable_search: true` with an explicit `files:` path so the uploader only sends the intended report (it was previously sweeping up the two `.runsettings` files as extra "coverage files").
+
+### Preventive guidance
+- A green upload step proves the report arrived, not that statuses were posted. Verify the full chain: CI log token length > 0, Codecov commit page shows the report, and `gh api repos/<owner>/<repo>/commits/<sha>/status` lists `codecov/project`.
+- Diagnostic commands:
+  ```bash
+  gh api repos/<owner>/<repo>/commits/<sha>/status --jq '.statuses[] | {context, state}'
+  gh run view <run-id> --log | grep -A 5 "Upload coverage to Codecov"
+  ```
+
+---
+
 ## Current stable baseline (summary)
 
 - `ci.yml`
   - Triggers: push to `main`, PR to `main`
   - Unit-test filter: `Category!=Integration&Category!=E2E`
+  - Coverage: Cobertura via `coverage.unit.runsettings`, uploaded to Codecov (token: `CODECOV_TOKEN` secret; scope/thresholds in `codecov.yml`: project target 80%, threshold 3%)
   - Concurrency: per-PR/ref group, cancel-in-progress
 - `integration.yml`
   - Triggers: push to `main`, PR to `main`, manual `workflow_dispatch`

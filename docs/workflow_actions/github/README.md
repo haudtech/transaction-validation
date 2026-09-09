@@ -10,6 +10,7 @@ These guides are synchronized with the current workflow files and the latest pas
 - [Integration Workflow Guide](integration_workflow.md)
 - [Deploy to Azure Workflow Guide](deploy_azure_workflow.md)
 - [Infrastructure Workflow Guide](infra_workflow.md)
+- [Codecov Configuration Guide](codecov_configuration.md)
 - [Branch Protection & Required Checks Setup](branch_protection_setup.md)
 - [Workflow Case Studies (Fixed Issues)](workflow_case_studies.md)
 
