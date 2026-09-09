@@ -21,10 +21,17 @@ ignore:
 
 coverage:
   status:
-    # Informational checks on PRs; the blocking gate is the ruleset's
-    # "Restrict code coverage" rule, which reads these Codecov results.
-    project: true
-    patch: true
+    # Blocking gate: project coverage must be >= 80% (with 3% leniency for
+    # minor fluctuations). This posts a failing `codecov/project` status check
+    # on PRs below the bar; the branch ruleset requires that check, so merges
+    # are blocked until coverage recovers.
+    project:
+      default:
+        target: 80%
+        threshold: 3%
+    patch:
+      default:
+        target: auto
 
 comment:
   layout: "reach, diff, files"
