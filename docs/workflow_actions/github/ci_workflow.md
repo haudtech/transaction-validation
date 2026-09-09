@@ -57,10 +57,10 @@ Explanation:
 - `--no-restore`: skips restore because restore already happened in the previous step.
 - `--configuration Release`: builds with `Release` configuration (optimized build profile).
 
-### Step: Test (unit only)
+### Step: Test (unit, with coverage)
 Command:
 ```bash
-dotnet test tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj --configuration Release --verbosity normal --filter "Category!=Integration&Category!=E2E"
+dotnet test tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj --configuration Release --verbosity normal --filter "Category!=Integration&Category!=E2E" --settings ./coverage.unit.runsettings --results-directory ./coverage
 ```
 Explanation:
 - `dotnet`: invokes the .NET CLI.
@@ -69,6 +69,27 @@ Explanation:
 - `--configuration Release`: uses the same build configuration as the build step.
 - `--verbosity normal`: shows standard test output detail.
 - `--filter "Category!=Integration&Category!=E2E"`: runs only unit tests, excluding tests tagged as Integration (run by the separate Integration Tests workflow) and E2E (require Docker Compose services).
+- `--settings ./coverage.unit.runsettings`: uses the same coverage settings file as the local `test:coverage:unit` task, which pins the XPlat Code Coverage collector output to Cobertura format.
+- `--results-directory ./coverage`: writes results under `./coverage/` so the upload step can find the report.
+
+### Step: Upload coverage to Codecov
+Configuration:
+```yaml
+uses: codecov/codecov-action@v5
+with:
+  token: ${{ secrets.CODECOV_TOKEN }}
+  files: ./coverage/**/coverage.cobertura.xml
+  disable_search: true
+  fail_ci_if_error: false
+```
+Explanation:
+- Uploads the Cobertura report to Codecov, which computes project/patch coverage and posts `codecov/project` and `codecov/patch` status checks on the PR.
+- `token`: the repository upload token (stored as the `CODECOV_TOKEN` secret). Without it Codecov can receive uploads but cannot post status checks back to GitHub.
+- `files`: explicit report path.
+- `disable_search: true`: prevents the uploader from sweeping up unrelated files (e.g. the `.runsettings` files) as extra reports.
+- `fail_ci_if_error: false`: an upload failure never blocks CI; coverage gating is Codecov's job, not the build's.
+- The coverage target (`80%` project, `3%` threshold) and exclusion scope are configured in `codecov.yml` at the repo root — kept in version control, not in the GitHub UI. The exclusions mirror the local report filters in `.vscode/tasks.json` (`test:coverage:unit:report`), so the Codecov percentage (~87.5%) matches the locally measured value.
+- Prerequisites: the Codecov GitHub App must be installed on the repository for status checks to be posted; a token alone only enables uploads and PR comments.
 
 ### Step: Verify formatting
 Command:
