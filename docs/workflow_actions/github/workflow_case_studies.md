@@ -74,12 +74,71 @@ This document captures real workflow failures that occurred in this repository a
 
 ---
 
+## Case Study 4: Required status checks stuck on "Expected — Waiting for status to be reported"
+
+### Symptoms
+- PR showed all checks green (`CI / build (pull_request)`, `Integration Tests / integration (pull_request)` succeeded), yet the required entries stayed pending forever and merging remained blocked.
+
+### Root cause
+- The branch ruleset's required status check contexts were configured with PR-UI display strings (`CI / build (pull_request)`) instead of the actual check-run names GitHub Actions reports — the job names `build` and `integration`.
+- A ruleset requires an exact context match; the display string in the Checks tab is `<workflow name> / <job name> (<event>)`, which is not the context.
+
+### Fix applied
+- Updated the ruleset's `required_status_checks` contexts to the job names (`build`, `integration`) via the API, then re-ran the checks. The required entries matched and went green.
+
+### Preventive guidance
+- When configuring required checks, copy the context from the check-run `name` field, not the Checks tab display:
+  ```bash
+  gh api repos/<owner>/<repo>/commits/<head-sha>/check-runs \
+    --jq '.check_runs[] | {name, status, conclusion}'
+  ```
+- See [branch_protection_setup.md](branch_protection_setup.md) for the full diagnostic sequence.
+
+---
+
+## Case Study 5: "Merging is blocked — Cannot update this protected ref" with all checks green
+
+### Symptoms
+- After the required-check contexts were fixed, every check passed, but merging was still blocked with `Cannot update this protected ref.`
+
+### Root cause
+- The ruleset included the `update` rule ("Restrict updates: only allow users with bypass permission to update matching refs") while its bypass actor list was empty.
+- Unlike classic branch protection, rulesets do **not** automatically bypass admins/owners — so nobody could update `main`, including merge commits. Rule evaluations confirmed: `update: fail` (`Cannot update this protected ref.`), all other rules `pass`.
+
+### Fix applied
+- Removed the `update` rule from the ruleset. PR-only merging is already enforced by the `pull_request` rule; check enforcement stays via `required_status_checks` with an empty bypass list.
+
+### Preventive guidance
+- Only add the `update` rule if you intend to gate ref updates behind an explicit bypass-actor list.
+- To diagnose any blocked merge, read the rule evaluations:
+  ```bash
+  gh api repos/<owner>/<repo>/rulesets/rule-suites \
+    --jq '.rule_suites[0:5][] | {id, result, ref: .ref}'
+  gh api repos/<owner>/<repo>/rulesets/rule-suites/<id> \
+    --jq '.rule_evaluations[] | {rule_type, result, details}'
+  ```
+
+---
+
 ## Current stable baseline (summary)
 
 - `ci.yml`
-  - Triggers: push to `main` and `feature/**`, PR to `main`
-  - Unit-test filter: `Category!=Integration`
+  - Triggers: push to `main`, PR to `main`
+  - Unit-test filter: `Category!=Integration&Category!=E2E`
+  - Concurrency: per-PR/ref group, cancel-in-progress
 - `integration.yml`
   - Triggers: push to `main`, PR to `main`, manual `workflow_dispatch`
   - Integration filter: `Category=Integration`
   - Uses `environment: integration` for optional protection gates
+  - Concurrency: per-PR/ref group, cancel-in-progress
+- `deploy-azure.yml`
+  - Triggers: push to `main` (paths: `src/**`, workflow file), manual `workflow_dispatch`
+  - Builds/pushes API + Mock images to ACR, updates Container Apps, verifies `/healthz`
+  - Uses `environment: azure-dev` (ungated for auto-deploy-on-merge)
+  - Concurrency: per-ref group, cancel-in-progress
+- `infra.yml`
+  - Triggers: PR touching `infra/bicep/**` (what-if preview), push to `main` touching `infra/bicep/**` (apply), manual `workflow_dispatch` (apply)
+  - `apply` job uses `environment: azure-infra`, which should have required reviewers enabled
+- Ruleset `main` (id `20794465`)
+  - Required checks: `build`, `integration` (strict up-to-date policy)
+  - PR-only merges, no bypass actors — see [branch_protection_setup.md](branch_protection_setup.md)

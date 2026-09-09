@@ -60,7 +60,7 @@ Explanation:
 ### Step: Test (unit only)
 Command:
 ```bash
-dotnet test tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj --configuration Release --verbosity normal --filter "Category!=Integration"
+dotnet test tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj --configuration Release --verbosity normal --filter "Category!=Integration&Category!=E2E"
 ```
 Explanation:
 - `dotnet`: invokes the .NET CLI.
@@ -68,7 +68,7 @@ Explanation:
 - `tests/TransactionValidation.Tests/TransactionValidation.Tests.csproj`: targets the test project explicitly.
 - `--configuration Release`: uses the same build configuration as the build step.
 - `--verbosity normal`: shows standard test output detail.
-- `--filter "Category!=Integration"`: excludes tests tagged as Integration and runs non-integration tests (unit/default tests).
+- `--filter "Category!=Integration&Category!=E2E"`: runs only unit tests, excluding tests tagged as Integration (run by the separate Integration Tests workflow) and E2E (require Docker Compose services).
 
 ### Step: Verify formatting
 Command:
@@ -84,16 +84,20 @@ Explanation:
 ## 2) When it is triggered
 
 Defined triggers in `ci.yml`:
-- `push` to branches:
+- `push` to branch:
   - `main`
-  - `feature/**` (any branch under `feature/`)
 - `pull_request` targeting branch:
   - `main`
 
+Deliberately, `feature/**` pushes do **not** trigger CI: with a PR open, the push run would duplicate the `pull_request` run (same commit, same steps), doubling runner minutes and cluttering the PR check list. Pre-PR feedback is covered by the local `check` task (format verification, build, unit tests).
+
 Practical trigger examples:
-- Push a commit to `feature/phase-2-core` => CI runs.
-- Open/update PR from feature branch into `main` => CI runs.
-- Push directly to `main` => CI runs.
+- Open/update a PR into `main` => CI runs (this is the required `build` check).
+- Push directly to `main` => CI runs (post-merge validation).
+- Push a commit to `feature/phase-2-core` with no PR => CI does not run; use the local `check` task instead.
+
+Concurrency behavior:
+- The workflow defines a concurrency group keyed on workflow name + PR number (or branch ref) with `cancel-in-progress: true`, so pushing a follow-up commit cancels the obsolete in-progress run instead of queuing a full duplicate.
 
 ## 3) How to trigger it manually
 

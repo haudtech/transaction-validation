@@ -41,7 +41,10 @@ This folder is the central entry point for the project’s technical and enginee
 - Workflow docs index: [workflow_actions/github/README.md](workflow_actions/github/README.md)
 - CI workflow details: [workflow_actions/github/ci_workflow.md](workflow_actions/github/ci_workflow.md)
 - Integration workflow details: [workflow_actions/github/integration_workflow.md](workflow_actions/github/integration_workflow.md)
+- Deploy to Azure workflow details: [workflow_actions/github/deploy_azure_workflow.md](workflow_actions/github/deploy_azure_workflow.md)
+- Infrastructure workflow details: [workflow_actions/github/infra_workflow.md](workflow_actions/github/infra_workflow.md)
 - Workflow case studies: [workflow_actions/github/workflow_case_studies.md](workflow_actions/github/workflow_case_studies.md)
+- Branch protection and required checks setup: [workflow_actions/github/branch_protection_setup.md](workflow_actions/github/branch_protection_setup.md)
 
 ### Azure deployment
 - Azure deployment documentation: [azure_deployment/README.md](azure_deployment/README.md)

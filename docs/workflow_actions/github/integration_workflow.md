@@ -86,10 +86,11 @@ Defined triggers in `integration.yml`:
 
 Additional behavior:
 - Job uses `environment: integration`, so repository environment protection rules (required reviewers, wait timers, etc.) can gate execution.
+- The workflow defines a concurrency group keyed on workflow name + PR number (or branch ref) with `cancel-in-progress: true`, so pushing a follow-up commit cancels the obsolete in-progress run.
 
 Practical trigger examples:
 - Push to `main` => integration workflow runs.
-- Open/update PR into `main` => integration workflow runs.
+- Open/update PR into `main` => integration workflow runs (this is the required `integration` check).
 - Manually click **Run workflow** => integration workflow runs.
 
 ## 3) How to trigger it manually
