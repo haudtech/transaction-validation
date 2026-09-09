@@ -1,8 +1,8 @@
 # Azure AD OIDC Prerequisite Setup — Runbook
 
-Status: Completed for the `azure-infra` / `azure-dev` dev environment on 2026-09-07. The deployed dev environment was validated; the optional repository E2E suite remains blocked because the Mock app has internal-only ingress.
+This is a **reusable, purely procedural runbook**: the exact commands to satisfy the "Prerequisite: one-time Azure AD OIDC setup" checklist in [azure_deployment_plan.md](../implementation/azure_deployment_plan.md), with the expected result for each step. Use it for a new repository, a new Azure tenant/subscription, or a new environment (e.g. `staging`/`prod`).
 
-This document records the exact commands run to satisfy the "Prerequisite: one-time Azure AD OIDC setup" checklist in [azure_deployment_plan.md](../implementation/azure_deployment_plan.md), including the expected result for each step. It doubles as a runbook for repeating this setup for a future `staging`/`prod` environment.
+One-time execution status and live validation evidence are recorded in [azure_deployment_plan.md](../implementation/azure_deployment_plan.md), not here.
 
 Replace every placeholder in angle brackets before running a command. The values are intentionally omitted from this reusable guide:
 
@@ -324,7 +324,7 @@ gh secret list
 | GitHub environments | `azure-infra` (required reviewer: `<GITHUB_REVIEWER_LOGIN>`), `azure-dev` |
 | GitHub secrets | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `API_KEY_SECRET_VALUE` |
 
-Both [infra.yml](../../.github/workflows/infra.yml) and [deploy-azure.yml](../../.github/workflows/deploy-azure.yml) authenticate via OIDC, and the dev deployment has been validated. The repository E2E suite and the audit-consumer redelivery check still require a runner that can reach the Mock app's internal-only ingress; they are optional follow-up validation, not OIDC prerequisites.
+Both [infra.yml](../../.github/workflows/infra.yml) and [deploy-azure.yml](../../.github/workflows/deploy-azure.yml) authenticate via OIDC. For the record of the dev-environment validation performed after this setup (including the checks still blocked by the Mock app's internal-only ingress), see Phase 7 in [azure_deployment_plan.md](../implementation/azure_deployment_plan.md).
 
 ## Repeating this for a future environment (e.g. `staging`)
 
