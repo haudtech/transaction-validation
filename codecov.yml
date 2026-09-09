@@ -1,0 +1,32 @@
+# Codecov configuration — mirrors the scope of the local coverage report tasks
+# (.vscode/tasks.json test:coverage:unit:report), so the Codecov percentage
+# matches the locally measured ~87.5% unit coverage instead of the raw 40.5%
+# that includes untestable infrastructure glue and the Mock server.
+
+ignore:
+  # Mock server: exists only to be called over HTTP by integration/E2E tests; it
+  # has no unit tests by design (1028 lines at 0% would dominate the total).
+  - "src/TransactionValidation.Mock"
+  # Composition root / startup wiring — validated by host integration tests.
+  - "**/Program.cs"
+  # Infrastructure glue: thin wrappers over RabbitMQ/Azure Service Bus SDKs that
+  # require live brokers; covered by integration tests, excluded from the unit gate.
+  - "src/TransactionValidation.Messaging/RabbitMqClientAdapter.cs"
+  - "src/TransactionValidation.Messaging/RabbitMqTopologyInitializer.cs"
+  - "src/TransactionValidation.Messaging/ServiceBusClientFactory.cs"
+  - "src/TransactionValidation.Messaging/ServiceBusMessageSender.cs"
+  # Pure options DTOs — no logic to cover.
+  - "src/TransactionValidation.Configuration/Options/RabbitMqOptions.cs"
+  - "src/TransactionValidation.Configuration/Options/SerilogOptions.cs"
+
+coverage:
+  status:
+    # Informational checks on PRs; the blocking gate is the ruleset's
+    # "Restrict code coverage" rule, which reads these Codecov results.
+    project: true
+    patch: true
+
+comment:
+  layout: "reach, diff, files"
+  require_base: false
+  require_head: true
