@@ -12,6 +12,10 @@ param apiKeySecretValue string
 @description('Redis connection string, computed by the caller from listKeys() and stored as a secret.')
 param redisConnectionStringSecretValue string
 
+@secure()
+@description('Application Insights connection string stored as a secret for Container Apps telemetry export.')
+param applicationInsightsConnectionStringSecretValue string
+
 resource keyVault 'Microsoft.KeyVault/vaults@2024-11-01' = {
   name: keyVaultName
   location: location
@@ -40,6 +44,14 @@ resource redisConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2024-11-
   name: 'Redis--ConnectionString'
   properties: {
     value: redisConnectionStringSecretValue
+  }
+}
+
+resource applicationInsightsConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
+  parent: keyVault
+  name: 'ApplicationInsights--ConnectionString'
+  properties: {
+    value: applicationInsightsConnectionStringSecretValue
   }
 }
 

@@ -1,6 +1,6 @@
 # Azure Deployment Plan
 
-Status: Deployed and validated in the dev environment
+Status: Core infrastructure deployed and validated in the dev environment; Application Insights observability wiring is prepared and requires a new infrastructure deployment plus telemetry validation.
 
 Scope: steps required to deploy the TransactionValidation BFF to Azure as a single dev/POC environment, expandable later to dev + staging. This plan was agreed after a point-by-point clarification pass and supersedes ad-hoc deployment notes elsewhere.
 
@@ -16,8 +16,9 @@ Scope: steps required to deploy the TransactionValidation BFF to Azure as a sing
 | Infrastructure as code | Bicep |
 | CI/CD | Full pipeline: build, push, deploy |
 | Networking | Public HTTPS (enforced) for the API; private endpoints for Service Bus and Redis |
-| Health checks & logging | Both included |
-| Execution order | Identity → Idempotency → Health checks → Prod logging → Infra → Deploy |
+| Health checks & logging | Health checks, structured JSON Serilog console logging, and OpenTelemetry are included |
+| Observability | Workspace-based Application Insights linked to Log Analytics; OpenTelemetry from API and Mock; Serilog console logs collected by Log Analytics |
+| Execution order | Identity → Idempotency → Health checks → Prod logging → Observability → Infra → Deploy → Validate telemetry |
 
 ## Phase 1 — Managed Identity auth for Azure Service Bus
 
@@ -56,8 +57,9 @@ Status: Done
 - [x] Removed the `File` sink from the base `appsettings.json` (Api) so Production (default environment when unset) is Console-only; container filesystems are ephemeral.
 - [x] Kept the `File` sink in `appsettings.Development.json` only, so local dev logging to `logs/app-.txt` is unchanged.
 - [x] Added `appsettings.Production.json` (Api) explicitly documenting the Console-only profile for ops clarity, even though the base file alone already produces this behavior.
-- [x] `TransactionValidation.Mock` has no Serilog wiring (default ASP.NET Core logging only), so no change was needed there.
+- [x] Added JSON console Serilog wiring to `TransactionValidation.Mock`; Mock logs are collected by Container Apps and Log Analytics.
 - [x] Verified end-to-end: ran the Api with `ASPNETCORE_ENVIRONMENT=Production`, confirmed `GET /healthz` → `200 Healthy` and no `logs/` directory was created; confirmed Development still writes files as before.
+- [x] API and Mock share Serilog and OpenTelemetry startup registration through the common Configuration project while retaining app-specific service names.
 - Note: a plain JSON-array override in `appsettings.Production.json` would **not** have removed the base file sink (later config providers merge arrays by index, they don't shrink them), so the base file itself had to drop the `File` entry rather than relying on a Production-only override.
 
 ## Phase 5 — Bicep infrastructure
@@ -69,18 +71,21 @@ New `infra/bicep/` with modules:
 - [x] `vnet.bicep` — VNet with `snet-infra` (delegated to Container Apps) and `snet-pe` (private endpoints)
 - [x] `servicebus.bicep` — topic + primary/audit subscriptions + SQL filters + private endpoint
 - [x] `redis.bicep` — Azure Cache for Redis with private endpoint only
-- [x] `keyvault.bicep` — secrets (API key, Redis connection string)
-- [x] `containerapps.bicep` — Log Analytics, ACR, Container Apps environment, `txv-api` (external HTTPS-only ingress), `txv-mock` (internal-only ingress), system-assigned managed identities
-- [x] Role assignments: `Azure Service Bus Data Sender` (API), `Azure Service Bus Data Receiver` (Mock), `Key Vault Secrets User` (API), `AcrPull` (both apps)
+- [x] `observability.bicep` — 5-day Log Analytics workspace and workspace-based Application Insights component.
+- [x] `keyvault.bicep` — API key, Redis connection string, and Application Insights connection string secrets.
+- [x] `containerapps.bicep` — Log Analytics-linked Container Apps environment, ACR, `txv-api` (external HTTPS-only ingress), `txv-mock` (internal-only ingress), and user-assigned managed identities.
+- [x] Role assignments: `Azure Service Bus Data Sender` (API), `Azure Service Bus Data Receiver` (Mock), `Key Vault Secrets User` (API and Mock), `AcrPull` (both apps).
 - [x] Use **user-assigned** managed identities (one per app) rather than system-assigned. With system-assigned identities the role assignments can only be declared after the app exists (they need its `principalId`), but Container Apps provisions the first revision immediately — so the image pull ran before `AcrPull` was granted and failed with `401 UNAUTHORIZED`, surfacing as `ContainerAppOperationError: Operation expired`. User-assigned identities are created first, granted their roles, and only then referenced by the apps via `dependsOn`. Each app sets `AZURE_CLIENT_ID` so `DefaultAzureCredential` selects the right identity, and the per-app least-privilege split is preserved.
-- [x] `main.bicep` (subscription-scope entry point, creates the resource group and wires all five modules) + `main.parameters.dev.json`
+- [x] `main.bicep` (subscription-scope entry point, creates the resource group and wires observability, networking, broker, Redis, Key Vault, and Container Apps modules) + `main.parameters.dev.json`
 - [x] Verified with `az deployment sub what-if` against a real subscription — confirmed the template is valid and produces the expected resource plan.
+- [x] Bicep compiles with the workspace-based Application Insights and Key Vault secret wiring.
+- [ ] Deploy the updated observability resources and verify Application Insights ingestion, sampling, daily cap, and alert configuration.
 
 ## Phase 6 — CI/CD pipeline
 
 Status: Done
 
-- [x] Add `.github/workflows/deploy-azure.yml` — triggered on pushes to `main` touching `src/**`; builds both images via `az acr build` (ACR Tasks, no local Docker in the runner) and updates the two Container Apps' revisions with the new image tag (`github.sha`).
+- [x] Add `.github/workflows/deploy-azure.yml` — triggered on pushes to `main` touching `src/**`; builds both images on the GitHub runner and pushes them to ACR because ACR Tasks are unavailable on this subscription, then updates both Container Apps with the new image tag (`github.sha`).
 - [x] Add `.github/workflows/infra.yml` — separate from app deploys since infra changes are rarer and higher blast radius:
   - on pull requests touching `infra/bicep/**`: runs `az deployment sub what-if` only (preview, no changes)
   - on merge to `main` touching `infra/bicep/**`: runs the real `az deployment sub create`, gated behind the `azure-infra` GitHub environment (configure required reviewers there for manual approval)
@@ -118,7 +123,7 @@ Both workflows can now authenticate via OIDC; nothing else blocks running them.
 
 ## Phase 7 — Validation
 
-Status: Done
+Status: Partially done; observability validation remains pending after the updated infrastructure deployment.
 
 Verified against the live dev environment (`txv-api-dev.wittyfield-669bab78.eastus.azurecontainerapps.io`) on 2026-09-07:
 
@@ -128,6 +133,12 @@ Verified against the live dev environment (`txv-api-dev.wittyfield-669bab78.east
 - [x] Confirmed both consumers observed the same `MessageId` on their own subscriptions, with the audit consumer receiving `RoutingKey=partner.transaction.accepted`. Dead-letter counts stayed at `0`.
 - [x] Confirmed Redis-backed idempotency across replicas: scaled the API to `minReplicas: 2`, sent 16 identical requests with one `Idempotency-Key`, and received exactly one distinct `messageId`. A per-instance in-memory store would have produced one id per replica. Scale restored to `minReplicas: 1` afterwards.
 - [x] Confirmed error semantics: `409` for an idempotency key reused with a different payload, `400` with ProblemDetails for an invalid payload, and `401` for a missing or incorrect API key.
+- [ ] Deploy the updated Bicep observability resources and confirm the Application Insights connection string is present in Key Vault as `ApplicationInsights--ConnectionString`.
+- [ ] Confirm both Container Apps resolve `APPLICATIONINSIGHTS__CONNECTIONSTRING` through their user-assigned identities.
+- [ ] Send an authenticated transaction with a known `Correlation-Id` and confirm the same value in the API response, JSON Serilog logs, and Application Insights `app.correlation_id` custom dimensions.
+- [ ] Confirm `operation_Id` links the API request to the partner verification dependency and consumer telemetry where available.
+- [ ] Query Log Analytics for the JSON `EventId`, owning class category, and `CorrelationId`.
+- [ ] Verify 5-day retention, 10% sampling, 100 MB/day ingestion cap, and 80% alert configuration in Azure.
 - [ ] Run the repository `test:e2e` suite against the deployed environment. The suite's fixture publishes directly to Service Bus and reads the Mock observation endpoint, but the Mock app uses internal-only ingress, so it is unreachable from a developer machine. Running it requires either temporary external ingress on the Mock app or a runner inside the VNet.
 - [ ] Exercise the audit-consumer failure-before-completion redelivery path in Azure. It relies on the Mock test-support endpoint, which is blocked by the same internal-ingress constraint.
 

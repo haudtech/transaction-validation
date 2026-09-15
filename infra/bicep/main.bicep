@@ -25,6 +25,16 @@ resource rg 'Microsoft.Resources/resourceGroups@2024-11-01' = {
   tags: tags
 }
 
+module observability 'modules/observability.bicep' = {
+  scope: rg
+  params: {
+    location: location
+    logAnalyticsName: 'log-${namePrefix}-${environmentName}'
+    applicationInsightsName: 'appi-${namePrefix}-${environmentName}'
+    tags: tags
+  }
+}
+
 module vnet 'modules/vnet.bicep' = {
   name: 'vnet'
   scope: rg
@@ -67,6 +77,7 @@ module keyVault 'modules/keyvault.bicep' = {
     keyVaultName: 'kv-${namePrefix}-${environmentName}'
     apiKeySecretValue: apiKeySecretValue
     redisConnectionStringSecretValue: redis.outputs.primaryConnectionString
+    applicationInsightsConnectionStringSecretValue: observability.outputs.applicationInsightsConnectionString
     tags: tags
   }
 }
