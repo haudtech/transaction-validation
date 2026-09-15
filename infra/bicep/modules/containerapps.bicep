@@ -31,16 +31,8 @@ resource existingKeyVault 'Microsoft.KeyVault/vaults@2024-11-01' existing = {
   name: last(split(keyVaultId, '/'))
 }
 
-resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: logAnalyticsName
-  location: location
-  tags: tags
-  properties: {
-    sku: {
-      name: 'PerGB2018'
-    }
-    retentionInDays: 30
-  }
 }
 
 resource acr 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' = {
@@ -95,6 +87,16 @@ resource apiKeyVaultSecretsUserRoleAssignment 'Microsoft.Authorization/roleAssig
   scope: existingKeyVault
   properties: {
     principalId: apiIdentity.properties.principalId
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsUserRoleId)
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource mockKeyVaultSecretsUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(keyVaultId, mockIdentity.id, keyVaultSecretsUserRoleId)
+  scope: existingKeyVault
+  properties: {
+    principalId: mockIdentity.properties.principalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', keyVaultSecretsUserRoleId)
     principalType: 'ServicePrincipal'
   }
@@ -163,6 +165,13 @@ resource mockApp 'Microsoft.App/containerApps@2024-03-01' = {
           identity: mockIdentity.id
         }
       ]
+      secrets: [
+        {
+          name: 'applicationinsights-connection-string'
+          keyVaultUrl: '${keyVaultUri}secrets/ApplicationInsights--ConnectionString'
+          identity: mockIdentity.id
+        }
+      ]
     }
     template: {
       containers: [
@@ -178,6 +187,7 @@ resource mockApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'SERVICEBUSAUDITCONSUMER__NAMESPACE', value: serviceBusNamespaceFqdn }
             { name: 'SERVICEBUSCONSUMER__ENABLED', value: 'true' }
             { name: 'SERVICEBUSAUDITCONSUMER__ENABLED', value: 'true' }
+            { name: 'APPLICATIONINSIGHTS__CONNECTIONSTRING', secretRef: 'applicationinsights-connection-string' }
           ]
           resources: {
             cpu: json('0.5')
@@ -194,6 +204,7 @@ resource mockApp 'Microsoft.App/containerApps@2024-03-01' = {
   dependsOn: [
     mockAcrPullRoleAssignment
     mockServiceBusReceiverRoleAssignment
+    mockKeyVaultSecretsUserRoleAssignment
   ]
 }
 
@@ -233,6 +244,11 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
           keyVaultUrl: '${keyVaultUri}secrets/Redis--ConnectionString'
           identity: apiIdentity.id
         }
+        {
+          name: 'applicationinsights-connection-string'
+          keyVaultUrl: '${keyVaultUri}secrets/ApplicationInsights--ConnectionString'
+          identity: apiIdentity.id
+        }
       ]
     }
     template: {
@@ -249,6 +265,7 @@ resource apiApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'PARTNERVERIFICATION__BASEURL', value: 'http://${mockApp.properties.configuration.ingress.fqdn}/' }
             { name: 'SECURITY__APIKEY', secretRef: 'security-api-key' }
             { name: 'REDIS__CONNECTIONSTRING', secretRef: 'redis-connection-string' }
+            { name: 'APPLICATIONINSIGHTS__CONNECTIONSTRING', secretRef: 'applicationinsights-connection-string' }
           ]
           resources: {
             cpu: json('0.5')
