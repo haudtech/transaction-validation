@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 
 using TransactionValidation.Core.Models;
+using TransactionValidation.Core.Logging;
 using TransactionValidation.Messaging;
 using TransactionValidation.Mock.Options;
 
@@ -18,6 +19,8 @@ namespace TransactionValidation.Mock.Services;
 /// </summary>
 public sealed class RabbitMqNoOpConsumerService : BackgroundService
 {
+    private static readonly string DependencyName = "RabbitMQ";
+    private static readonly string ConsumerName = "primary";
     private readonly RabbitMqPrimaryConsumerOptions _options;
     private readonly ConsumerObservationStore _observationStore;
     private readonly ILogger<RabbitMqNoOpConsumerService> _logger;
@@ -61,7 +64,7 @@ public sealed class RabbitMqNoOpConsumerService : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "RabbitMQ consume loop failed. Retrying in 2 seconds.");
+                TransactionValidationLogger.ConsumerRetryScheduled(_logger, ex, DependencyName, ConsumerName, _options.QueueName, 2);
                 await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
             }
         }
@@ -113,7 +116,14 @@ public sealed class RabbitMqNoOpConsumerService : BackgroundService
                 1,
                 DateTimeOffset.UtcNow));
 
-            _logger.LogInformation("Consumed message from queue {QueueName}. DeliveryTag={DeliveryTag}", _options.QueueName, deliveryTag);
+            TransactionValidationLogger.ConsumerMessageObserved(
+                _logger,
+                DependencyName,
+                ConsumerName,
+                _options.QueueName,
+                envelope.MessageId,
+                envelope.CorrelationId,
+                1);
 
             if (!_options.AutoAck)
             {

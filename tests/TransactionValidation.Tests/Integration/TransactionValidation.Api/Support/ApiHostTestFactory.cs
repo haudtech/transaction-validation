@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging.Abstractions;
 
 using TransactionValidation.Api.Idempotency;
 using TransactionValidation.Core.Interfaces;
@@ -73,7 +74,7 @@ internal sealed class ApiHostTestFactory : WebApplicationFactory<Program>
             services.AddSingleton(_partnerVerifier);
             services.AddSingleton(_messagePublisher);
             services.AddSingleton<IIdempotencyStore>(_ =>
-                new InMemoryIdempotencyStore(TimeSpan.FromMinutes(15)));
+                new InMemoryIdempotencyStore(TimeSpan.FromMinutes(15), NullLogger<InMemoryIdempotencyStore>.Instance));
         });
     }
 }

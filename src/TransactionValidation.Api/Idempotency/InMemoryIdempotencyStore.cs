@@ -3,6 +3,10 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 
+using Microsoft.Extensions.Logging;
+
+using TransactionValidation.Core.Logging;
+
 namespace TransactionValidation.Api.Idempotency;
 
 /// <summary>
@@ -11,9 +15,20 @@ namespace TransactionValidation.Api.Idempotency;
 /// </summary>
 public sealed class InMemoryIdempotencyStore : IIdempotencyStore
 {
+    private enum CacheOutcome
+    {
+        Found,
+        Updated,
+        Created,
+        Released
+    }
+
+    private const string DependencyName = nameof(InMemoryIdempotencyStore);
+
     private readonly ConcurrentDictionary<string, IdempotencyEntry> _entries = new(StringComparer.Ordinal);
     private readonly TimeSpan _ttl;
     private int _cleanupCounter;
+    private readonly ILogger<InMemoryIdempotencyStore> _logger;
 
     private readonly record struct IdempotencyEntry(DateTimeOffset ExpiresAt, string RequestFingerprint, IdempotencyCachedResponse? CachedResponse);
 
@@ -21,7 +36,7 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
     /// Initializes the in-memory store with a TTL that limits how long duplicate requests are suppressed.
     /// </summary>
     /// <param name="ttl">Lifetime of the cached idempotency entry.</param>
-    public InMemoryIdempotencyStore(TimeSpan ttl)
+    public InMemoryIdempotencyStore(TimeSpan ttl, ILogger<InMemoryIdempotencyStore> logger)
     {
         if (ttl <= TimeSpan.Zero)
         {
@@ -29,6 +44,7 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
         }
 
         _ttl = ttl;
+        _logger = logger;
     }
 
     /// <summary>
@@ -67,13 +83,16 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
                     continue;
                 }
 
-                return string.Equals(existingEntry.RequestFingerprint, normalizedFingerprint, StringComparison.Ordinal)
+                var result = string.Equals(existingEntry.RequestFingerprint, normalizedFingerprint, StringComparison.Ordinal)
                     ? IdempotencyAcquireResult.Duplicate
                     : IdempotencyAcquireResult.KeyReusedWithDifferentPayload;
+                TransactionValidationLogger.IdempotencyAcquisitionCompleted(_logger, DependencyName, result.ToString());
+                return result;
             }
 
             if (_entries.TryAdd(encodedKey, new IdempotencyEntry(expiresAt, normalizedFingerprint, null)))
             {
+                TransactionValidationLogger.IdempotencyAcquisitionCompleted(_logger, DependencyName, nameof(IdempotencyAcquireResult.Acquired));
                 return IdempotencyAcquireResult.Acquired;
             }
         }
@@ -116,6 +135,10 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
         }
 
         cachedResponse = existingEntry.CachedResponse;
+        TransactionValidationLogger.IdempotencyCacheLookupCompleted(
+            _logger,
+            DependencyName,
+            nameof(CacheOutcome.Found));
         return true;
     }
 
@@ -158,6 +181,10 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
 
                 if (_entries.TryUpdate(encodedKey, updatedEntry, existingEntry))
                 {
+                    TransactionValidationLogger.IdempotencyCacheStorageCompleted(
+                        _logger,
+                        DependencyName,
+                        nameof(CacheOutcome.Updated));
                     return;
                 }
 
@@ -166,6 +193,10 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
 
             if (_entries.TryAdd(encodedKey, new IdempotencyEntry(expiresAt, normalizedFingerprint, cachedResponse)))
             {
+                TransactionValidationLogger.IdempotencyCacheStorageCompleted(
+                    _logger,
+                    DependencyName,
+                    nameof(CacheOutcome.Created));
                 return;
             }
         }
@@ -180,6 +211,10 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
 
         var encodedKey = EncodeKey(key);
         _entries.TryRemove(encodedKey, out _);
+        TransactionValidationLogger.IdempotencyReleaseCompleted(
+            _logger,
+            DependencyName,
+            nameof(CacheOutcome.Released));
     }
 
     private static string EncodeKey(string key)

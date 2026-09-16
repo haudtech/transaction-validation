@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 
 using TransactionValidation.Api.Idempotency;
 
@@ -11,7 +12,7 @@ public sealed class InMemoryIdempotencyStoreTests
     [Fact]
     public void Constructor_WhenTtlIsNotPositive_ThrowsArgumentOutOfRangeException()
     {
-        var action = () => new InMemoryIdempotencyStore(TimeSpan.Zero);
+        var action = () => new InMemoryIdempotencyStore(TimeSpan.Zero, NullLogger<InMemoryIdempotencyStore>.Instance);
 
         action.Should().Throw<ArgumentOutOfRangeException>();
     }
@@ -19,7 +20,7 @@ public sealed class InMemoryIdempotencyStoreTests
     [Fact]
     public void TryAcquire_WhenKeyIsNew_ReturnsAcquired()
     {
-        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10));
+        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10), NullLogger<InMemoryIdempotencyStore>.Instance);
 
         var result = store.TryAcquire("partner|request", "fingerprint", Now);
 
@@ -49,7 +50,7 @@ public sealed class InMemoryIdempotencyStoreTests
     [Fact]
     public void TryAcquire_WhenEntryHasExpired_AcquiresKeyAgain()
     {
-        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10));
+        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10), NullLogger<InMemoryIdempotencyStore>.Instance);
         store.TryAcquire("partner|request", "fingerprint", Now);
 
         var result = store.TryAcquire("partner|request", "new-fingerprint", Now.AddMinutes(10));
@@ -122,7 +123,7 @@ public sealed class InMemoryIdempotencyStoreTests
     [Fact]
     public void TryAcquire_WhenInputsAreBlank_ThrowsArgumentException()
     {
-        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10));
+        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10), NullLogger<InMemoryIdempotencyStore>.Instance);
 
         var blankKey = () => store.TryAcquire(" ", "fingerprint", Now);
         var blankFingerprint = () => store.TryAcquire("key", " ", Now);
@@ -134,7 +135,7 @@ public sealed class InMemoryIdempotencyStoreTests
     [Fact]
     public async Task TryAcquire_WhenCalledConcurrently_AllowsOnlyOneAcquisition()
     {
-        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10));
+        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10), NullLogger<InMemoryIdempotencyStore>.Instance);
         var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var attempts = Enumerable.Range(0, 16)
             .Select(_ => Task.Run(async () =>
@@ -155,7 +156,7 @@ public sealed class InMemoryIdempotencyStoreTests
 
     private static InMemoryIdempotencyStore CreateAcquiredStore()
     {
-        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10));
+        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10), NullLogger<InMemoryIdempotencyStore>.Instance);
         store.TryAcquire("partner|request", "fingerprint", Now);
         return store;
     }

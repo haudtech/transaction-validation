@@ -1,6 +1,7 @@
 using Azure.Messaging.ServiceBus;
 
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 
 using Moq;
 
@@ -25,7 +26,8 @@ public sealed class ServiceBusMessagePublisherTests
             "partner.transactions",
             "partner.transaction",
             "partner.transaction.accepted",
-            "partner.transaction.accepted");
+            "partner.transaction.accepted",
+            NullLogger<ServiceBusMessagePublisher>.Instance);
 
         await sut.PublishAsync(CreateEnvelope(), CancellationToken.None);
 

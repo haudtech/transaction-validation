@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 
 using Moq;
 
@@ -36,7 +37,7 @@ public sealed class RabbitMqMessagePublisherTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        var sut = new RabbitMqMessagePublisher("partner.transactions", adapterMock.Object, resolverMock.Object);
+        var sut = new RabbitMqMessagePublisher("partner.transactions", adapterMock.Object, resolverMock.Object, NullLogger<RabbitMqMessagePublisher>.Instance);
 
         await sut.PublishAsync(CreateEnvelope(), CancellationToken.None);
 
@@ -66,7 +67,7 @@ public sealed class RabbitMqMessagePublisherTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
-        var sut = new RabbitMqMessagePublisher("partner.transactions", adapterMock.Object, resolverMock.Object);
+        var sut = new RabbitMqMessagePublisher("partner.transactions", adapterMock.Object, resolverMock.Object, NullLogger<RabbitMqMessagePublisher>.Instance);
 
         var action = async () => await sut.PublishAsync(CreateEnvelope(), CancellationToken.None);
 
@@ -79,7 +80,8 @@ public sealed class RabbitMqMessagePublisherTests
         var sut = new RabbitMqMessagePublisher(
             "partner.transactions",
             Moq.Mock.Of<IRabbitMqClientAdapter>(),
-            Moq.Mock.Of<IMessageRoutingKeyResolver>());
+            Moq.Mock.Of<IMessageRoutingKeyResolver>(),
+            NullLogger<RabbitMqMessagePublisher>.Instance);
 
         var action = async () => await sut.PublishAsync(null!, CancellationToken.None);
 

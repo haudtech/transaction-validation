@@ -1,5 +1,9 @@
 using System.Text.Json;
+using System.Diagnostics;
 
+using Microsoft.Extensions.Logging;
+
+using TransactionValidation.Core.Logging;
 using TransactionValidation.Core.Exceptions;
 using TransactionValidation.Core.Interfaces;
 using TransactionValidation.Core.Models;
@@ -15,6 +19,7 @@ public sealed class RabbitMqMessagePublisher : IMessagePublisher
     private readonly string _exchangeName;
     private readonly IRabbitMqClientAdapter _rabbitMqClientAdapter;
     private readonly IMessageRoutingKeyResolver _routingKeyResolver;
+    private readonly ILogger<RabbitMqMessagePublisher> _logger;
 
     /// <summary>
     /// Initializes the publisher with the RabbitMQ exchange, adapter, and routing-key resolver.
@@ -25,11 +30,13 @@ public sealed class RabbitMqMessagePublisher : IMessagePublisher
     public RabbitMqMessagePublisher(
         string exchangeName,
         IRabbitMqClientAdapter rabbitMqClientAdapter,
-        IMessageRoutingKeyResolver routingKeyResolver)
+        IMessageRoutingKeyResolver routingKeyResolver,
+        ILogger<RabbitMqMessagePublisher> logger)
     {
         _exchangeName = exchangeName;
         _rabbitMqClientAdapter = rabbitMqClientAdapter;
         _routingKeyResolver = routingKeyResolver;
+        _logger = logger;
     }
 
     /// <summary>
@@ -52,15 +59,37 @@ public sealed class RabbitMqMessagePublisher : IMessagePublisher
             ["message-id"] = envelope.MessageId
         };
 
-        var confirmed = await _rabbitMqClientAdapter.PublishPersistentWithConfirmAsync(
-            _exchangeName,
-            routingKey,
-            payload,
-            headers,
-            cancellationToken);
-        if (!confirmed)
+        var stopwatch = Stopwatch.StartNew();
+        try
         {
-            throw new ConflictException("RabbitMQ did not confirm message publishing.");
+            var confirmed = await _rabbitMqClientAdapter.PublishPersistentWithConfirmAsync(
+                _exchangeName,
+                routingKey,
+                payload,
+                headers,
+                cancellationToken);
+            if (!confirmed)
+            {
+                throw new ConflictException("RabbitMQ did not confirm message publishing.");
+            }
+
+            TransactionValidationLogger.MessagePublishCompleted(
+                _logger,
+                "RabbitMQ",
+                envelope.CorrelationId,
+                envelope.MessageId,
+                stopwatch.Elapsed.TotalMilliseconds);
+        }
+        catch (Exception exception)
+        {
+            TransactionValidationLogger.MessagePublishFailed(
+                _logger,
+                exception,
+                "RabbitMQ",
+                envelope.CorrelationId,
+                envelope.MessageId,
+                stopwatch.Elapsed.TotalMilliseconds);
+            throw;
         }
     }
 }

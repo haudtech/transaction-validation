@@ -24,7 +24,7 @@ This document records the agreed observability model for TransactionValidation. 
 | Application `CorrelationId` | Continue propagating it in the API response and broker message metadata, and add it to OpenTelemetry telemetry as a custom property. |
 | Correlation input | Accept and validate a client-provided `Correlation-Id` header; generate one when absent. |
 | Broker tracing | Create linked OpenTelemetry activities for broker consumers in this implementation. |
-| Azure retention | Use 5-day retention, 10% telemetry sampling, and a 100 MB/day ingestion cap with an alert at 80%. |
+| Azure retention | Use 30-day retention, 10% telemetry sampling, and a 100 MB/day ingestion cap with an alert at 80%. |
 | Azure secret delivery | Store the Application Insights connection string in Key Vault and expose it through the existing Container Apps secret pattern. |
 | Direct Serilog-to-Application Insights sink | Do not add one by default. It would duplicate Container Apps log collection and increase ingestion complexity and cost. |
 
@@ -289,7 +289,7 @@ The following points must be confirmed before implementing the full observabilit
 | Correlation propagation | Adding `app.correlation_id` to the request `Activity` does not by itself define propagation to asynchronous consumer activities. | **Decided:** create linked broker-consumer activities in this implementation. |
 | Log and trace duplication | The design intentionally avoids a Serilog Application Insights sink. | Confirm that Application Insights traces/metrics and Log Analytics console logs are sufficient, with no direct Serilog-to-Application Insights export. |
 | Data classification | Partner and transaction identifiers are proposed as searchable fields. | Confirm that `PartnerId`, `TransactionReference`, `CorrelationId`, and `MessageId` are non-sensitive operational identifiers and approved for Azure retention. |
-| Retention and cost | The Log Analytics workspace has a retention setting, but Application Insights retention, sampling, and ingestion budget are not specified. | **Decided:** use 5-day retention, 10% sampling, a 100 MB/day ingestion cap, and an alert at 80%. |
+| Retention and cost | The Log Analytics workspace has a retention setting, but Application Insights retention, sampling, and ingestion budget are not specified. | **Decided:** use 30-day retention, 10% sampling, a 100 MB/day ingestion cap, and an alert at 80%. Azure Monitor enforces a 30-day minimum retention. |
 | Azure permissions and networking | The deployment uses managed identities and private endpoints for core dependencies, but observability permissions are not documented. | **Decided:** reuse the existing user-assigned identities and outbound network path; validate Azure Monitor connectivity. |
 | Validation access | The document has KQL examples but no agreed resource/table names or Azure validation identity. | **Decided:** perform final KQL validation manually in the Azure Portal or Log Analytics workspace. |
 
@@ -359,7 +359,7 @@ The following work is intentionally staged after the decisions above have been a
 - [x] Step 7 Azure Application Insights resource, Key Vault secret, and Container App secret propagation implemented in Bicep.
 - [ ] Step 8 local and Azure end-to-end validation.
 
-The next active implementation step is **Step 8: local and Azure end-to-end validation**. EF Core integration remains intentionally deferred until a real data layer and `DbContext` exist. Azure retention is configured at 5 days; sampling and the 100 MB/day cap still require deployment-time verification/configuration.
+The next active implementation step is **Step 8: local and Azure end-to-end validation**. EF Core integration remains intentionally deferred until a real data layer and `DbContext` exist. Azure retention is configured at the 30-day minimum; sampling and the 100 MB/day cap still require deployment-time verification/configuration.
 
 ### Step 1: Establish one correlation enrichment point
 
@@ -475,7 +475,7 @@ Current implementation status:
 - [x] Store the Application Insights connection string in Key Vault.
 - [x] Grant both Container App identities Key Vault Secrets User access.
 - [x] Inject `APPLICATIONINSIGHTS__CONNECTIONSTRING` into both API and Mock Container Apps.
-- [x] Configure Log Analytics retention at 5 days.
+- [x] Configure Log Analytics and Application Insights retention at 30 days, the Azure Monitor minimum.
 - [ ] Verify/configure 10% sampling and the 100 MB/day Application Insights ingestion cap with an 80% alert in Azure.
 
 ### Step 8: Validate locally and in Azure

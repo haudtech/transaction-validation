@@ -1,7 +1,10 @@
 using System.Text.Json;
+using System.Diagnostics;
 
 using Azure.Messaging.ServiceBus;
+using Microsoft.Extensions.Logging;
 
+using TransactionValidation.Core.Logging;
 using TransactionValidation.Core.Interfaces;
 using TransactionValidation.Core.Models;
 
@@ -17,19 +20,22 @@ public sealed class ServiceBusMessagePublisher : IMessagePublisher
     private readonly string _subject;
     private readonly string _routingKey;
     private readonly string _eventType;
+    private readonly ILogger<ServiceBusMessagePublisher> _logger;
 
     public ServiceBusMessagePublisher(
         IServiceBusMessageSender sender,
         string topicName,
         string subject,
         string routingKey,
-        string eventType)
+        string eventType,
+        ILogger<ServiceBusMessagePublisher> logger)
     {
         _sender = sender;
         _topicName = topicName;
         _subject = subject;
         _routingKey = routingKey;
         _eventType = eventType;
+        _logger = logger;
     }
 
     public async Task PublishAsync(TransactionEnvelope envelope, CancellationToken cancellationToken = default)
@@ -49,6 +55,27 @@ public sealed class ServiceBusMessagePublisher : IMessagePublisher
         message.ApplicationProperties["correlation-id"] = envelope.CorrelationId;
         message.ApplicationProperties["message-id"] = envelope.MessageId;
 
-        await _sender.SendMessageAsync(message, cancellationToken);
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            await _sender.SendMessageAsync(message, cancellationToken);
+            TransactionValidationLogger.MessagePublishCompleted(
+                _logger,
+                "AzureServiceBus",
+                envelope.CorrelationId,
+                envelope.MessageId,
+                stopwatch.Elapsed.TotalMilliseconds);
+        }
+        catch (Exception exception)
+        {
+            TransactionValidationLogger.MessagePublishFailed(
+                _logger,
+                exception,
+                "AzureServiceBus",
+                envelope.CorrelationId,
+                envelope.MessageId,
+                stopwatch.Elapsed.TotalMilliseconds);
+            throw;
+        }
     }
 }

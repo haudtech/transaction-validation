@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 
 using Moq;
 
@@ -22,7 +23,7 @@ public sealed class RedisIdempotencyStoreTests
     {
         var multiplexer = Moq.Mock.Of<IConnectionMultiplexer>();
 
-        var action = () => new RedisIdempotencyStore(multiplexer, TimeSpan.Zero);
+        var action = () => new RedisIdempotencyStore(multiplexer, TimeSpan.Zero, NullLogger<RedisIdempotencyStore>.Instance);
 
         action.Should().Throw<ArgumentOutOfRangeException>();
     }
@@ -183,6 +184,6 @@ public sealed class RedisIdempotencyStoreTests
             .Setup(value => value.GetDatabase(It.IsAny<int>(), It.IsAny<object>()))
             .Returns(database.Object);
 
-        return new RedisIdempotencyStore(multiplexer.Object, Ttl);
+        return new RedisIdempotencyStore(multiplexer.Object, Ttl, NullLogger<RedisIdempotencyStore>.Instance);
     }
 }

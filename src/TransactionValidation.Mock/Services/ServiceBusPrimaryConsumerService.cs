@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using TransactionValidation.Core.Models;
+using TransactionValidation.Core.Logging;
 using TransactionValidation.Mock.Options;
 
 namespace TransactionValidation.Mock.Services;
@@ -17,6 +18,7 @@ namespace TransactionValidation.Mock.Services;
 public sealed class ServiceBusPrimaryConsumerService : BackgroundService
 {
     private const string ConsumerName = "primary";
+    private static readonly string DependencyName = "AzureServiceBus";
     private readonly ServiceBusPrimaryConsumerOptions _options;
     private readonly ConsumerObservationStore _observationStore;
     private readonly ILogger<ServiceBusPrimaryConsumerService> _logger;
@@ -67,11 +69,14 @@ public sealed class ServiceBusPrimaryConsumerService : BackgroundService
                 args.Message.DeliveryCount,
                 DateTimeOffset.UtcNow));
 
-            _logger.LogInformation(
-                "Observed message on primary Service Bus consumer. Subscription={SubscriptionName}, MessageId={MessageId}, CorrelationId={CorrelationId}",
+            TransactionValidationLogger.ConsumerMessageObserved(
+                _logger,
+                DependencyName,
+                ConsumerName,
                 _options.SubscriptionName,
                 envelope.MessageId,
-                envelope.CorrelationId);
+                envelope.CorrelationId,
+                args.Message.DeliveryCount);
 
             if (!_options.AutoComplete)
             {
@@ -81,7 +86,12 @@ public sealed class ServiceBusPrimaryConsumerService : BackgroundService
 
         processor.ProcessErrorAsync += args =>
         {
-            _logger.LogError(args.Exception, "Primary Service Bus processor error. EntityPath={EntityPath}", args.EntityPath);
+            TransactionValidationLogger.ConsumerProcessingFailed(
+                _logger,
+                args.Exception,
+                DependencyName,
+                ConsumerName,
+                args.EntityPath);
             return Task.CompletedTask;
         };
 

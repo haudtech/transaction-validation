@@ -1,15 +1,19 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Diagnostics;
 
 using FluentValidation;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 using TransactionValidation.Api.Idempotency;
+using TransactionValidation.Configuration.Middleware;
 using TransactionValidation.Core.Exceptions;
 using TransactionValidation.Core.Interfaces;
+using TransactionValidation.Core.Logging;
 using TransactionValidation.Core.Models;
 
 namespace TransactionValidation.Api.Controllers;
@@ -26,17 +30,20 @@ public sealed class PartnerTransactionsController : ControllerBase
     private readonly IPartnerVerifier _partnerVerifier;
     private readonly IMessagePublisher _messagePublisher;
     private readonly IIdempotencyStore _idempotencyStore;
+    private readonly ILogger<PartnerTransactionsController> _logger;
 
     public PartnerTransactionsController(
         IValidator<PartnerTransactionRequest> validator,
         IPartnerVerifier partnerVerifier,
         IMessagePublisher messagePublisher,
-        IIdempotencyStore idempotencyStore)
+        IIdempotencyStore idempotencyStore,
+        ILogger<PartnerTransactionsController> logger)
     {
         _validator = validator;
         _partnerVerifier = partnerVerifier;
         _messagePublisher = messagePublisher;
         _idempotencyStore = idempotencyStore;
+        _logger = logger;
     }
 
     /// <summary>
@@ -58,6 +65,11 @@ public sealed class PartnerTransactionsController : ControllerBase
             throw new BadRequestException("request body is required.");
         }
 
+        var correlationId = HttpContext.Items[CorrelationContextMiddleware.CorrelationIdItemKey]?.ToString()
+            ?? (string.IsNullOrWhiteSpace(HttpContext.TraceIdentifier)
+                ? Guid.NewGuid().ToString("N")
+                : HttpContext.TraceIdentifier);
+
         var validationResult = await _validator.ValidateAsync(request, cancellationToken);
         if (!validationResult.IsValid)
         {
@@ -67,10 +79,34 @@ public sealed class PartnerTransactionsController : ControllerBase
                     .Select(error => error.ErrorMessage)
                     .Distinct(StringComparer.Ordinal));
 
+            var invalidRequestContext = new TransactionLogContext(
+                correlationId,
+                request.PartnerId?.Trim() ?? string.Empty,
+                request.TransactionReference?.Trim() ?? string.Empty,
+                BuildIdempotencyKey(request));
+
+            TransactionValidationLogger.ValidationFailed(
+                _logger,
+                invalidRequestContext.CorrelationId,
+                invalidRequestContext.PartnerId,
+                invalidRequestContext.TransactionReference,
+                errorMessage);
             throw new BadRequestException(errorMessage);
         }
 
         var idempotencyKey = BuildIdempotencyKey(request);
+        var context = new TransactionLogContext(
+            correlationId,
+            request.PartnerId.Trim(),
+            request.TransactionReference.Trim(),
+            idempotencyKey);
+        var workflowStopwatch = Stopwatch.StartNew();
+        TransactionValidationLogger.RequestReceived(
+            _logger,
+            context.CorrelationId,
+            context.PartnerId,
+            context.TransactionReference);
+
         var requestFingerprint = BuildRequestFingerprint(request);
         var acquireResult = _idempotencyStore.TryAcquire(idempotencyKey, requestFingerprint, DateTimeOffset.UtcNow);
 
@@ -78,6 +114,12 @@ public sealed class PartnerTransactionsController : ControllerBase
         {
             if (_idempotencyStore.TryGetCachedResponse(idempotencyKey, requestFingerprint, DateTimeOffset.UtcNow, out var cachedResponse))
             {
+                TransactionValidationLogger.DuplicateReplayed(
+                    _logger,
+                    context.CorrelationId,
+                    context.PartnerId,
+                    context.TransactionReference,
+                    cachedResponse.MessageId);
                 return Accepted(new
                 {
                     messageId = cachedResponse.MessageId,
@@ -91,16 +133,24 @@ public sealed class PartnerTransactionsController : ControllerBase
 
         if (acquireResult == IdempotencyAcquireResult.KeyReusedWithDifferentPayload)
         {
+            TransactionValidationLogger.IdempotencyConflict(
+                _logger,
+                context.CorrelationId,
+                context.PartnerId,
+                context.TransactionReference);
             throw new ConflictException("Idempotency key was already used with a different request payload.");
         }
 
         try
         {
+            var partnerVerificationStopwatch = Stopwatch.StartNew();
             var partnerVerified = await _partnerVerifier.VerifyAsync(request.PartnerId, cancellationToken);
-
-            var correlationId = string.IsNullOrWhiteSpace(HttpContext.TraceIdentifier)
-                ? Guid.NewGuid().ToString("N")
-                : HttpContext.TraceIdentifier;
+            TransactionValidationLogger.PartnerVerificationCompleted(
+                _logger,
+                context.CorrelationId,
+                context.PartnerId,
+                context.TransactionReference,
+                partnerVerificationStopwatch.Elapsed.TotalMilliseconds);
 
             var envelope = new TransactionEnvelope
             {
@@ -111,7 +161,15 @@ public sealed class PartnerTransactionsController : ControllerBase
                 PartnerVerified = partnerVerified
             };
 
+            var publishStopwatch = Stopwatch.StartNew();
             await _messagePublisher.PublishAsync(envelope, cancellationToken);
+            TransactionValidationLogger.TransactionPublished(
+                _logger,
+                context.CorrelationId,
+                context.PartnerId,
+                context.TransactionReference,
+                envelope.MessageId,
+                publishStopwatch.Elapsed.TotalMilliseconds);
 
             var acceptedResponse = new IdempotencyCachedResponse(
                 envelope.MessageId,
@@ -127,8 +185,15 @@ public sealed class PartnerTransactionsController : ControllerBase
                 status = acceptedResponse.Status.ToString().ToLowerInvariant()
             });
         }
-        catch
+        catch (Exception exception)
         {
+            TransactionValidationLogger.ProcessingFailed(
+                _logger,
+                exception,
+                context.CorrelationId,
+                context.PartnerId,
+                context.TransactionReference,
+                workflowStopwatch.Elapsed.TotalMilliseconds);
             _idempotencyStore.Release(idempotencyKey);
             throw;
         }
@@ -141,7 +206,7 @@ public sealed class PartnerTransactionsController : ControllerBase
     /// <returns>A stable key that identifies the same logical transaction across retries.</returns>
     private string BuildIdempotencyKey(PartnerTransactionRequest request)
     {
-        var partnerId = request.PartnerId.Trim();
+        var partnerId = request.PartnerId?.Trim() ?? string.Empty;
 
         if (Request.Headers.TryGetValue("Idempotency-Key", out var idempotencyHeader)
             && !string.IsNullOrWhiteSpace(idempotencyHeader))
@@ -149,7 +214,7 @@ public sealed class PartnerTransactionsController : ControllerBase
             return $"{partnerId}|{idempotencyHeader.ToString().Trim()}";
         }
 
-        return $"{partnerId}|{request.TransactionReference.Trim()}";
+        return $"{partnerId}|{request.TransactionReference?.Trim() ?? string.Empty}";
     }
 
     /// <summary>

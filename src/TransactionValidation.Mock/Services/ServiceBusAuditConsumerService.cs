@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using TransactionValidation.Core.Models;
+using TransactionValidation.Core.Logging;
 using TransactionValidation.Mock.Options;
 
 namespace TransactionValidation.Mock.Services;
@@ -17,6 +18,7 @@ namespace TransactionValidation.Mock.Services;
 public sealed class ServiceBusAuditConsumerService : BackgroundService
 {
     private const string ConsumerName = "audit";
+    private static readonly string DependencyName = "AzureServiceBus";
     private readonly ServiceBusAuditConsumerOptions _options;
     private readonly ConsumerObservationStore _observationStore;
     private readonly ConsumerFailureControl _failureControl;
@@ -70,19 +72,25 @@ public sealed class ServiceBusAuditConsumerService : BackgroundService
                 args.Message.DeliveryCount,
                 DateTimeOffset.UtcNow));
 
-            _logger.LogInformation(
-                "Observed message on audit Service Bus consumer. Subscription={SubscriptionName}, MessageId={MessageId}, CorrelationId={CorrelationId}, RoutingKey={RoutingKey}",
+            TransactionValidationLogger.ConsumerMessageObserved(
+                _logger,
+                DependencyName,
+                ConsumerName,
                 _options.SubscriptionName,
                 envelope.MessageId,
                 envelope.CorrelationId,
-                routingKey);
+                args.Message.DeliveryCount);
 
             if (!_options.AutoComplete && _failureControl.ShouldFailBeforeAcknowledgement(ConsumerName, envelope.MessageId))
             {
-                _logger.LogWarning(
-                    "Audit consumer intentionally failed before acknowledgement. MessageId={MessageId}",
-                    envelope.MessageId);
-                throw new InvalidOperationException("Configured audit consumer failure before acknowledgement.");
+                var failure = new InvalidOperationException("Configured audit consumer failure before acknowledgement.");
+                TransactionValidationLogger.ConsumerProcessingFailed(
+                    _logger,
+                    failure,
+                    DependencyName,
+                    ConsumerName,
+                    _options.SubscriptionName);
+                throw failure;
             }
 
             if (!_options.AutoComplete)
@@ -93,7 +101,12 @@ public sealed class ServiceBusAuditConsumerService : BackgroundService
 
         processor.ProcessErrorAsync += args =>
         {
-            _logger.LogError(args.Exception, "Audit Service Bus processor error. EntityPath={EntityPath}", args.EntityPath);
+            TransactionValidationLogger.ConsumerProcessingFailed(
+                _logger,
+                args.Exception,
+                DependencyName,
+                ConsumerName,
+                args.EntityPath);
             return Task.CompletedTask;
         };
 

@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 
 using TransactionValidation.Core.Models;
+using TransactionValidation.Core.Logging;
 using TransactionValidation.Mock.Options;
 
 namespace TransactionValidation.Mock.Services;
@@ -14,6 +15,7 @@ namespace TransactionValidation.Mock.Services;
 public sealed class RabbitMqAuditConsumerService : BackgroundService
 {
     private const string ConsumerName = "audit";
+    private static readonly string DependencyName = "RabbitMQ";
     private readonly RabbitMqAuditConsumerOptions _options;
     private readonly ConsumerObservationStore _observationStore;
     private readonly ILogger<RabbitMqAuditConsumerService> _logger;
@@ -50,7 +52,7 @@ public sealed class RabbitMqAuditConsumerService : BackgroundService
             }
             catch (Exception exception)
             {
-                _logger.LogWarning(exception, "Audit RabbitMQ consume loop failed. Retrying in 2 seconds.");
+                TransactionValidationLogger.ConsumerRetryScheduled(_logger, exception, DependencyName, ConsumerName, _options.QueueName, 2);
                 await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
             }
         }
@@ -113,19 +115,25 @@ public sealed class RabbitMqAuditConsumerService : BackgroundService
                 delivery.Redelivered ? 2 : 1,
                 DateTimeOffset.UtcNow));
 
-            _logger.LogInformation(
-                "Audit consumer observed message. Queue={QueueName}, MessageId={MessageId}, CorrelationId={CorrelationId}, RoutingKey={RoutingKey}",
+            TransactionValidationLogger.ConsumerMessageObserved(
+                _logger,
+                DependencyName,
+                ConsumerName,
                 _options.QueueName,
                 envelope.MessageId,
                 envelope.CorrelationId,
-                delivery.RoutingKey);
+                delivery.Redelivered ? 2 : 1);
 
             if (!_options.AutoAck && _failureControl.ShouldFailBeforeAcknowledgement(ConsumerName, envelope.MessageId))
             {
-                _logger.LogWarning(
-                    "Audit consumer intentionally failed before acknowledgement. MessageId={MessageId}",
-                    envelope.MessageId);
-                throw new InvalidOperationException("Configured audit consumer failure before acknowledgement.");
+                var failure = new InvalidOperationException("Configured audit consumer failure before acknowledgement.");
+                TransactionValidationLogger.ConsumerProcessingFailed(
+                    _logger,
+                    failure,
+                    DependencyName,
+                    ConsumerName,
+                    _options.QueueName);
+                throw failure;
             }
 
             if (!_options.AutoAck)

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http;
 
 using FluentAssertions;
+using Microsoft.Extensions.Logging.Abstractions;
 
 using TransactionValidation.Core.Exceptions;
 using TransactionValidation.Integration;
@@ -20,7 +21,7 @@ public sealed class PartnerVerifierClientTests
     {
         var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
-        var sut = new PartnerVerifierClient(httpClient);
+        var sut = new PartnerVerifierClient(httpClient, NullLogger<PartnerVerifierClient>.Instance);
 
         var action = async () => await sut.VerifyAsync(string.Empty, CancellationToken.None);
 
@@ -32,7 +33,7 @@ public sealed class PartnerVerifierClientTests
     {
         var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
-        var sut = new PartnerVerifierClient(httpClient);
+        var sut = new PartnerVerifierClient(httpClient, NullLogger<PartnerVerifierClient>.Instance);
 
         var result = await sut.VerifyAsync("partner-123", CancellationToken.None);
 
@@ -44,7 +45,7 @@ public sealed class PartnerVerifierClientTests
     {
         var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound));
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
-        var sut = new PartnerVerifierClient(httpClient);
+        var sut = new PartnerVerifierClient(httpClient, NullLogger<PartnerVerifierClient>.Instance);
 
         var action = async () => await sut.VerifyAsync("missing-partner", CancellationToken.None);
 
@@ -56,7 +57,7 @@ public sealed class PartnerVerifierClientTests
     {
         var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.RequestTimeout));
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
-        var sut = new PartnerVerifierClient(httpClient);
+        var sut = new PartnerVerifierClient(httpClient, NullLogger<PartnerVerifierClient>.Instance);
 
         var action = async () => await sut.VerifyAsync("partner-timeout", CancellationToken.None);
 
@@ -68,7 +69,7 @@ public sealed class PartnerVerifierClientTests
     {
         var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
-        var sut = new PartnerVerifierClient(httpClient);
+        var sut = new PartnerVerifierClient(httpClient, NullLogger<PartnerVerifierClient>.Instance);
 
         var action = async () => await sut.VerifyAsync("partner-unavailable", CancellationToken.None);
 
@@ -80,7 +81,7 @@ public sealed class PartnerVerifierClientTests
     {
         var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
-        var sut = new PartnerVerifierClient(httpClient);
+        var sut = new PartnerVerifierClient(httpClient, NullLogger<PartnerVerifierClient>.Instance);
 
         var action = async () => await sut.VerifyAsync("partner-unavailable", CancellationToken.None);
 
@@ -92,7 +93,7 @@ public sealed class PartnerVerifierClientTests
     {
         var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.BadRequest));
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
-        var sut = new PartnerVerifierClient(httpClient);
+        var sut = new PartnerVerifierClient(httpClient, NullLogger<PartnerVerifierClient>.Instance);
 
         var action = async () => await sut.VerifyAsync("partner-invalid", CancellationToken.None);
 
@@ -111,7 +112,7 @@ public sealed class PartnerVerifierClientTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
-        var sut = new PartnerVerifierClient(httpClient);
+        var sut = new PartnerVerifierClient(httpClient, NullLogger<PartnerVerifierClient>.Instance);
 
         await sut.VerifyAsync("partner-123", CancellationToken.None, true);
 
@@ -130,7 +131,7 @@ public sealed class PartnerVerifierClientTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
-        var sut = new PartnerVerifierClient(httpClient);
+        var sut = new PartnerVerifierClient(httpClient, NullLogger<PartnerVerifierClient>.Instance);
 
         await sut.VerifyAsync("partner-123", CancellationToken.None, false);
 
@@ -149,7 +150,7 @@ public sealed class PartnerVerifierClientTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
-        var sut = new PartnerVerifierClient(httpClient);
+        var sut = new PartnerVerifierClient(httpClient, NullLogger<PartnerVerifierClient>.Instance);
 
         await sut.VerifyAsync("partner/123", CancellationToken.None);
 
@@ -167,7 +168,7 @@ public sealed class PartnerVerifierClientTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
-        var sut = new PartnerVerifierClient(httpClient);
+        var sut = new PartnerVerifierClient(httpClient, NullLogger<PartnerVerifierClient>.Instance);
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(50));
 
         var action = async () => await sut.VerifyAsync("partner-123", cts.Token);
@@ -180,7 +181,7 @@ public sealed class PartnerVerifierClientTests
     {
         var handler = new StubHttpMessageHandler((_, _) => throw new TaskCanceledException("request timed out"));
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
-        var sut = new PartnerVerifierClient(httpClient);
+        var sut = new PartnerVerifierClient(httpClient, NullLogger<PartnerVerifierClient>.Instance);
 
         var action = async () => await sut.VerifyAsync("partner-timeout", CancellationToken.None);
 
@@ -192,7 +193,7 @@ public sealed class PartnerVerifierClientTests
     {
         var handler = new StubHttpMessageHandler((_, _) => throw new HttpRequestException("connection failed"));
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5002/") };
-        var sut = new PartnerVerifierClient(httpClient);
+        var sut = new PartnerVerifierClient(httpClient, NullLogger<PartnerVerifierClient>.Instance);
 
         var action = async () => await sut.VerifyAsync("partner-unavailable", CancellationToken.None);
 

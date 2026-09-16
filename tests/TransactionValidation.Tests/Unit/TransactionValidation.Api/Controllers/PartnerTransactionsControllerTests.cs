@@ -4,6 +4,7 @@ using FluentValidation;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
 
 using Moq;
 
@@ -13,7 +14,6 @@ using TransactionValidation.Core.Exceptions;
 using TransactionValidation.Core.Interfaces;
 using TransactionValidation.Core.Models;
 using TransactionValidation.Core.Validation;
-
 using Xunit;
 
 namespace TransactionValidation.Tests.Unit.TransactionValidation.Api.Controllers;
@@ -311,7 +311,7 @@ public sealed class PartnerTransactionsControllerTests
             httpContext.Request.Headers["Idempotency-Key"] = idempotencyKeyHeader;
         }
 
-        var controller = new PartnerTransactionsController(validator, partnerVerifier, publisher, idempotencyStore)
+        var controller = new PartnerTransactionsController(validator, partnerVerifier, publisher, idempotencyStore, NullLogger<PartnerTransactionsController>.Instance)
         {
             ControllerContext = new ControllerContext
             {
