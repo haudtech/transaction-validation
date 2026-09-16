@@ -1,3 +1,5 @@
+using System.Reflection;
+
 using FluentAssertions;
 
 using Microsoft.Extensions.Logging.Abstractions;
@@ -256,6 +258,44 @@ public sealed class InMemoryIdempotencyStoreTests
         var action = () => store.Release(" ");
 
         action.Should().NotThrow();
+    }
+
+    /// <summary>
+    /// Scenario: the cleanup interval is reached and an expired entry remains in the dictionary.
+    /// Expected: the expired entry is removed while the cleanup cycle executes.
+    /// </summary>
+    [Fact]
+    public void CleanupExpiredEntriesIfNeeded_WhenExpiredEntriesExist_RemovesThem()
+    {
+        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10), NullLogger<InMemoryIdempotencyStore>.Instance);
+        var method = typeof(InMemoryIdempotencyStore).GetMethod("CleanupExpiredEntriesIfNeeded", BindingFlags.Instance | BindingFlags.NonPublic);
+        method.Should().NotBeNull();
+
+        var entriesField = typeof(InMemoryIdempotencyStore).GetField("_entries", BindingFlags.Instance | BindingFlags.NonPublic);
+        entriesField.Should().NotBeNull();
+
+        var cleanupCounterField = typeof(InMemoryIdempotencyStore).GetField("_cleanupCounter", BindingFlags.Instance | BindingFlags.NonPublic);
+        cleanupCounterField.Should().NotBeNull();
+        cleanupCounterField!.SetValue(store, 127);
+
+        var encodeMethod = typeof(InMemoryIdempotencyStore).GetMethod("EncodeKey", BindingFlags.Static | BindingFlags.NonPublic);
+        encodeMethod.Should().NotBeNull();
+        var encodedKey = (string)encodeMethod!.Invoke(null, ["partner|request"])!;
+
+        var entryType = typeof(InMemoryIdempotencyStore).GetNestedType("IdempotencyEntry", BindingFlags.NonPublic);
+        entryType.Should().NotBeNull();
+        var constructor = entryType!.GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).Single();
+        var expiredEntry = constructor.Invoke([Now.AddMinutes(-1), "fingerprint", null]);
+
+        var entries = entriesField!.GetValue(store)!;
+        var tryAdd = entries.GetType().GetMethod("TryAdd", [typeof(string), entryType]);
+        tryAdd.Should().NotBeNull();
+        tryAdd!.Invoke(entries, [encodedKey, expiredEntry]).Should().Be(true);
+
+        method!.Invoke(store, [Now]);
+
+        var tryGetResult = store.TryGetCachedResponse("partner|request", "fingerprint", Now, out _);
+        tryGetResult.Should().BeFalse();
     }
 
     /// <summary>

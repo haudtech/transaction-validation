@@ -1,3 +1,5 @@
+using System.Reflection;
+
 using FluentAssertions;
 
 using FluentValidation;
@@ -10,6 +12,7 @@ using Moq;
 
 using TransactionValidation.Api.Controllers;
 using TransactionValidation.Api.Idempotency;
+using TransactionValidation.Configuration.Middleware;
 using TransactionValidation.Core.Exceptions;
 using TransactionValidation.Core.Interfaces;
 using TransactionValidation.Core.Models;
@@ -69,6 +72,28 @@ public sealed class PartnerTransactionsControllerTests
 
         await action.Should().ThrowAsync<BadRequestException>()
             .WithMessage("request body is required.");
+    }
+
+    /// <summary>
+    /// Scenario: validation fails because the request has missing partner and transaction metadata.
+    /// Expected: the controller still builds an error context using empty strings for null values.
+    /// </summary>
+    [Fact]
+    public async Task CreateAsync_WhenValidationFailsWithNullPartnerAndReference_UsesEmptyStringsInContext()
+    {
+        var sut = CreateSut(new PartnerTransactionRequestValidator(), Moq.Mock.Of<IPartnerVerifier>(), Moq.Mock.Of<IMessagePublisher>(), Moq.Mock.Of<IIdempotencyStore>());
+        var request = new PartnerTransactionRequest
+        {
+            PartnerId = null,
+            TransactionReference = null,
+            Amount = 99m,
+            Currency = "USD",
+            Timestamp = DateTime.UtcNow
+        };
+
+        var action = async () => await sut.CreateAsync(request, CancellationToken.None);
+
+        await action.Should().ThrowAsync<BadRequestException>();
     }
 
     /// <summary>
@@ -371,6 +396,82 @@ public sealed class PartnerTransactionsControllerTests
         Guid.TryParseExact(correlationId, "N", out _).Should().BeTrue();
         capturedEnvelope.Should().NotBeNull();
         capturedEnvelope!.CorrelationId.Should().Be(correlationId);
+    }
+
+    /// <summary>
+    /// Scenario: the correlation-context item is already set on the HTTP context.
+    /// Expected: the controller prefers the correlation context value over the trace identifier.
+    /// </summary>
+    [Fact]
+    public async Task CreateAsync_WhenCorrelationContextExists_UsesCorrelationContextValue()
+    {
+        var partnerVerifier = new Mock<IPartnerVerifier>();
+        partnerVerifier
+            .Setup(x => x.VerifyAsync("partner-123", It.IsAny<CancellationToken>(), It.IsAny<bool?>()))
+            .ReturnsAsync(true);
+
+        var publisher = new Mock<IMessagePublisher>();
+        publisher
+            .Setup(x => x.PublishAsync(It.IsAny<TransactionEnvelope>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var idempotencyStore = new Mock<IIdempotencyStore>();
+        idempotencyStore
+            .Setup(x => x.TryAcquire("partner-123|ref-001", It.IsAny<string>(), It.IsAny<DateTimeOffset>()))
+            .Returns(IdempotencyAcquireResult.Acquired);
+        idempotencyStore
+            .Setup(x => x.StoreCachedResponse("partner-123|ref-001", It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<IdempotencyCachedResponse>()));
+
+        var sut = CreateSut(new PartnerTransactionRequestValidator(), partnerVerifier.Object, publisher.Object, idempotencyStore.Object);
+        sut.ControllerContext.HttpContext.Items[CorrelationContextMiddleware.CorrelationIdItemKey] = "ctx-correlation-456";
+
+        var result = await sut.CreateAsync(CreateValidRequest(), CancellationToken.None);
+
+        result.Should().BeOfType<AcceptedResult>();
+        var accepted = (AcceptedResult)result;
+        var payload = accepted.Value!
+            .GetType()
+            .GetProperty("correlationId")!
+            .GetValue(accepted.Value)!
+            .ToString();
+        payload.Should().Be("ctx-correlation-456");
+    }
+
+    /// <summary>
+    /// Scenario: the idempotency key builder sees a blank idempotency header.
+    /// Expected: the fallback request reference is used and blank request values collapse to empty strings.
+    /// </summary>
+    [Fact]
+    public void BuildIdempotencyKey_WhenHeaderIsBlankOrRequestFieldsAreNull_UsesFallbackAndEmptyStrings()
+    {
+        var sut = CreateSut(new PartnerTransactionRequestValidator(), new Mock<IPartnerVerifier>().Object, new Mock<IMessagePublisher>().Object, new Mock<IIdempotencyStore>().Object);
+        var method = typeof(PartnerTransactionsController).GetMethod("BuildIdempotencyKey", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        var blankHeaderRequest = new PartnerTransactionRequest
+        {
+            PartnerId = "partner-123",
+            TransactionReference = "ref-001",
+            Amount = 10m,
+            Currency = "USD",
+            Timestamp = DateTime.UtcNow
+        };
+        sut.ControllerContext.HttpContext.Request.Headers["Idempotency-Key"] = " ";
+
+        var resultFromBlankHeader = (string)method!.Invoke(sut, [blankHeaderRequest])!;
+        resultFromBlankHeader.Should().Be("partner-123|ref-001");
+
+        var nullRequest = new PartnerTransactionRequest
+        {
+            PartnerId = null!,
+            TransactionReference = null!,
+            Amount = 10m,
+            Currency = "USD",
+            Timestamp = DateTime.UtcNow
+        };
+        sut.ControllerContext.HttpContext.Request.Headers.Remove("Idempotency-Key");
+
+        var resultFromNulls = (string)method.Invoke(sut, [nullRequest])!;
+        resultFromNulls.Should().Be("|");
     }
 
     private static PartnerTransactionsController CreateSut(
