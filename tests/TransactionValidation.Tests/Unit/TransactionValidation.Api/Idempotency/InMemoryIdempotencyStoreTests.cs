@@ -1,4 +1,5 @@
 using FluentAssertions;
+
 using Microsoft.Extensions.Logging.Abstractions;
 
 using TransactionValidation.Api.Idempotency;

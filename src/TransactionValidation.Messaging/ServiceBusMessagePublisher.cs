@@ -1,11 +1,12 @@
-using System.Text.Json;
 using System.Diagnostics;
+using System.Text.Json;
 
 using Azure.Messaging.ServiceBus;
+
 using Microsoft.Extensions.Logging;
 
-using TransactionValidation.Core.Logging;
 using TransactionValidation.Core.Interfaces;
+using TransactionValidation.Core.Logging;
 using TransactionValidation.Core.Models;
 
 namespace TransactionValidation.Messaging;

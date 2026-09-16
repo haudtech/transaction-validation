@@ -6,8 +6,8 @@ using Microsoft.Extensions.Options;
 
 using RabbitMQ.Client;
 
-using TransactionValidation.Core.Models;
 using TransactionValidation.Core.Logging;
+using TransactionValidation.Core.Models;
 using TransactionValidation.Mock.Options;
 
 namespace TransactionValidation.Mock.Services;

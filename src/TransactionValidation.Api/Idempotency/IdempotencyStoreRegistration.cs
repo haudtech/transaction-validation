@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using StackExchange.Redis;
-using Microsoft.Extensions.Logging;
 
 using TransactionValidation.Configuration.Options;
 using TransactionValidation.Core.Interfaces;

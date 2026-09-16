@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http;
 
 using FluentAssertions;
+
 using Microsoft.Extensions.Logging.Abstractions;
 
 using TransactionValidation.Core.Exceptions;

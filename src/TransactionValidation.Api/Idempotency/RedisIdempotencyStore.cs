@@ -2,9 +2,9 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
-using StackExchange.Redis;
-
 using Microsoft.Extensions.Logging;
+
+using StackExchange.Redis;
 
 using TransactionValidation.Core.Logging;
 

@@ -1,6 +1,7 @@
 using Azure.Messaging.ServiceBus;
 
 using FluentAssertions;
+
 using Microsoft.Extensions.Logging.Abstractions;
 
 using Moq;
