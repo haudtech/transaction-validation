@@ -331,16 +331,59 @@ public sealed class PartnerTransactionsControllerTests
             It.IsAny<IdempotencyCachedResponse>()), Times.Once);
     }
 
+    /// <summary>
+    /// Scenario: no correlation context item exists and the trace identifier is blank.
+    /// Expected: the controller generates a GUID correlation identifier in the accepted response.
+    /// </summary>
+    [Fact]
+    public async Task CreateAsync_WhenTraceIdentifierIsBlank_GeneratesCorrelationId()
+    {
+        var partnerVerifier = new Mock<IPartnerVerifier>();
+        partnerVerifier
+            .Setup(x => x.VerifyAsync("partner-123", It.IsAny<CancellationToken>(), It.IsAny<bool?>()))
+            .ReturnsAsync(true);
+
+        TransactionEnvelope? capturedEnvelope = null;
+        var publisher = new Mock<IMessagePublisher>();
+        publisher
+            .Setup(x => x.PublishAsync(It.IsAny<TransactionEnvelope>(), It.IsAny<CancellationToken>()))
+            .Callback<TransactionEnvelope, CancellationToken>((envelope, _) => capturedEnvelope = envelope)
+            .Returns(Task.CompletedTask);
+
+        var idempotencyStore = new Mock<IIdempotencyStore>();
+        idempotencyStore
+            .Setup(x => x.TryAcquire("partner-123|ref-001", It.IsAny<string>(), It.IsAny<DateTimeOffset>()))
+            .Returns(IdempotencyAcquireResult.Acquired);
+        idempotencyStore
+            .Setup(x => x.StoreCachedResponse("partner-123|ref-001", It.IsAny<string>(), It.IsAny<DateTimeOffset>(), It.IsAny<IdempotencyCachedResponse>()));
+
+        var sut = CreateSut(new PartnerTransactionRequestValidator(), partnerVerifier.Object, publisher.Object, idempotencyStore.Object, traceIdentifier: string.Empty);
+
+        var result = await sut.CreateAsync(CreateValidRequest(), CancellationToken.None);
+
+        var accepted = result.Should().BeOfType<AcceptedResult>().Subject;
+        var payload = accepted.Value.Should().BeAssignableTo<object>().Subject;
+        var correlationIdProperty = payload.GetType().GetProperty("correlationId");
+        correlationIdProperty.Should().NotBeNull();
+        var correlationId = correlationIdProperty!.GetValue(payload)?.ToString();
+
+        correlationId.Should().NotBeNullOrWhiteSpace();
+        Guid.TryParseExact(correlationId, "N", out _).Should().BeTrue();
+        capturedEnvelope.Should().NotBeNull();
+        capturedEnvelope!.CorrelationId.Should().Be(correlationId);
+    }
+
     private static PartnerTransactionsController CreateSut(
         IValidator<PartnerTransactionRequest> validator,
         IPartnerVerifier partnerVerifier,
         IMessagePublisher publisher,
         IIdempotencyStore idempotencyStore,
-        string? idempotencyKeyHeader = null)
+        string? idempotencyKeyHeader = null,
+        string? traceIdentifier = "trace-123")
     {
         var httpContext = new DefaultHttpContext
         {
-            TraceIdentifier = "trace-123"
+            TraceIdentifier = traceIdentifier ?? "trace-123"
         };
 
         if (!string.IsNullOrWhiteSpace(idempotencyKeyHeader))

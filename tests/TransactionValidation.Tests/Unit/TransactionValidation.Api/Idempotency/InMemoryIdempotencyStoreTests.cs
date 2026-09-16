@@ -125,6 +125,19 @@ public sealed class InMemoryIdempotencyStoreTests
     }
 
     /// <summary>
+    /// Scenario: cached-response lookup receives a blank key or fingerprint.
+    /// Expected: lookup returns false without throwing.
+    /// </summary>
+    [Fact]
+    public void TryGetCachedResponse_WhenInputsAreBlank_ReturnsFalse()
+    {
+        var store = CreateAcquiredStore();
+
+        store.TryGetCachedResponse(" ", "fingerprint", Now, out _).Should().BeFalse();
+        store.TryGetCachedResponse("partner|request", " ", Now, out _).Should().BeFalse();
+    }
+
+    /// <summary>
     /// Scenario: cache storage receives blank keys, blank fingerprints, or a null response.
     /// Expected: the operation returns without throwing.
     /// </summary>
@@ -148,6 +161,23 @@ public sealed class InMemoryIdempotencyStoreTests
     }
 
     /// <summary>
+    /// Scenario: cached response is stored for a key that does not yet exist.
+    /// Expected: the entry is created and can be retrieved by a matching fingerprint.
+    /// </summary>
+    [Fact]
+    public void StoreCachedResponse_WhenEntryDoesNotExist_CreatesCachedEntry()
+    {
+        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10), NullLogger<InMemoryIdempotencyStore>.Instance);
+        var response = new IdempotencyCachedResponse("message-1", "correlation-1", IdempotencyCachedResponseStatus.Accepted);
+
+        store.StoreCachedResponse("partner|request", "fingerprint", Now, response);
+
+        store.TryGetCachedResponse("partner|request", "fingerprint", Now.AddMinutes(1), out var actual)
+            .Should().BeTrue();
+        actual.Should().Be(response);
+    }
+
+    /// <summary>
     /// Scenario: a cached entry has expired.
     /// Expected: the lookup returns false and removes the expired entry.
     /// </summary>
@@ -160,6 +190,23 @@ public sealed class InMemoryIdempotencyStoreTests
 
         store.TryGetCachedResponse("partner|request", "fingerprint", Now.AddMinutes(10), out _)
             .Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Scenario: a cached response is stored when the existing entry has already expired.
+    /// Expected: the expired entry is removed and replaced with a fresh cached response.
+    /// </summary>
+    [Fact]
+    public void StoreCachedResponse_WhenExistingEntryExpired_ReplacesEntry()
+    {
+        var store = CreateAcquiredStore();
+        var replacement = new IdempotencyCachedResponse("message-2", "correlation-2", IdempotencyCachedResponseStatus.Accepted);
+
+        store.StoreCachedResponse("partner|request", "fingerprint", Now.AddMinutes(10), replacement);
+
+        store.TryGetCachedResponse("partner|request", "fingerprint", Now.AddMinutes(11), out var actual)
+            .Should().BeTrue();
+        actual.Should().Be(replacement);
     }
 
     /// <summary>
@@ -195,6 +242,20 @@ public sealed class InMemoryIdempotencyStoreTests
 
         store.TryAcquire("partner|request", "new-fingerprint", Now.AddMinutes(1))
             .Should().Be(IdempotencyAcquireResult.Acquired);
+    }
+
+    /// <summary>
+    /// Scenario: release is called with a blank idempotency key.
+    /// Expected: the operation is ignored without throwing.
+    /// </summary>
+    [Fact]
+    public void Release_WhenKeyIsBlank_DoesNothing()
+    {
+        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10), NullLogger<InMemoryIdempotencyStore>.Instance);
+
+        var action = () => store.Release(" ");
+
+        action.Should().NotThrow();
     }
 
     /// <summary>

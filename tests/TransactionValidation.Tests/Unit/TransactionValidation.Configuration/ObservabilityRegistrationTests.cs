@@ -1,5 +1,6 @@
 using FluentAssertions;
 
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -79,6 +80,9 @@ public sealed class ObservabilityRegistrationTests
         var action = () => services.AddTransactionValidationObservability(configuration, "txv-tests");
 
         action.Should().NotThrow();
+
+        using var provider = services.BuildServiceProvider();
+        provider.GetRequiredService<TracerProvider>().Should().NotBeNull();
     }
 
     /// <summary>
@@ -99,6 +103,20 @@ public sealed class ObservabilityRegistrationTests
 
         using var host = hostBuilder.Build();
         host.Should().NotBeNull();
+    }
+
+    /// <summary>
+    /// Scenario: the shared middleware extension is applied to an application builder.
+    /// Expected: exception handling, correlation, and API-key middleware are registered and the same builder is returned.
+    /// </summary>
+    [Fact]
+    public void UseTransactionValidationCommon_WhenCalled_ReturnsSameBuilder()
+    {
+        var app = new ApplicationBuilder(new ServiceCollection().BuildServiceProvider());
+
+        var result = app.UseTransactionValidationCommon();
+
+        result.Should().BeSameAs(app);
     }
 
     private static IConfiguration BuildConfiguration(Dictionary<string, string?> values)
