@@ -182,11 +182,53 @@ MUST:
 - Add tests for public behavior and contract-level logic.
 - Keep tests deterministic and focused.
 - Use xUnit and FluentAssertions for the standard project test style.
+- Place the XML `<summary>` for every test method above the complete attribute block.
+- Place xUnit and test metadata attributes after the XML summary and immediately before the test method.
+- Keep the test declaration order as: XML summary, `[Trait]` attributes, `[Fact]` or `[Theory]`, then the method declaration.
+- Use `[Fact]` for a single scenario and `[Theory]` with data attributes for parameterized scenarios.
+- Keep all test methods discoverable by xUnit; do not place executable statements or unrelated declarations between the attributes and the method.
 
 SHOULD:
 - Keep unit tests fast and independent from external systems.
 - Separate integration tests from unit tests via clear project or trait structure.
 - Use `Theory` where helpful for data-driven validation.
+- Write test summaries with separate `Scenario:` and `Expected:` lines.
+- Describe behavior and observable outcomes rather than implementation details.
+
+Preferred test method layout:
+
+```csharp
+/// <summary>
+/// Scenario: a valid transaction is submitted with a recognized currency.
+/// Expected: validation succeeds and no errors are returned.
+/// </summary>
+[Trait("Category", "Unit")]
+[Trait("Feature", "Validation")]
+[Fact]
+public void Validate_WhenRequestIsValid_ReturnsNoErrors()
+{
+    // Arrange, act, and assert.
+}
+```
+
+Parameterized test layout:
+
+```csharp
+/// <summary>
+/// Scenario: the transaction amount is zero or negative.
+/// Expected: validation reports an amount error.
+/// </summary>
+[Trait("Category", "Unit")]
+[Theory]
+[InlineData(0)]
+[InlineData(-1)]
+public void Validate_WhenAmountIsNotPositive_ReturnsAmountError(decimal amount)
+{
+    // Arrange, act, and assert.
+}
+```
+
+The XML summary belongs to the method documentation and therefore comes before every attribute. Attribute order among `[Trait]`, `[Fact]`, `[Theory]`, and data attributes should remain consistent within the test project, but all attributes must remain directly above the method declaration.
 
 ---
 

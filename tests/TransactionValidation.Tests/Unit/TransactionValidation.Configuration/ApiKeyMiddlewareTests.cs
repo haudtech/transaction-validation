@@ -16,6 +16,10 @@ namespace TransactionValidation.Configuration.Tests;
 /// </summary>
 public class ApiKeyMiddlewareTests
 {
+    /// <summary>
+    /// Scenario: API-key protection is enabled and the request has no key.
+    /// Expected: the middleware returns HTTP 401.
+    /// </summary>
     [Fact]
     public async Task InvokeAsync_WhenApiKeyMissing_ReturnsUnauthorized()
     {
@@ -28,6 +32,10 @@ public class ApiKeyMiddlewareTests
         context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
     }
 
+    /// <summary>
+    /// Scenario: API-key protection is enabled and the request key matches.
+    /// Expected: the next middleware is invoked.
+    /// </summary>
     [Fact]
     public async Task InvokeAsync_WhenApiKeyMatches_InvokesNext()
     {
@@ -42,6 +50,10 @@ public class ApiKeyMiddlewareTests
         called.Should().BeTrue();
     }
 
+    /// <summary>
+    /// Scenario: API-key protection is disabled.
+    /// Expected: the next middleware is invoked without authorization checks.
+    /// </summary>
     [Fact]
     public async Task InvokeAsync_WhenApiKeyProtectionIsDisabled_InvokesNext()
     {
@@ -56,6 +68,10 @@ public class ApiKeyMiddlewareTests
         context.Response.StatusCode.Should().Be(StatusCodes.Status200OK);
     }
 
+    /// <summary>
+    /// Scenario: the health endpoint is requested without an API key.
+    /// Expected: the health request bypasses API-key validation.
+    /// </summary>
     [Fact]
     public async Task InvokeAsync_WhenHealthCheckHasNoApiKey_InvokesNext()
     {
@@ -70,6 +86,10 @@ public class ApiKeyMiddlewareTests
         called.Should().BeTrue();
     }
 
+    /// <summary>
+    /// Scenario: API-key protection is enabled and the request key is incorrect.
+    /// Expected: HTTP 401 is returned and the next middleware is not invoked.
+    /// </summary>
     [Fact]
     public async Task InvokeAsync_WhenApiKeyIsWrong_ReturnsUnauthorizedWithoutInvokingNext()
     {

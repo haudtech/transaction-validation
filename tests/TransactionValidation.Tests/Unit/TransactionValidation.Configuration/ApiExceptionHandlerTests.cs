@@ -14,6 +14,10 @@ namespace TransactionValidation.Configuration.Tests;
 /// </summary>
 public class ApiExceptionHandlerTests
 {
+    /// <summary>
+    /// Scenario: a bad-request domain exception is handled.
+    /// Expected: HTTP 400 ProblemDetails is written.
+    /// </summary>
     [Fact]
     public async Task TryHandleAsync_WhenBadRequestException_Maps400ProblemDetails()
     {
@@ -27,6 +31,10 @@ public class ApiExceptionHandlerTests
         context.Response.ContentType.Should().Be("application/problem+json");
     }
 
+    /// <summary>
+    /// Scenario: a not-found domain exception is handled.
+    /// Expected: HTTP 404 ProblemDetails is written.
+    /// </summary>
     [Fact]
     public async Task TryHandleAsync_WhenNotFoundException_Maps404ProblemDetails()
     {
@@ -39,6 +47,10 @@ public class ApiExceptionHandlerTests
         context.Response.StatusCode.Should().Be(StatusCodes.Status404NotFound);
     }
 
+    /// <summary>
+    /// Scenario: an upstream timeout exception is handled.
+    /// Expected: HTTP 408 ProblemDetails is written.
+    /// </summary>
     [Fact]
     public async Task TryHandleAsync_WhenUpstreamTimeoutException_Maps408ProblemDetails()
     {
@@ -51,6 +63,10 @@ public class ApiExceptionHandlerTests
         context.Response.StatusCode.Should().Be(StatusCodes.Status408RequestTimeout);
     }
 
+    /// <summary>
+    /// Scenario: an upstream service-unavailable exception is handled.
+    /// Expected: HTTP 503 ProblemDetails is written.
+    /// </summary>
     [Fact]
     public async Task TryHandleAsync_WhenUpstreamServiceUnavailableException_Maps503ProblemDetails()
     {
@@ -63,6 +79,10 @@ public class ApiExceptionHandlerTests
         context.Response.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
     }
 
+    /// <summary>
+    /// Scenario: a conflict exception is handled.
+    /// Expected: HTTP 409 ProblemDetails is written.
+    /// </summary>
     [Fact]
     public async Task TryHandleAsync_WhenConflictException_Maps409ProblemDetails()
     {
@@ -75,6 +95,10 @@ public class ApiExceptionHandlerTests
         context.Response.StatusCode.Should().Be(StatusCodes.Status409Conflict);
     }
 
+    /// <summary>
+    /// Scenario: an unauthorized exception is handled.
+    /// Expected: HTTP 401 ProblemDetails is written.
+    /// </summary>
     [Fact]
     public async Task TryHandleAsync_WhenUnauthorizedException_Maps401ProblemDetails()
     {
@@ -87,6 +111,10 @@ public class ApiExceptionHandlerTests
         context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
     }
 
+    /// <summary>
+    /// Scenario: an unrecognized exception is handled.
+    /// Expected: HTTP 500 ProblemDetails is written.
+    /// </summary>
     [Fact]
     public async Task TryHandleAsync_WhenExceptionIsUnknown_Maps500ProblemDetails()
     {

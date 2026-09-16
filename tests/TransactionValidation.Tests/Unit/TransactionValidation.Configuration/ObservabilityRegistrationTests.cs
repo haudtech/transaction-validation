@@ -17,6 +17,10 @@ namespace TransactionValidation.Tests.Unit.TransactionValidation.Configuration;
 
 public sealed class ObservabilityRegistrationTests
 {
+    /// <summary>
+    /// Scenario: console tracing and instrumentation are enabled.
+    /// Expected: options, trace, and metric providers are registered.
+    /// </summary>
     [Fact]
     public void AddTransactionValidationObservability_WhenConsoleExporterConfigured_RegistersTelemetryServices()
     {
@@ -38,6 +42,10 @@ public sealed class ObservabilityRegistrationTests
         provider.GetRequiredService<MeterProvider>().Should().NotBeNull();
     }
 
+    /// <summary>
+    /// Scenario: the Azure Monitor option is empty but an Application Insights connection string is configured.
+    /// Expected: registration completes without throwing.
+    /// </summary>
     [Fact]
     public void AddTransactionValidationObservability_WhenConnectionStringComesFromApplicationInsights_RegistersWithoutThrowing()
     {
@@ -54,6 +62,29 @@ public sealed class ObservabilityRegistrationTests
         action.Should().NotThrow();
     }
 
+    /// <summary>
+    /// Scenario: an Azure Monitor connection string is configured directly.
+    /// Expected: Azure Monitor registration completes without throwing.
+    /// </summary>
+    [Fact]
+    public void AddTransactionValidationObservability_WhenAzureMonitorConnectionStringIsConfigured_RegistersWithoutThrowing()
+    {
+        var services = new ServiceCollection();
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["OpenTelemetry:Tracing:Exporter"] = "AzureMonitor",
+            ["OpenTelemetry:Tracing:AzureMonitor:ConnectionString"] = "InstrumentationKey=00000000-0000-0000-0000-000000000000;IngestionEndpoint=https://eastus-0.in.applicationinsights.azure.com/"
+        });
+
+        var action = () => services.AddTransactionValidationObservability(configuration, "txv-tests");
+
+        action.Should().NotThrow();
+    }
+
+    /// <summary>
+    /// Scenario: Serilog configuration is applied to a host builder.
+    /// Expected: the host builds successfully with the shared logging setup.
+    /// </summary>
     [Fact]
     public void UseTransactionValidationSerilog_ReturnsUsableHostBuilder()
     {

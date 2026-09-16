@@ -14,6 +14,10 @@ namespace TransactionValidation.Tests.Unit.TransactionValidation.Configuration;
 
 public sealed class CorrelationContextMiddlewareTests
 {
+    /// <summary>
+    /// Scenario: no correlation header is supplied and a trace identifier exists.
+    /// Expected: the trace identifier is used, tagged, and the next delegate runs.
+    /// </summary>
     [Fact]
     public async Task InvokeAsync_WhenHeaderMissing_UsesTraceIdentifierAndInvokesNext()
     {
@@ -36,6 +40,10 @@ public sealed class CorrelationContextMiddlewareTests
         activity.GetTagItem("app.correlation_id").Should().Be("trace-123");
     }
 
+    /// <summary>
+    /// Scenario: no correlation header or trace identifier is available.
+    /// Expected: a valid compact GUID correlation identifier is generated.
+    /// </summary>
     [Fact]
     public async Task InvokeAsync_WhenHeaderMissingAndTraceIdentifierBlank_GeneratesGuidCorrelationId()
     {
@@ -49,6 +57,10 @@ public sealed class CorrelationContextMiddlewareTests
         Guid.TryParseExact(correlationId, "N", out _).Should().BeTrue();
     }
 
+    /// <summary>
+    /// Scenario: a correlation header contains surrounding whitespace.
+    /// Expected: the trimmed header value is stored as the correlation identifier.
+    /// </summary>
     [Fact]
     public async Task InvokeAsync_WhenHeaderIsProvided_UsesTrimmedHeader()
     {
@@ -61,6 +73,10 @@ public sealed class CorrelationContextMiddlewareTests
         context.Items[CorrelationContextMiddleware.CorrelationIdItemKey].Should().Be("req-correlation-1");
     }
 
+    /// <summary>
+    /// Scenario: the correlation header exceeds the maximum length.
+    /// Expected: a bad-request response is returned and the next delegate is skipped.
+    /// </summary>
     [Fact]
     public async Task InvokeAsync_WhenHeaderIsTooLong_ReturnsBadRequestAndSkipsNext()
     {
@@ -86,6 +102,10 @@ public sealed class CorrelationContextMiddlewareTests
         payload.Should().Contain("Correlation-Id header is invalid.");
     }
 
+    /// <summary>
+    /// Scenario: the correlation header contains a control character.
+    /// Expected: the request is rejected with a bad-request response.
+    /// </summary>
     [Fact]
     public async Task InvokeAsync_WhenHeaderContainsControlCharacter_ReturnsBadRequest()
     {

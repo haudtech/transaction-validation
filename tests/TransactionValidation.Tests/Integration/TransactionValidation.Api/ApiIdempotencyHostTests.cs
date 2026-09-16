@@ -12,6 +12,10 @@ namespace TransactionValidation.Tests.Integration.TransactionValidation.Api;
 /// </summary>
 public sealed class ApiIdempotencyHostTests
 {
+    /// <summary>
+    /// Scenario: the same valid request is submitted twice with one idempotency key.
+    /// Expected: the second response is HTTP 202 and replays the original identifiers.
+    /// </summary>
     [Trait("Category", "Integration")]
     [Trait("Feature", "Idempotency")]
     [Fact(DisplayName = "API host replays 202 response on second request when same Idempotency-Key is reused")]

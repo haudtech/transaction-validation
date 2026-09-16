@@ -10,6 +10,10 @@ namespace TransactionValidation.Tests.Unit.TransactionValidation.Configuration.L
 
 public sealed class TransactionValidationLoggerTests
 {
+    /// <summary>
+    /// Scenario: every approved generated logging event is emitted.
+    /// Expected: event IDs and structured properties stay within the approved catalog and exclude sensitive identifiers.
+    /// </summary>
     [Fact]
     public void GeneratedEvents_UseApprovedStructuredPropertiesOnly()
     {

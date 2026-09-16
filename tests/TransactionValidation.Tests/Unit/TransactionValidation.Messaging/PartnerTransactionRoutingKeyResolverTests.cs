@@ -12,6 +12,10 @@ namespace TransactionValidation.Tests.Unit.TransactionValidation.Messaging;
 /// </summary>
 public sealed class PartnerTransactionRoutingKeyResolverTests
 {
+    /// <summary>
+    /// Scenario: the partner transaction has been verified.
+    /// Expected: the accepted routing key is returned.
+    /// </summary>
     [Fact]
     public void Resolve_WhenPartnerIsVerified_ReturnsAcceptedRoutingKey()
     {
@@ -22,6 +26,10 @@ public sealed class PartnerTransactionRoutingKeyResolverTests
         result.Should().Be("partner.transaction.accepted");
     }
 
+    /// <summary>
+    /// Scenario: the partner transaction has not been verified.
+    /// Expected: the unverified routing key is returned.
+    /// </summary>
     [Fact]
     public void Resolve_WhenPartnerIsNotVerified_ReturnsUnverifiedRoutingKey()
     {
@@ -32,6 +40,10 @@ public sealed class PartnerTransactionRoutingKeyResolverTests
         result.Should().Be("partner.transaction.unverified");
     }
 
+    /// <summary>
+    /// Scenario: the routing-key prefix contains surrounding whitespace.
+    /// Expected: the prefix is trimmed before the routing key is returned.
+    /// </summary>
     [Fact]
     public void Resolve_WhenPrefixHasWhitespace_TrimsPrefix()
     {
@@ -42,6 +54,10 @@ public sealed class PartnerTransactionRoutingKeyResolverTests
         result.Should().Be("custom.transaction.accepted");
     }
 
+    /// <summary>
+    /// Scenario: the transaction envelope is null.
+    /// Expected: resolving the routing key throws an argument-null exception.
+    /// </summary>
     [Fact]
     public void Resolve_WhenEnvelopeIsNull_ThrowsArgumentNullException()
     {

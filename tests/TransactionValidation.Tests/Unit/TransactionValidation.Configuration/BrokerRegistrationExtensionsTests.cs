@@ -12,6 +12,10 @@ namespace TransactionValidation.Tests.Unit.TransactionValidation.Configuration;
 
 public sealed class BrokerRegistrationExtensionsTests
 {
+    /// <summary>
+    /// Scenario: no broker type is configured.
+    /// Expected: RabbitMQ registration is selected.
+    /// </summary>
     [Fact]
     public void AddConfiguredBroker_WhenBrokerIsNotConfigured_UsesRabbitMqRegistration()
     {
@@ -29,6 +33,10 @@ public sealed class BrokerRegistrationExtensionsTests
         azureRegistered.Should().BeFalse();
     }
 
+    /// <summary>
+    /// Scenario: Azure Service Bus is selected as the broker.
+    /// Expected: Azure Service Bus registration is selected.
+    /// </summary>
     [Fact]
     public void AddConfiguredBroker_WhenAzureServiceBusIsSelected_UsesAzureRegistration()
     {
@@ -46,6 +54,10 @@ public sealed class BrokerRegistrationExtensionsTests
         azureRegistered.Should().BeTrue();
     }
 
+    /// <summary>
+    /// Scenario: Azure Service Bus is selected without a registration delegate.
+    /// Expected: an invalid-operation exception explains the missing registration.
+    /// </summary>
     [Fact]
     public void AddConfiguredBroker_WhenAzureRegistrationIsMissing_ThrowsInvalidOperationException()
     {
@@ -58,6 +70,10 @@ public sealed class BrokerRegistrationExtensionsTests
             .WithMessage("*Azure Service Bus broker registration is not configured*");
     }
 
+    /// <summary>
+    /// Scenario: an unsupported broker type is configured.
+    /// Expected: an invalid-operation exception identifies the unsupported value.
+    /// </summary>
     [Fact]
     public void AddConfiguredBroker_WhenBrokerIsUnsupported_ThrowsInvalidOperationException()
     {
@@ -70,6 +86,10 @@ public sealed class BrokerRegistrationExtensionsTests
             .WithMessage("*Unsupported broker configuration: Unsupported*");
     }
 
+    /// <summary>
+    /// Scenario: a broker type is configured in the configuration source.
+    /// Expected: the bound broker-selection options are returned.
+    /// </summary>
     [Fact]
     public void GetBrokerSelection_WhenBrokerIsConfigured_ReturnsBoundOptions()
     {

@@ -17,6 +17,10 @@ namespace TransactionValidation.Tests.Unit.TransactionValidation.Messaging;
 /// </summary>
 public sealed class RabbitMqMessagePublisherTests
 {
+    /// <summary>
+    /// Scenario: RabbitMQ confirms publication of a transaction envelope.
+    /// Expected: the message is published with routing and correlation headers.
+    /// </summary>
     [Fact]
     public async Task PublishAsync_WhenPublisherConfirms_PublishesToExchangeWithRoutingAndHeaders()
     {
@@ -51,6 +55,10 @@ public sealed class RabbitMqMessagePublisherTests
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    /// <summary>
+    /// Scenario: RabbitMQ does not confirm publication.
+    /// Expected: the publisher throws a conflict exception.
+    /// </summary>
     [Fact]
     public async Task PublishAsync_WhenPublisherConfirmFails_ThrowsConflictException()
     {
@@ -75,6 +83,10 @@ public sealed class RabbitMqMessagePublisherTests
         await action.Should().ThrowAsync<ConflictException>();
     }
 
+    /// <summary>
+    /// Scenario: the transaction envelope is null.
+    /// Expected: publication throws an argument-null exception.
+    /// </summary>
     [Fact]
     public async Task PublishAsync_WhenEnvelopeIsNull_ThrowsArgumentNullException()
     {

@@ -24,6 +24,10 @@ namespace TransactionValidation.Tests.Unit.TransactionValidation.Api.Controllers
 /// </summary>
 public sealed class PartnerTransactionsControllerTests
 {
+    /// <summary>
+    /// Scenario: the request fails validation.
+    /// Expected: controller execution throws a bad-request exception.
+    /// </summary>
     [Fact]
     public async Task CreateAsync_WhenRequestIsInvalid_ThrowsBadRequestException()
     {
@@ -48,6 +52,10 @@ public sealed class PartnerTransactionsControllerTests
             .WithMessage("*currency must be a valid ISO-4217 code.*");
     }
 
+    /// <summary>
+    /// Scenario: the request body is null.
+    /// Expected: controller execution throws a bad-request exception.
+    /// </summary>
     [Fact]
     public async Task CreateAsync_WhenRequestIsNull_ThrowsBadRequestException()
     {
@@ -63,6 +71,10 @@ public sealed class PartnerTransactionsControllerTests
             .WithMessage("request body is required.");
     }
 
+    /// <summary>
+    /// Scenario: partner verification fails with not found.
+    /// Expected: the exception propagates, publication is skipped, and the idempotency claim is released.
+    /// </summary>
     [Fact]
     public async Task CreateAsync_WhenPartnerVerificationFails_PropagatesNotFoundException()
     {
@@ -88,6 +100,10 @@ public sealed class PartnerTransactionsControllerTests
         idempotencyStore.Verify(x => x.Release("partner-123|ref-001"), Times.Once);
     }
 
+    /// <summary>
+    /// Scenario: message publication fails with a conflict.
+    /// Expected: the exception propagates and the idempotency claim is released.
+    /// </summary>
     [Fact]
     public async Task CreateAsync_WhenPublishFails_PropagatesConflictException()
     {
@@ -116,6 +132,10 @@ public sealed class PartnerTransactionsControllerTests
         idempotencyStore.Verify(x => x.Release("partner-123|ref-001"), Times.Once);
     }
 
+    /// <summary>
+    /// Scenario: a duplicate request has a cached accepted response.
+    /// Expected: the cached HTTP 202 response is returned without reprocessing.
+    /// </summary>
     [Fact]
     public async Task CreateAsync_WhenDuplicateRequestWithCachedResponse_ReturnsAcceptedWithoutProcessing()
     {
@@ -150,6 +170,10 @@ public sealed class PartnerTransactionsControllerTests
         idempotencyStore.Verify(x => x.Release(It.IsAny<string>()), Times.Never);
     }
 
+    /// <summary>
+    /// Scenario: a duplicate request has no cached response.
+    /// Expected: a conflict exception is thrown without reprocessing.
+    /// </summary>
     [Fact]
     public async Task CreateAsync_WhenDuplicateRequestWithoutCachedResponse_ThrowsConflictExceptionWithoutProcessing()
     {
@@ -177,6 +201,10 @@ public sealed class PartnerTransactionsControllerTests
         idempotencyStore.Verify(x => x.Release(It.IsAny<string>()), Times.Never);
     }
 
+    /// <summary>
+    /// Scenario: an idempotency key is reused with a different payload.
+    /// Expected: a conflict exception is thrown without invoking downstream services.
+    /// </summary>
     [Fact]
     public async Task CreateAsync_WhenIdempotencyKeyIsReusedWithDifferentPayload_ThrowsConflictException()
     {
@@ -204,6 +232,10 @@ public sealed class PartnerTransactionsControllerTests
         idempotencyStore.Verify(x => x.Release(It.IsAny<string>()), Times.Never);
     }
 
+    /// <summary>
+    /// Scenario: a valid request passes verification and publication.
+    /// Expected: an accepted result is returned and the envelope is cached.
+    /// </summary>
     [Fact]
     public async Task CreateAsync_WhenRequestIsValid_ReturnsAcceptedAndPublishesEnvelope()
     {
@@ -254,6 +286,10 @@ public sealed class PartnerTransactionsControllerTests
         idempotencyStore.Verify(x => x.Release(It.IsAny<string>()), Times.Never);
     }
 
+    /// <summary>
+    /// Scenario: a valid request supplies an idempotency header.
+    /// Expected: the header-derived key is used for acquisition and caching.
+    /// </summary>
     [Fact]
     public async Task CreateAsync_WhenIdempotencyHeaderIsProvided_UsesHeaderBasedKey()
     {
