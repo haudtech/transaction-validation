@@ -16,6 +16,10 @@ namespace TransactionValidation.Tests.Integration.TransactionValidation.Api;
 /// </summary>
 public sealed class ApiExceptionMappingHostTests
 {
+    /// <summary>
+    /// Scenario: an authenticated request contains an invalid payload.
+    /// Expected: the host returns HTTP 400 ProblemDetails.
+    /// </summary>
     [Trait("Category", "Integration")]
     [Trait("Feature", "ExceptionMapping")]
     [Fact(DisplayName = "API host maps invalid request payload to 400 ProblemDetails")]
@@ -43,6 +47,10 @@ public sealed class ApiExceptionMappingHostTests
         Assert.Equal("Bad Request", problem?.Title);
     }
 
+    /// <summary>
+    /// Scenario: partner verification throws a not-found exception.
+    /// Expected: the host returns HTTP 404 ProblemDetails.
+    /// </summary>
     [Trait("Category", "Integration")]
     [Trait("Feature", "ExceptionMapping")]
     [Fact(DisplayName = "API host maps NotFoundException from verifier to 404 ProblemDetails")]
@@ -60,6 +68,10 @@ public sealed class ApiExceptionMappingHostTests
         Assert.Equal("Not Found", problem?.Title);
     }
 
+    /// <summary>
+    /// Scenario: message publication throws a conflict exception.
+    /// Expected: the host returns HTTP 409 ProblemDetails.
+    /// </summary>
     [Trait("Category", "Integration")]
     [Trait("Feature", "ExceptionMapping")]
     [Fact(DisplayName = "API host maps ConflictException from publisher to 409 ProblemDetails")]
@@ -77,6 +89,10 @@ public sealed class ApiExceptionMappingHostTests
         Assert.Equal("Conflict", problem?.Title);
     }
 
+    /// <summary>
+    /// Scenario: partner verification throws an unauthorized exception.
+    /// Expected: the host returns HTTP 401 ProblemDetails.
+    /// </summary>
     [Trait("Category", "Integration")]
     [Trait("Feature", "ExceptionMapping")]
     [Fact(DisplayName = "API host maps UnauthorizedAccessException from verifier to 401 ProblemDetails")]
@@ -94,6 +110,10 @@ public sealed class ApiExceptionMappingHostTests
         Assert.Equal("Unauthorized", problem?.Title);
     }
 
+    /// <summary>
+    /// Scenario: an unexpected exception escapes the transaction pipeline.
+    /// Expected: the host returns HTTP 500 ProblemDetails.
+    /// </summary>
     [Trait("Category", "Integration")]
     [Trait("Feature", "ExceptionMapping")]
     [Fact(DisplayName = "API host maps unhandled exceptions to 500 ProblemDetails")]

@@ -41,13 +41,11 @@ public static class ServiceCollectionExtensions
         services.Configure<ApiKeyOptions>(configuration.GetSection(ApiKeyOptions.SectionName));
         services.Configure<IdempotencyOptions>(configuration.GetSection(IdempotencyOptions.SectionName));
         services.Configure<PartnerVerificationOptions>(configuration.GetSection(PartnerVerificationOptions.SectionName));
-        services.Configure<OpenTelemetryOptions>(configuration.GetSection(OpenTelemetryOptions.SectionName));
         services.Configure<SerilogOptions>(configuration.GetSection(SerilogOptions.SectionName));
 
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<ApiKeyOptions>>().Value);
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<IdempotencyOptions>>().Value);
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<PartnerVerificationOptions>>().Value);
-        services.AddSingleton(sp => sp.GetRequiredService<IOptions<OpenTelemetryOptions>>().Value);
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<SerilogOptions>>().Value);
 
         services.AddValidatorsFromAssemblyContaining<PartnerTransactionRequestValidator>();
@@ -85,6 +83,20 @@ public static class ServiceCollectionExtensions
             options.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(partnerVerificationOptions.CircuitBreakerDurationSeconds);
         });
 
+        return services;
+    }
+
+    /// <summary>
+    /// Registers the shared OpenTelemetry pipeline for an executable and assigns its service identity.
+    /// </summary>
+    public static IServiceCollection AddTransactionValidationObservability(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        string serviceName)
+    {
+        services.Configure<OpenTelemetryOptions>(configuration.GetSection(OpenTelemetryOptions.SectionName));
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<OpenTelemetryOptions>>().Value);
+
         var telemetryOptions = configuration.GetSection(OpenTelemetryOptions.SectionName).Get<OpenTelemetryOptions>() ?? new OpenTelemetryOptions();
         var exporterName = telemetryOptions.Tracing.Exporter;
         var useAspNetCoreInstrumentation = telemetryOptions.Tracing.UseAspNetCoreInstrumentation;
@@ -94,7 +106,7 @@ public static class ServiceCollectionExtensions
             : configuration["ApplicationInsights:ConnectionString"];
 
         services.AddOpenTelemetry()
-            .ConfigureResource(resource => resource.AddService("TransactionValidation"))
+            .ConfigureResource(resource => resource.AddService(serviceName))
             .WithTracing(tracing =>
             {
                 if (useAspNetCoreInstrumentation)
@@ -104,7 +116,7 @@ public static class ServiceCollectionExtensions
 
                 if (useEntityFrameworkCoreInstrumentation)
                 {
-                    // EF Core instrumentation is optional and currently enabled through config only.
+                    tracing.AddEntityFrameworkCoreInstrumentation();
                 }
 
                 tracing.AddHttpClientInstrumentation();
@@ -144,6 +156,7 @@ public static class ServiceCollectionExtensions
     public static IApplicationBuilder UseTransactionValidationCommon(this IApplicationBuilder app)
     {
         app.UseExceptionHandler();
+        app.UseMiddleware<CorrelationContextMiddleware>();
         app.UseMiddleware<ApiKeyMiddleware>();
         return app;
     }

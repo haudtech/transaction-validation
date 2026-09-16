@@ -9,6 +9,10 @@ namespace TransactionValidation.Tests.Integration.TransactionValidation.Api;
 
 public sealed class ApiStartupHostTests
 {
+    /// <summary>
+    /// Scenario: the API host starts with Azure Service Bus selected.
+    /// Expected: an authenticated transaction is accepted.
+    /// </summary>
     [Trait("Category", "Integration")]
     [Trait("Feature", "Startup")]
     [Fact(DisplayName = "API host starts with Azure Service Bus broker selection")]
@@ -25,6 +29,10 @@ public sealed class ApiStartupHostTests
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
     }
 
+    /// <summary>
+    /// Scenario: the API runs in the Development environment.
+    /// Expected: the Swagger endpoint returns HTTP 200.
+    /// </summary>
     [Trait("Category", "Integration")]
     [Trait("Feature", "Startup")]
     [Fact(DisplayName = "API host exposes Swagger in Development")]
@@ -39,6 +47,10 @@ public sealed class ApiStartupHostTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    /// <summary>
+    /// Scenario: the health endpoint is requested without an API key.
+    /// Expected: the API returns HTTP 200.
+    /// </summary>
     [Trait("Category", "Integration")]
     [Trait("Feature", "Startup")]
     [Fact(DisplayName = "API host exposes health endpoint without API key")]

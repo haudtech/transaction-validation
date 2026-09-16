@@ -1,4 +1,8 @@
+using System.Reflection;
+
 using FluentAssertions;
+
+using Microsoft.Extensions.Logging.Abstractions;
 
 using TransactionValidation.Api.Idempotency;
 
@@ -8,24 +12,36 @@ namespace TransactionValidation.Tests.Unit.TransactionValidation.Api.Idempotency
 
 public sealed class InMemoryIdempotencyStoreTests
 {
+    /// <summary>
+    /// Scenario: the idempotency TTL is zero.
+    /// Expected: construction throws an argument-out-of-range exception.
+    /// </summary>
     [Fact]
     public void Constructor_WhenTtlIsNotPositive_ThrowsArgumentOutOfRangeException()
     {
-        var action = () => new InMemoryIdempotencyStore(TimeSpan.Zero);
+        var action = () => new InMemoryIdempotencyStore(TimeSpan.Zero, NullLogger<InMemoryIdempotencyStore>.Instance);
 
         action.Should().Throw<ArgumentOutOfRangeException>();
     }
 
+    /// <summary>
+    /// Scenario: a new idempotency key is acquired.
+    /// Expected: the result is Acquired.
+    /// </summary>
     [Fact]
     public void TryAcquire_WhenKeyIsNew_ReturnsAcquired()
     {
-        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10));
+        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10), NullLogger<InMemoryIdempotencyStore>.Instance);
 
         var result = store.TryAcquire("partner|request", "fingerprint", Now);
 
         result.Should().Be(IdempotencyAcquireResult.Acquired);
     }
 
+    /// <summary>
+    /// Scenario: an existing key is submitted with the same fingerprint.
+    /// Expected: the result is Duplicate.
+    /// </summary>
     [Fact]
     public void TryAcquire_WhenFingerprintMatches_ReturnsDuplicate()
     {
@@ -36,6 +52,10 @@ public sealed class InMemoryIdempotencyStoreTests
         result.Should().Be(IdempotencyAcquireResult.Duplicate);
     }
 
+    /// <summary>
+    /// Scenario: an existing key is submitted with a different fingerprint.
+    /// Expected: the result indicates key reuse with a different payload.
+    /// </summary>
     [Fact]
     public void TryAcquire_WhenFingerprintDiffers_ReturnsKeyReusedWithDifferentPayload()
     {
@@ -46,10 +66,14 @@ public sealed class InMemoryIdempotencyStoreTests
         result.Should().Be(IdempotencyAcquireResult.KeyReusedWithDifferentPayload);
     }
 
+    /// <summary>
+    /// Scenario: an existing idempotency entry has expired.
+    /// Expected: the key can be acquired again.
+    /// </summary>
     [Fact]
     public void TryAcquire_WhenEntryHasExpired_AcquiresKeyAgain()
     {
-        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10));
+        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10), NullLogger<InMemoryIdempotencyStore>.Instance);
         store.TryAcquire("partner|request", "fingerprint", Now);
 
         var result = store.TryAcquire("partner|request", "new-fingerprint", Now.AddMinutes(10));
@@ -57,6 +81,10 @@ public sealed class InMemoryIdempotencyStoreTests
         result.Should().Be(IdempotencyAcquireResult.Acquired);
     }
 
+    /// <summary>
+    /// Scenario: an accepted response is cached for a matching request.
+    /// Expected: the cached response is returned.
+    /// </summary>
     [Fact]
     public void TryGetCachedResponse_WhenResponseWasStored_ReturnsResponse()
     {
@@ -70,6 +98,10 @@ public sealed class InMemoryIdempotencyStoreTests
         actual.Should().Be(expected);
     }
 
+    /// <summary>
+    /// Scenario: the cache is queried with a different fingerprint or unknown key.
+    /// Expected: no cached response is returned.
+    /// </summary>
     [Fact]
     public void TryGetCachedResponse_WhenResponseIsMissingOrFingerprintDiffers_ReturnsFalse()
     {
@@ -81,6 +113,76 @@ public sealed class InMemoryIdempotencyStoreTests
         store.TryGetCachedResponse("other|request", "fingerprint", Now, out _).Should().BeFalse();
     }
 
+    /// <summary>
+    /// Scenario: an acquired entry has no cached response yet.
+    /// Expected: the lookup returns false.
+    /// </summary>
+    [Fact]
+    public void TryGetCachedResponse_WhenEntryHasNoCachedResponse_ReturnsFalse()
+    {
+        var store = CreateAcquiredStore();
+
+        store.TryGetCachedResponse("partner|request", "fingerprint", Now, out _)
+            .Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Scenario: cached-response lookup receives a blank key or fingerprint.
+    /// Expected: lookup returns false without throwing.
+    /// </summary>
+    [Fact]
+    public void TryGetCachedResponse_WhenInputsAreBlank_ReturnsFalse()
+    {
+        var store = CreateAcquiredStore();
+
+        store.TryGetCachedResponse(" ", "fingerprint", Now, out _).Should().BeFalse();
+        store.TryGetCachedResponse("partner|request", " ", Now, out _).Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Scenario: cache storage receives blank keys, blank fingerprints, or a null response.
+    /// Expected: the operation returns without throwing.
+    /// </summary>
+    [Fact]
+    public void StoreCachedResponse_WhenInputsAreBlank_DoesNotThrow()
+    {
+        var store = CreateAcquiredStore();
+        var response = new IdempotencyCachedResponse("message-1", "correlation-1", IdempotencyCachedResponseStatus.Accepted);
+
+        var actions = new Action[]
+        {
+            () => store.StoreCachedResponse(" ", "fingerprint", Now, response),
+            () => store.StoreCachedResponse("key", " ", Now, response),
+            () => store.StoreCachedResponse("key", "fingerprint", Now, null!)
+        };
+
+        foreach (var action in actions)
+        {
+            action();
+        }
+    }
+
+    /// <summary>
+    /// Scenario: cached response is stored for a key that does not yet exist.
+    /// Expected: the entry is created and can be retrieved by a matching fingerprint.
+    /// </summary>
+    [Fact]
+    public void StoreCachedResponse_WhenEntryDoesNotExist_CreatesCachedEntry()
+    {
+        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10), NullLogger<InMemoryIdempotencyStore>.Instance);
+        var response = new IdempotencyCachedResponse("message-1", "correlation-1", IdempotencyCachedResponseStatus.Accepted);
+
+        store.StoreCachedResponse("partner|request", "fingerprint", Now, response);
+
+        store.TryGetCachedResponse("partner|request", "fingerprint", Now.AddMinutes(1), out var actual)
+            .Should().BeTrue();
+        actual.Should().Be(response);
+    }
+
+    /// <summary>
+    /// Scenario: a cached entry has expired.
+    /// Expected: the lookup returns false and removes the expired entry.
+    /// </summary>
     [Fact]
     public void TryGetCachedResponse_WhenEntryHasExpired_ReturnsFalse()
     {
@@ -92,6 +194,27 @@ public sealed class InMemoryIdempotencyStoreTests
             .Should().BeFalse();
     }
 
+    /// <summary>
+    /// Scenario: a cached response is stored when the existing entry has already expired.
+    /// Expected: the expired entry is removed and replaced with a fresh cached response.
+    /// </summary>
+    [Fact]
+    public void StoreCachedResponse_WhenExistingEntryExpired_ReplacesEntry()
+    {
+        var store = CreateAcquiredStore();
+        var replacement = new IdempotencyCachedResponse("message-2", "correlation-2", IdempotencyCachedResponseStatus.Accepted);
+
+        store.StoreCachedResponse("partner|request", "fingerprint", Now.AddMinutes(10), replacement);
+
+        store.TryGetCachedResponse("partner|request", "fingerprint", Now.AddMinutes(11), out var actual)
+            .Should().BeTrue();
+        actual.Should().Be(replacement);
+    }
+
+    /// <summary>
+    /// Scenario: a conflicting fingerprint attempts to overwrite an entry.
+    /// Expected: the existing entry is preserved and the conflicting response is not returned.
+    /// </summary>
     [Fact]
     public void StoreCachedResponse_WhenFingerprintDiffers_DoesNotReplaceExistingEntry()
     {
@@ -108,6 +231,10 @@ public sealed class InMemoryIdempotencyStoreTests
         actual.Should().Be(response);
     }
 
+    /// <summary>
+    /// Scenario: an existing idempotency key is released.
+    /// Expected: the same key can be acquired again.
+    /// </summary>
     [Fact]
     public void Release_RemovesExistingEntry()
     {
@@ -119,10 +246,66 @@ public sealed class InMemoryIdempotencyStoreTests
             .Should().Be(IdempotencyAcquireResult.Acquired);
     }
 
+    /// <summary>
+    /// Scenario: release is called with a blank idempotency key.
+    /// Expected: the operation is ignored without throwing.
+    /// </summary>
+    [Fact]
+    public void Release_WhenKeyIsBlank_DoesNothing()
+    {
+        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10), NullLogger<InMemoryIdempotencyStore>.Instance);
+
+        var action = () => store.Release(" ");
+
+        action.Should().NotThrow();
+    }
+
+    /// <summary>
+    /// Scenario: the cleanup interval is reached and an expired entry remains in the dictionary.
+    /// Expected: the expired entry is removed while the cleanup cycle executes.
+    /// </summary>
+    [Fact]
+    public void CleanupExpiredEntriesIfNeeded_WhenExpiredEntriesExist_RemovesThem()
+    {
+        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10), NullLogger<InMemoryIdempotencyStore>.Instance);
+        var method = typeof(InMemoryIdempotencyStore).GetMethod("CleanupExpiredEntriesIfNeeded", BindingFlags.Instance | BindingFlags.NonPublic);
+        method.Should().NotBeNull();
+
+        var entriesField = typeof(InMemoryIdempotencyStore).GetField("_entries", BindingFlags.Instance | BindingFlags.NonPublic);
+        entriesField.Should().NotBeNull();
+
+        var cleanupCounterField = typeof(InMemoryIdempotencyStore).GetField("_cleanupCounter", BindingFlags.Instance | BindingFlags.NonPublic);
+        cleanupCounterField.Should().NotBeNull();
+        cleanupCounterField!.SetValue(store, 127);
+
+        var encodeMethod = typeof(InMemoryIdempotencyStore).GetMethod("EncodeKey", BindingFlags.Static | BindingFlags.NonPublic);
+        encodeMethod.Should().NotBeNull();
+        var encodedKey = (string)encodeMethod!.Invoke(null, ["partner|request"])!;
+
+        var entryType = typeof(InMemoryIdempotencyStore).GetNestedType("IdempotencyEntry", BindingFlags.NonPublic);
+        entryType.Should().NotBeNull();
+        var constructor = entryType!.GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).Single();
+        var expiredEntry = constructor.Invoke([Now.AddMinutes(-1), "fingerprint", null]);
+
+        var entries = entriesField!.GetValue(store)!;
+        var tryAdd = entries.GetType().GetMethod("TryAdd", [typeof(string), entryType]);
+        tryAdd.Should().NotBeNull();
+        tryAdd!.Invoke(entries, [encodedKey, expiredEntry]).Should().Be(true);
+
+        method!.Invoke(store, [Now]);
+
+        var tryGetResult = store.TryGetCachedResponse("partner|request", "fingerprint", Now, out _);
+        tryGetResult.Should().BeFalse();
+    }
+
+    /// <summary>
+    /// Scenario: the key or request fingerprint is blank.
+    /// Expected: acquisition throws an argument exception.
+    /// </summary>
     [Fact]
     public void TryAcquire_WhenInputsAreBlank_ThrowsArgumentException()
     {
-        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10));
+        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10), NullLogger<InMemoryIdempotencyStore>.Instance);
 
         var blankKey = () => store.TryAcquire(" ", "fingerprint", Now);
         var blankFingerprint = () => store.TryAcquire("key", " ", Now);
@@ -131,10 +314,14 @@ public sealed class InMemoryIdempotencyStoreTests
         blankFingerprint.Should().Throw<ArgumentException>();
     }
 
+    /// <summary>
+    /// Scenario: multiple callers acquire the same key concurrently.
+    /// Expected: exactly one acquisition succeeds and all remaining calls are duplicates.
+    /// </summary>
     [Fact]
     public async Task TryAcquire_WhenCalledConcurrently_AllowsOnlyOneAcquisition()
     {
-        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10));
+        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10), NullLogger<InMemoryIdempotencyStore>.Instance);
         var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var attempts = Enumerable.Range(0, 16)
             .Select(_ => Task.Run(async () =>
@@ -155,7 +342,7 @@ public sealed class InMemoryIdempotencyStoreTests
 
     private static InMemoryIdempotencyStore CreateAcquiredStore()
     {
-        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10));
+        var store = new InMemoryIdempotencyStore(TimeSpan.FromMinutes(10), NullLogger<InMemoryIdempotencyStore>.Instance);
         store.TryAcquire("partner|request", "fingerprint", Now);
         return store;
     }

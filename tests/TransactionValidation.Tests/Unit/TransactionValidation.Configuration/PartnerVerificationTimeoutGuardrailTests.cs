@@ -18,6 +18,10 @@ namespace TransactionValidation.Tests.Unit.TransactionValidation.Configuration;
 /// </summary>
 public sealed class PartnerVerificationTimeoutGuardrailTests
 {
+    /// <summary>
+    /// Scenario: total request timeout is omitted while attempt timeout and retries are configured.
+    /// Expected: total timeout is derived from the attempt timeout and retry count.
+    /// </summary>
     [Fact]
     public void HttpClientTimeout_WhenTotalTimeoutMissing_DerivesFromAttemptAndRetry()
     {
@@ -35,6 +39,10 @@ public sealed class PartnerVerificationTimeoutGuardrailTests
         timeout.Should().Be(TimeSpan.FromSeconds(12));
     }
 
+    /// <summary>
+    /// Scenario: total request timeout is not greater than the attempt timeout.
+    /// Expected: total timeout is raised to one second above the attempt timeout.
+    /// </summary>
     [Fact]
     public void HttpClientTimeout_WhenTotalTimeoutIsNotGreaterThanAttempt_UsesAttemptPlusOneSecond()
     {
@@ -52,6 +60,10 @@ public sealed class PartnerVerificationTimeoutGuardrailTests
         timeout.Should().Be(TimeSpan.FromSeconds(9));
     }
 
+    /// <summary>
+    /// Scenario: total request timeout is explicitly configured above the attempt timeout.
+    /// Expected: the configured total timeout is used unchanged.
+    /// </summary>
     [Fact]
     public void HttpClientTimeout_WhenTotalTimeoutProvided_UsesConfiguredValue()
     {

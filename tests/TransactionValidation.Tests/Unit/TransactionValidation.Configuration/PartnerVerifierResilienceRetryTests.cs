@@ -21,7 +21,8 @@ namespace TransactionValidation.Tests.Unit.TransactionValidation.Configuration;
 public sealed class PartnerVerifierResilienceRetryTests
 {
     /// <summary>
-    /// Ensures transient 503 responses are retried and a later success is returned.
+    /// Scenario: transient 503 responses are followed by a successful response.
+    /// Expected: retries occur and verification returns true.
     /// </summary>
     [Fact]
     public async Task VerifyAsync_WhenTransient503ThenSuccess_RetriesAndReturnsTrue()
@@ -45,8 +46,8 @@ public sealed class PartnerVerifierResilienceRetryTests
     }
 
     /// <summary>
-    /// Ensures persistent 503 responses consume the retry budget and surface
-    /// a service-unavailable exception.
+    /// Scenario: 503 responses persist through the configured retry budget.
+    /// Expected: retries are exhausted and an upstream-service-unavailable exception is thrown.
     /// </summary>
     [Fact]
     public async Task VerifyAsync_WhenTransient503Persists_RetriesThenThrowsServiceUnavailable()

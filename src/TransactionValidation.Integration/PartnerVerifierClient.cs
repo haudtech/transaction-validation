@@ -1,7 +1,11 @@
+using System.Diagnostics;
 using System.Net;
+
+using Microsoft.Extensions.Logging;
 
 using TransactionValidation.Core.Exceptions;
 using TransactionValidation.Core.Interfaces;
+using TransactionValidation.Core.Logging;
 
 namespace TransactionValidation.Integration;
 
@@ -11,15 +15,19 @@ namespace TransactionValidation.Integration;
 /// </summary>
 public sealed class PartnerVerifierClient : IPartnerVerifier
 {
+    private const string PartnerApiDependencyName = "PartnerApi";
+
     private readonly HttpClient _httpClient;
+    private readonly ILogger<PartnerVerifierClient> _logger;
 
     /// <summary>
     /// Initializes the client with the configured HTTP client for the mocked verification service.
     /// </summary>
     /// <param name="httpClient">The outbound HTTP client used to reach the partner verification endpoint.</param>
-    public PartnerVerifierClient(HttpClient httpClient)
+    public PartnerVerifierClient(HttpClient httpClient, ILogger<PartnerVerifierClient> logger)
     {
         _httpClient = httpClient;
+        _logger = logger;
     }
 
     /// <summary>
@@ -42,11 +50,18 @@ public sealed class PartnerVerifierClient : IPartnerVerifier
             requestPath += $"?forceTimeout={forceTimeout.Value.ToString().ToLowerInvariant()}";
         }
 
+        var stopwatch = Stopwatch.StartNew();
         try
         {
             var response = await _httpClient.GetAsync(requestPath, cancellationToken);
             if (response.IsSuccessStatusCode)
             {
+                TransactionValidationLogger.PartnerVerificationCompleted(
+                    _logger,
+                    PartnerApiDependencyName,
+                    partnerId,
+                    (int)response.StatusCode,
+                    stopwatch.Elapsed.TotalMilliseconds);
                 return true;
             }
 
@@ -69,12 +84,26 @@ public sealed class PartnerVerifierClient : IPartnerVerifier
             throw new UpstreamServiceUnavailableException(
                 $"Partner verification returned unexpected status code {(int)response.StatusCode} ({response.StatusCode}).");
         }
-        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
+            TransactionValidationLogger.PartnerVerificationFailed(
+                _logger,
+                exception,
+                PartnerApiDependencyName,
+                partnerId,
+                nameof(UpstreamTimeoutException),
+                stopwatch.Elapsed.TotalMilliseconds);
             throw new UpstreamTimeoutException("Partner verification request timed out.");
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException exception)
         {
+            TransactionValidationLogger.PartnerVerificationFailed(
+                _logger,
+                exception,
+                PartnerApiDependencyName,
+                partnerId,
+                nameof(UpstreamServiceUnavailableException),
+                stopwatch.Elapsed.TotalMilliseconds);
             throw new UpstreamServiceUnavailableException("Partner verification service is unavailable.");
         }
     }

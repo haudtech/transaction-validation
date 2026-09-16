@@ -1,5 +1,7 @@
 using FluentAssertions;
 
+using Microsoft.Extensions.Logging.Abstractions;
+
 using Moq;
 
 using TransactionValidation.Core.Exceptions;
@@ -15,6 +17,10 @@ namespace TransactionValidation.Tests.Unit.TransactionValidation.Messaging;
 /// </summary>
 public sealed class RabbitMqMessagePublisherTests
 {
+    /// <summary>
+    /// Scenario: RabbitMQ confirms publication of a transaction envelope.
+    /// Expected: the message is published with routing and correlation headers.
+    /// </summary>
     [Fact]
     public async Task PublishAsync_WhenPublisherConfirms_PublishesToExchangeWithRoutingAndHeaders()
     {
@@ -36,7 +42,7 @@ public sealed class RabbitMqMessagePublisherTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        var sut = new RabbitMqMessagePublisher("partner.transactions", adapterMock.Object, resolverMock.Object);
+        var sut = new RabbitMqMessagePublisher("partner.transactions", adapterMock.Object, resolverMock.Object, NullLogger<RabbitMqMessagePublisher>.Instance);
 
         await sut.PublishAsync(CreateEnvelope(), CancellationToken.None);
 
@@ -49,6 +55,10 @@ public sealed class RabbitMqMessagePublisherTests
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    /// <summary>
+    /// Scenario: RabbitMQ does not confirm publication.
+    /// Expected: the publisher throws a conflict exception.
+    /// </summary>
     [Fact]
     public async Task PublishAsync_WhenPublisherConfirmFails_ThrowsConflictException()
     {
@@ -66,20 +76,25 @@ public sealed class RabbitMqMessagePublisherTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
-        var sut = new RabbitMqMessagePublisher("partner.transactions", adapterMock.Object, resolverMock.Object);
+        var sut = new RabbitMqMessagePublisher("partner.transactions", adapterMock.Object, resolverMock.Object, NullLogger<RabbitMqMessagePublisher>.Instance);
 
         var action = async () => await sut.PublishAsync(CreateEnvelope(), CancellationToken.None);
 
         await action.Should().ThrowAsync<ConflictException>();
     }
 
+    /// <summary>
+    /// Scenario: the transaction envelope is null.
+    /// Expected: publication throws an argument-null exception.
+    /// </summary>
     [Fact]
     public async Task PublishAsync_WhenEnvelopeIsNull_ThrowsArgumentNullException()
     {
         var sut = new RabbitMqMessagePublisher(
             "partner.transactions",
             Moq.Mock.Of<IRabbitMqClientAdapter>(),
-            Moq.Mock.Of<IMessageRoutingKeyResolver>());
+            Moq.Mock.Of<IMessageRoutingKeyResolver>(),
+            NullLogger<RabbitMqMessagePublisher>.Instance);
 
         var action = async () => await sut.PublishAsync(null!, CancellationToken.None);
 

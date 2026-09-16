@@ -15,6 +15,10 @@ namespace TransactionValidation.Tests.Unit.TransactionValidation.Api.HealthCheck
 
 public sealed class HealthChecksTests
 {
+    /// <summary>
+    /// Scenario: the message publisher resolves from the service provider.
+    /// Expected: the messaging health check reports healthy.
+    /// </summary>
     [Fact]
     public async Task MessagingHealthCheck_WhenPublisherResolves_ReturnsHealthy()
     {
@@ -31,6 +35,10 @@ public sealed class HealthChecksTests
         result.Description.Should().Contain("registered");
     }
 
+    /// <summary>
+    /// Scenario: the message publisher cannot be resolved.
+    /// Expected: the messaging health check reports unhealthy with an exception.
+    /// </summary>
     [Fact]
     public async Task MessagingHealthCheck_WhenPublisherDoesNotResolve_ReturnsUnhealthy()
     {
@@ -47,6 +55,10 @@ public sealed class HealthChecksTests
         result.Exception.Should().BeOfType<InvalidOperationException>();
     }
 
+    /// <summary>
+    /// Scenario: no Redis connection is configured.
+    /// Expected: the Redis health check reports healthy using in-memory mode.
+    /// </summary>
     [Fact]
     public async Task RedisHealthCheck_WhenRedisIsNotConfigured_ReturnsHealthy()
     {
@@ -62,6 +74,10 @@ public sealed class HealthChecksTests
         result.Description.Should().Contain("in-memory");
     }
 
+    /// <summary>
+    /// Scenario: Redis responds successfully to a ping.
+    /// Expected: the Redis health check reports healthy and reachable.
+    /// </summary>
     [Fact]
     public async Task RedisHealthCheck_WhenRedisPingSucceeds_ReturnsHealthy()
     {
@@ -86,6 +102,10 @@ public sealed class HealthChecksTests
         result.Description.Should().Contain("reachable");
     }
 
+    /// <summary>
+    /// Scenario: the Redis ping throws a connection exception.
+    /// Expected: the Redis health check reports unhealthy and preserves the exception.
+    /// </summary>
     [Fact]
     public async Task RedisHealthCheck_WhenRedisPingFails_ReturnsUnhealthy()
     {

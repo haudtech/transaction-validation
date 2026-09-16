@@ -8,6 +8,10 @@ namespace TransactionValidation.Tests.Unit.TransactionValidation.Configuration;
 
 public sealed class ServiceBusPublisherOptionsValidatorTests
 {
+    /// <summary>
+    /// Scenario: all Service Bus publisher settings are present.
+    /// Expected: validation returns the original options instance.
+    /// </summary>
     [Fact]
     public void Validate_WhenAllRequiredValuesArePresent_ReturnsOptions()
     {
@@ -18,6 +22,10 @@ public sealed class ServiceBusPublisherOptionsValidatorTests
         result.Should().BeSameAs(options);
     }
 
+    /// <summary>
+    /// Scenario: both Service Bus connection mechanisms are missing.
+    /// Expected: validation reports the connection requirement.
+    /// </summary>
     [Fact]
     public void Validate_WhenConnectionDetailsAreMissing_ReportsConnectionRequirement()
     {
@@ -31,6 +39,10 @@ public sealed class ServiceBusPublisherOptionsValidatorTests
             .WithMessage("*ConnectionString or Namespace*");
     }
 
+    /// <summary>
+    /// Scenario: Service Bus topic metadata is missing.
+    /// Expected: validation reports every required metadata property.
+    /// </summary>
     [Fact]
     public void Validate_WhenTopicMetadataIsMissing_ReportsAllMissingProperties()
     {
@@ -43,6 +55,10 @@ public sealed class ServiceBusPublisherOptionsValidatorTests
             .WithMessage("*EventType*");
     }
 
+    /// <summary>
+    /// Scenario: the publisher options argument is null.
+    /// Expected: validation throws an argument-null exception.
+    /// </summary>
     [Fact]
     public void Validate_WhenOptionsAreNull_ThrowsArgumentNullException()
     {

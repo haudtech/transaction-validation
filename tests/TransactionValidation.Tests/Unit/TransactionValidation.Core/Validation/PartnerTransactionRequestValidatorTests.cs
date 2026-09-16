@@ -14,6 +14,10 @@ public class PartnerTransactionRequestValidatorTests
 {
     private readonly PartnerTransactionRequestValidator validator = new();
 
+    /// <summary>
+    /// Scenario: a transaction request contains valid values.
+    /// Expected: validation succeeds.
+    /// </summary>
     [Fact]
     public void Validate_WhenRequestIsValid_IsValid()
     {
@@ -24,6 +28,10 @@ public class PartnerTransactionRequestValidatorTests
         result.IsValid.Should().BeTrue();
     }
 
+    /// <summary>
+    /// Scenario: the currency is not a supported ISO-4217 code.
+    /// Expected: validation reports a currency error.
+    /// </summary>
     [Fact]
     public void Validate_WhenCurrencyIsUnsupported_ReturnsCurrencyError()
     {
@@ -37,6 +45,10 @@ public class PartnerTransactionRequestValidatorTests
             && e.ErrorMessage == "currency must be a valid ISO-4217 code.");
     }
 
+    /// <summary>
+    /// Scenario: the currency uses lowercase letters for a valid ISO code.
+    /// Expected: validation succeeds case-insensitively.
+    /// </summary>
     [Fact]
     public void Validate_WhenCurrencyIsLowercaseIso_IsValid()
     {
@@ -47,6 +59,10 @@ public class PartnerTransactionRequestValidatorTests
         result.IsValid.Should().BeTrue();
     }
 
+    /// <summary>
+    /// Scenario: the transaction timestamp has its default value.
+    /// Expected: validation reports a required-timestamp error.
+    /// </summary>
     [Fact]
     public void Validate_WhenTimestampIsDefault_ReturnsTimestampError()
     {
@@ -60,6 +76,10 @@ public class PartnerTransactionRequestValidatorTests
             && e.ErrorMessage == "timestamp is required.");
     }
 
+    /// <summary>
+    /// Scenario: the partner ID is null, empty, or whitespace.
+    /// Expected: validation reports a partner-ID error.
+    /// </summary>
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -73,6 +93,10 @@ public class PartnerTransactionRequestValidatorTests
         result.Errors.Should().ContainSingle(error => error.PropertyName == nameof(PartnerTransactionRequest.PartnerId));
     }
 
+    /// <summary>
+    /// Scenario: the transaction amount is zero or negative.
+    /// Expected: validation reports an amount error.
+    /// </summary>
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
@@ -87,6 +111,10 @@ public class PartnerTransactionRequestValidatorTests
             && error.ErrorMessage == "amount must be greater than zero.");
     }
 
+    /// <summary>
+    /// Scenario: the transaction reference is blank.
+    /// Expected: validation reports a transaction-reference error.
+    /// </summary>
     [Fact]
     public void Validate_WhenTransactionReferenceIsMissing_ReturnsReferenceError()
     {
@@ -97,6 +125,10 @@ public class PartnerTransactionRequestValidatorTests
         result.Errors.Should().ContainSingle(error => error.PropertyName == nameof(PartnerTransactionRequest.TransactionReference));
     }
 
+    /// <summary>
+    /// Scenario: the currency is missing or malformed.
+    /// Expected: validation reports a currency error.
+    /// </summary>
     [Theory]
     [InlineData(null)]
     [InlineData("")]

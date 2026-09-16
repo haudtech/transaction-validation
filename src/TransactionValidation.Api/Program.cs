@@ -1,10 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-
-using Serilog;
 
 using TransactionValidation.Api.HealthChecks;
 using TransactionValidation.Api.Idempotency;
@@ -17,15 +14,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddTransactionValidationConfiguration(builder.Environment, args);
 
-builder.Host.UseSerilog((context, services, loggerConfiguration) =>
-    loggerConfiguration
-        .ReadFrom.Configuration(context.Configuration)
-        .Enrich.FromLogContext());
+builder.Host.UseTransactionValidationSerilog();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddTransactionValidationCommonServices(builder.Configuration);
+builder.Services.AddTransactionValidationObservability(builder.Configuration, "TransactionValidation.Api");
 builder.Services.AddConfiguredBroker(
     builder.Configuration,
     AddRabbitMqMessagingServices,
@@ -100,7 +95,11 @@ public partial class Program
             var options = sp.GetRequiredService<RabbitMqOptions>();
             var rabbitMqClientAdapter = sp.GetRequiredService<IRabbitMqClientAdapter>();
             var routingKeyResolver = sp.GetRequiredService<IMessageRoutingKeyResolver>();
-            return new RabbitMqMessagePublisher(options.ExchangeName, rabbitMqClientAdapter, routingKeyResolver);
+            return new RabbitMqMessagePublisher(
+                options.ExchangeName,
+                rabbitMqClientAdapter,
+                routingKeyResolver,
+                sp.GetRequiredService<ILogger<RabbitMqMessagePublisher>>());
         });
     }
 
@@ -129,7 +128,8 @@ public partial class Program
                 options.TopicName,
                 options.Subject,
                 options.RoutingKey,
-                options.EventType);
+                options.EventType,
+                sp.GetRequiredService<ILogger<ServiceBusMessagePublisher>>());
         });
     }
 }

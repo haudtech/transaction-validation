@@ -43,6 +43,7 @@ This folder is the central entry point for the project’s technical and enginee
 - Integration workflow details: [workflow_actions/github/integration_workflow.md](workflow_actions/github/integration_workflow.md)
 - Deploy to Azure workflow details: [workflow_actions/github/deploy_azure_workflow.md](workflow_actions/github/deploy_azure_workflow.md)
 - Infrastructure workflow details: [workflow_actions/github/infra_workflow.md](workflow_actions/github/infra_workflow.md)
+- Codecov coverage configuration: [workflow_actions/github/codecov_configuration.md](workflow_actions/github/codecov_configuration.md)
 - Workflow case studies: [workflow_actions/github/workflow_case_studies.md](workflow_actions/github/workflow_case_studies.md)
 - Branch protection and required checks setup: [workflow_actions/github/branch_protection_setup.md](workflow_actions/github/branch_protection_setup.md)
 

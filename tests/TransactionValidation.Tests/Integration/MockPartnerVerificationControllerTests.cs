@@ -14,6 +14,10 @@ namespace TransactionValidation.Tests.Integration;
 /// </summary>
 public class MockPartnerVerificationControllerTests
 {
+    /// <summary>
+    /// Scenario: partner verification is forced to time out.
+    /// Expected: the mock returns HTTP 408 with a timeout payload.
+    /// </summary>
     [Trait("Category", "Integration")]
     [Trait("Feature", "MockVerification")]
     [Fact(DisplayName = "Mock VerifyPartner returns 408 with timeout payload when forceTimeout=true")]
@@ -30,6 +34,10 @@ public class MockPartnerVerificationControllerTests
         payload.ToString().Should().Contain("Simulated timeout");
     }
 
+    /// <summary>
+    /// Scenario: partner verification is forced to succeed.
+    /// Expected: the mock returns HTTP 200 with verified=true.
+    /// </summary>
     [Trait("Category", "Integration")]
     [Trait("Feature", "MockVerification")]
     [Fact(DisplayName = "Mock VerifyPartner returns 200 with verified=true when forceTimeout=false")]
@@ -46,6 +54,10 @@ public class MockPartnerVerificationControllerTests
         payload.ToString().Should().Contain("verified = True");
     }
 
+    /// <summary>
+    /// Scenario: forceTimeout is omitted across a representative sample.
+    /// Expected: the simulated timeout rate remains within the documented statistical band.
+    /// </summary>
     [Trait("Category", "Integration")]
     [Trait("Feature", "MockVerification")]
     [Fact(DisplayName = "Mock VerifyPartner random path produces timeout rate near 30%")]

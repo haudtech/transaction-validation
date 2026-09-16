@@ -12,6 +12,10 @@ namespace TransactionValidation.Tests.Integration.TransactionValidation.Api;
 /// </summary>
 public sealed class ApiSecurityHostTests
 {
+    /// <summary>
+    /// Scenario: a transaction is submitted without an API key.
+    /// Expected: the host returns HTTP 401 Unauthorized.
+    /// </summary>
     [Trait("Category", "Integration")]
     [Trait("Feature", "Security")]
     [Fact(DisplayName = "API host returns 401 when X-API-Key header is missing")]
@@ -27,6 +31,10 @@ public sealed class ApiSecurityHostTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    /// <summary>
+    /// Scenario: a valid API key accompanies a valid transaction.
+    /// Expected: the host accepts the request with HTTP 202.
+    /// </summary>
     [Trait("Category", "Integration")]
     [Trait("Feature", "Security")]
     [Fact(DisplayName = "API host returns 202 when valid X-API-Key is provided")]

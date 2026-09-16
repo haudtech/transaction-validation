@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using StackExchange.Redis;
 
@@ -17,7 +18,9 @@ public static class IdempotencyStoreRegistration
         if (string.IsNullOrWhiteSpace(redisOptions.ConnectionString))
         {
             services.AddSingleton<IIdempotencyStore>(sp =>
-                new InMemoryIdempotencyStore(GetWindow(sp.GetRequiredService<IdempotencyOptions>())));
+                new InMemoryIdempotencyStore(
+                    GetWindow(sp.GetRequiredService<IdempotencyOptions>()),
+                    sp.GetRequiredService<ILogger<InMemoryIdempotencyStore>>()));
             return;
         }
 
@@ -27,7 +30,8 @@ public static class IdempotencyStoreRegistration
             var connectionMultiplexer = sp.GetRequiredService<IConnectionMultiplexer>();
             return new RedisIdempotencyStore(
                 connectionMultiplexer,
-                GetWindow(sp.GetRequiredService<IdempotencyOptions>()));
+                GetWindow(sp.GetRequiredService<IdempotencyOptions>()),
+                sp.GetRequiredService<ILogger<RedisIdempotencyStore>>());
         });
     }
 

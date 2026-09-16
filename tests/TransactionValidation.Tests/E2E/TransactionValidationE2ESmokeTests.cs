@@ -32,12 +32,13 @@ public sealed class TransactionValidationE2ESmokeTests : IClassFixture<E2ETestFi
         _fixture = fixture;
     }
 
+    /// <summary>
+    /// Scenario: the root endpoint is called with a valid API key.
+    /// Expected: the deployed API returns HTTP 200.
+    /// </summary>
     [Trait("Category", "E2E")]
     [Trait("Feature", "RuntimeSmoke")]
     [Fact(DisplayName = "E2E root endpoint returns 200 when API key is valid")]
-    /// <summary>
-    /// Verifies that the root endpoint is reachable and authorized when a valid API key is sent.
-    /// </summary>
     public async Task Root_WithValidApiKey_ReturnsOk()
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "/");
@@ -48,12 +49,13 @@ public sealed class TransactionValidationE2ESmokeTests : IClassFixture<E2ETestFi
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    /// <summary>
+    /// Scenario: a valid transaction is submitted to the deployed API.
+    /// Expected: the API returns HTTP 202 Accepted.
+    /// </summary>
     [Trait("Category", "E2E")]
     [Trait("Feature", "RuntimeSmoke")]
     [Fact(DisplayName = "E2E transaction happy path returns 202 Accepted")]
-    /// <summary>
-    /// Verifies that a valid transaction request is accepted by the running API.
-    /// </summary>
     public async Task CreateTransaction_HappyPath_ReturnsAccepted()
     {
         var id = Guid.NewGuid().ToString("N");
@@ -64,13 +66,13 @@ public sealed class TransactionValidationE2ESmokeTests : IClassFixture<E2ETestFi
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
     }
 
+    /// <summary>
+    /// Scenario: the same transaction is submitted twice with one idempotency key.
+    /// Expected: the second submission returns the same accepted response identifiers.
+    /// </summary>
     [Trait("Category", "E2E")]
     [Trait("Feature", "RuntimeSmoke")]
     [Fact(DisplayName = "E2E duplicate request with same Idempotency-Key replays 202 response")]
-    /// <summary>
-    /// Verifies idempotency replay behavior by asserting the second submission with
-    /// the same idempotency key returns the same accepted response.
-    /// </summary>
     public async Task CreateTransaction_DuplicateIdempotencyKey_ReplaysAcceptedResponse()
     {
         var id = Guid.NewGuid().ToString("N");
@@ -88,6 +90,10 @@ public sealed class TransactionValidationE2ESmokeTests : IClassFixture<E2ETestFi
         Assert.Equal("accepted", secondBody?.Status);
     }
 
+    /// <summary>
+    /// Scenario: an accepted transaction is published to the deployed broker.
+    /// Expected: both independent primary and audit consumers observe the message.
+    /// </summary>
     [Trait("Category", "E2E")]
     [Trait("Feature", "MultipleConsumers")]
     [Fact(DisplayName = "E2E one transaction is delivered to both independent consumer queues")]
@@ -110,6 +116,10 @@ public sealed class TransactionValidationE2ESmokeTests : IClassFixture<E2ETestFi
         Assert.NotEqual(primary.QueueName, audit.QueueName);
     }
 
+    /// <summary>
+    /// Scenario: an unverified transaction is published with the unverified routing key.
+    /// Expected: only the primary consumer observes the message.
+    /// </summary>
     [Trait("Category", "E2E")]
     [Trait("Feature", "MultipleConsumers")]
     [Fact(DisplayName = "E2E selective binding delivers unverified messages only to the primary queue")]
@@ -134,6 +144,10 @@ public sealed class TransactionValidationE2ESmokeTests : IClassFixture<E2ETestFi
         Assert.Equal("partner-transactions", primary.QueueName);
     }
 
+    /// <summary>
+    /// Scenario: the audit consumer fails before acknowledging an accepted message.
+    /// Expected: the broker redelivers the message while the primary consumer processes it.
+    /// </summary>
     [Trait("Category", "E2E")]
     [Trait("Feature", "ConsumerFailureIsolation")]
     [Fact(DisplayName = "E2E audit consumer redelivers a message after failing before acknowledgement")]
@@ -162,13 +176,13 @@ public sealed class TransactionValidationE2ESmokeTests : IClassFixture<E2ETestFi
         Assert.Equal("partner-transactions.audit", auditObservations[0].QueueName);
     }
 
+    /// <summary>
+    /// Scenario: an invalid transaction payload is submitted.
+    /// Expected: the API returns HTTP 400 RFC 7807 ProblemDetails.
+    /// </summary>
     [Trait("Category", "E2E")]
     [Trait("Feature", "RuntimeSmoke")]
     [Fact(DisplayName = "E2E validation error returns 400 ProblemDetails")]
-    /// <summary>
-    /// Verifies request validation behavior by sending an invalid payload and asserting
-    /// an RFC 7807 bad request response.
-    /// </summary>
     public async Task CreateTransaction_InvalidPayload_ReturnsBadRequest()
     {
         var id = Guid.NewGuid().ToString("N");
@@ -190,12 +204,13 @@ public sealed class TransactionValidationE2ESmokeTests : IClassFixture<E2ETestFi
         Assert.Equal("Bad Request", problem?.Title);
     }
 
+    /// <summary>
+    /// Scenario: a transaction is submitted without an API key.
+    /// Expected: the deployed API returns HTTP 401 Unauthorized.
+    /// </summary>
     [Trait("Category", "E2E")]
     [Trait("Feature", "RuntimeSmoke")]
     [Fact(DisplayName = "E2E missing API key returns 401")]
-    /// <summary>
-    /// Verifies authentication enforcement by sending a request without the API key header.
-    /// </summary>
     public async Task CreateTransaction_MissingApiKey_ReturnsUnauthorized()
     {
         var id = Guid.NewGuid().ToString("N");

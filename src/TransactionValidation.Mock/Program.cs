@@ -9,6 +9,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddTransactionValidationConfiguration(builder.Environment, args);
 
+builder.Host.UseTransactionValidationSerilog();
+builder.Services.AddTransactionValidationObservability(builder.Configuration, "TransactionValidation.Mock");
+
 builder.Services.AddConfiguredBroker(
     builder.Configuration,
     (services, configuration) =>
