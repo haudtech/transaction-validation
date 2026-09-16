@@ -37,6 +37,7 @@ public sealed class IdempotencyStoreRegistrationTests
     public void Add_WhenRedisIsNotConfigured_RegistersInMemoryStore()
     {
         var services = new ServiceCollection();
+        services.AddLogging();
         services.AddSingleton(new IdempotencyOptions { WindowMinutes = 12 });
         var configuration = new ConfigurationBuilder().Build();
 
