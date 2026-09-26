@@ -17,7 +17,7 @@ A lightweight Backend-For-Frontend (BFF) to mediate partner integrations for tra
 | Error handling | ASP.NET Core `IExceptionHandler` + RFC 7807 `ProblemDetails` mapping |
 | Resilience | `Microsoft.Extensions.Http.Resilience` (Polly-based pipelines) |
 | Messaging | RabbitMQ (`RabbitMQ.Client`) or Azure Service Bus (`Azure.Messaging.ServiceBus`), selected by `MESSAGING__BROKERTYPE` |
-| Observability | Serilog, OpenTelemetry, optional Azure Monitor exporter |
+| Observability | Serilog, OpenTelemetry, optional Azure Monitor exporter, and source-generated structured logging via `LoggerMessage` |
 | Configuration | `appsettings*.json`, environment variables, `DotNetEnv` |
 | Architecture | Multi-project solution (`Api`, `Configuration`, `Core`, `Integration`, `Messaging`, `Mock`, `Tests`) |
 
