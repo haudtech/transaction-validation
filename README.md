@@ -46,6 +46,17 @@ A lightweight Backend-For-Frontend (BFF) to mediate partner integrations for tra
 | CI/CD | GitHub Actions with OIDC |
 | Secrets and identity | Azure Key Vault and managed identities |
 
+## GitHub Actions CI/CD
+
+GitHub Actions provides the path from pull request validation to the Azure deployment environment. Azure deployment authorization is an external security control provided by GitHub OIDC, Microsoft Entra federated credentials, Azure RBAC, and protected GitHub Environments; it is not implemented by the application source code.
+
+- CI and integration workflows validate code quality, tests, coverage, and formatting.
+- Infrastructure changes receive a Bicep preview before approved changes are applied.
+- Application changes build and deploy API and Mock container images to Azure.
+- GitHub OIDC provides short-lived workflow authentication without storing an Azure client secret in the repository.
+
+See the detailed [OIDC workflow diagrams](docs/azure_deployment/oidc_workflow_diagrams.md), [OIDC prerequisite setup](docs/azure_deployment/oidc_prerequisite_setup.md), and [Azure deployment documentation](docs/azure_deployment/README.md) for workflow triggers, approvals, identity, RBAC, secrets, and operational controls.
+
 ## Logging Standards
 
 Production logging uses source-generated structured logging with stable event IDs and typed parameters. Logging events are organized by domain-specific catalogs for transaction processing, broker-neutral messaging, RabbitMQ, and Azure Service Bus.
