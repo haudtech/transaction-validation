@@ -17,7 +17,7 @@ A lightweight Backend-For-Frontend (BFF) to mediate partner integrations for tra
 | Error handling | ASP.NET Core `IExceptionHandler` + RFC 7807 `ProblemDetails` mapping |
 | Resilience | `Microsoft.Extensions.Http.Resilience` (Polly-based pipelines) |
 | Messaging | RabbitMQ (`RabbitMQ.Client`) or Azure Service Bus (`Azure.Messaging.ServiceBus`), selected by `MESSAGING__BROKERTYPE` |
-| Observability | Serilog, OpenTelemetry, optional Azure Monitor exporter |
+| Observability | Serilog, OpenTelemetry, optional Azure Monitor exporter, and source-generated structured logging via `LoggerMessage` |
 | Configuration | `appsettings*.json`, environment variables, `DotNetEnv` |
 | Architecture | Multi-project solution (`Api`, `Configuration`, `Core`, `Integration`, `Messaging`, `Mock`, `Tests`) |
 
@@ -45,6 +45,25 @@ A lightweight Backend-For-Frontend (BFF) to mediate partner integrations for tra
 | Infrastructure as code | Bicep |
 | CI/CD | GitHub Actions with OIDC |
 | Secrets and identity | Azure Key Vault and managed identities |
+
+## GitHub Actions CI/CD
+
+GitHub Actions provides the path from pull request validation to the Azure deployment environment. Azure deployment authorization is an external security control provided by GitHub OIDC, Microsoft Entra federated credentials, Azure RBAC, and protected GitHub Environments; it is not implemented by the application source code.
+
+- CI and integration workflows validate code quality, tests, coverage, and formatting.
+- Infrastructure changes receive a Bicep preview before approved changes are applied.
+- Application changes build and deploy API and Mock container images to Azure.
+- GitHub OIDC provides short-lived workflow authentication without storing an Azure client secret in the repository.
+
+See the detailed [OIDC workflow diagrams](docs/azure_deployment/oidc_workflow_diagrams.md), [OIDC prerequisite setup](docs/azure_deployment/oidc_prerequisite_setup.md), and [Azure deployment documentation](docs/azure_deployment/README.md) for workflow triggers, approvals, identity, RBAC, secrets, and operational controls.
+
+## Logging Standards
+
+Production logging uses source-generated structured logging with stable event IDs and typed parameters. Logging events are organized by domain-specific catalogs for transaction processing, broker-neutral messaging, RabbitMQ, and Azure Service Bus.
+
+Direct `ILogger` extension-method calls are rejected by the repository's built-in analyzer rules. This keeps logging consistent, structured, and suitable for operational diagnostics across all solution projects.
+
+See the [Logging Standards](docs/observability/logging_standards.md) guide for the catalog structure, usage rules, event ID conventions, and validation commands.
 
 Docker Compose includes Redis for the distributed idempotency store. The API connects to `redis:6379` inside the Compose network; when the API runs on the host, use `localhost:6379` instead.
 

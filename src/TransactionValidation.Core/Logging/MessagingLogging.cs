@@ -1,0 +1,68 @@
+using Microsoft.Extensions.Logging;
+
+namespace TransactionValidation.Core.Logging;
+
+/// <summary>
+/// Source-generated structured logging events shared by message broker implementations.
+/// </summary>
+public static partial class MessagingLogging
+{
+    [LoggerMessage(
+        EventId = 1300,
+        Level = LogLevel.Information,
+        Message = "Message publish completed. Dependency={Dependency} CorrelationId={CorrelationId} MessageId={MessageId} DurationMs={DurationMs}")]
+    public static partial void MessagePublishCompleted(
+        ILogger logger,
+        string dependency,
+        string correlationId,
+        string messageId,
+        double durationMs);
+
+    [LoggerMessage(
+        EventId = 1301,
+        Level = LogLevel.Error,
+        Message = "Message publish failed. Dependency={Dependency} CorrelationId={CorrelationId} MessageId={MessageId} DurationMs={DurationMs}")]
+    public static partial void MessagePublishFailed(
+        ILogger logger,
+        Exception exception,
+        string dependency,
+        string correlationId,
+        string messageId,
+        double durationMs);
+
+    [LoggerMessage(
+        EventId = 1302,
+        Level = LogLevel.Information,
+        Message = "Consumer message observed. Dependency={Dependency} Consumer={Consumer} Destination={Destination} MessageId={MessageId} CorrelationId={CorrelationId} DeliveryCount={DeliveryCount}")]
+    public static partial void ConsumerMessageObserved(
+        ILogger logger,
+        string dependency,
+        string consumer,
+        string destination,
+        string messageId,
+        string correlationId,
+        int deliveryCount);
+
+    [LoggerMessage(
+        EventId = 1303,
+        Level = LogLevel.Warning,
+        Message = "Consumer retry scheduled. Dependency={Dependency} Consumer={Consumer} Destination={Destination} DelaySeconds={DelaySeconds}")]
+    public static partial void ConsumerRetryScheduled(
+        ILogger logger,
+        Exception exception,
+        string dependency,
+        string consumer,
+        string destination,
+        double delaySeconds);
+
+    [LoggerMessage(
+        EventId = 1304,
+        Level = LogLevel.Error,
+        Message = "Consumer processing failed. Dependency={Dependency} Consumer={Consumer} Destination={Destination}")]
+    public static partial void ConsumerProcessingFailed(
+        ILogger logger,
+        Exception exception,
+        string dependency,
+        string consumer,
+        string destination);
+}

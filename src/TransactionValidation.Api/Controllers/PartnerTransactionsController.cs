@@ -85,7 +85,7 @@ public sealed class PartnerTransactionsController : ControllerBase
                 request.TransactionReference?.Trim() ?? string.Empty,
                 BuildIdempotencyKey(request));
 
-            TransactionValidationLogger.ValidationFailed(
+            TransactionValidationLogging.ValidationFailed(
                 _logger,
                 invalidRequestContext.CorrelationId,
                 invalidRequestContext.PartnerId,
@@ -101,7 +101,7 @@ public sealed class PartnerTransactionsController : ControllerBase
             request.TransactionReference.Trim(),
             idempotencyKey);
         var workflowStopwatch = Stopwatch.StartNew();
-        TransactionValidationLogger.RequestReceived(
+        TransactionValidationLogging.RequestReceived(
             _logger,
             context.CorrelationId,
             context.PartnerId,
@@ -114,7 +114,7 @@ public sealed class PartnerTransactionsController : ControllerBase
         {
             if (_idempotencyStore.TryGetCachedResponse(idempotencyKey, requestFingerprint, DateTimeOffset.UtcNow, out var cachedResponse))
             {
-                TransactionValidationLogger.DuplicateReplayed(
+                TransactionValidationLogging.DuplicateReplayed(
                     _logger,
                     context.CorrelationId,
                     context.PartnerId,
@@ -133,7 +133,7 @@ public sealed class PartnerTransactionsController : ControllerBase
 
         if (acquireResult == IdempotencyAcquireResult.KeyReusedWithDifferentPayload)
         {
-            TransactionValidationLogger.IdempotencyConflict(
+            TransactionValidationLogging.IdempotencyConflict(
                 _logger,
                 context.CorrelationId,
                 context.PartnerId,
@@ -145,7 +145,7 @@ public sealed class PartnerTransactionsController : ControllerBase
         {
             var partnerVerificationStopwatch = Stopwatch.StartNew();
             var partnerVerified = await _partnerVerifier.VerifyAsync(request.PartnerId, cancellationToken);
-            TransactionValidationLogger.PartnerVerificationCompleted(
+            TransactionValidationLogging.PartnerVerificationCompleted(
                 _logger,
                 context.CorrelationId,
                 context.PartnerId,
@@ -163,7 +163,7 @@ public sealed class PartnerTransactionsController : ControllerBase
 
             var publishStopwatch = Stopwatch.StartNew();
             await _messagePublisher.PublishAsync(envelope, cancellationToken);
-            TransactionValidationLogger.TransactionPublished(
+            TransactionValidationLogging.TransactionPublished(
                 _logger,
                 context.CorrelationId,
                 context.PartnerId,
@@ -187,7 +187,7 @@ public sealed class PartnerTransactionsController : ControllerBase
         }
         catch (Exception exception)
         {
-            TransactionValidationLogger.ProcessingFailed(
+            TransactionValidationLogging.ProcessingFailed(
                 _logger,
                 exception,
                 context.CorrelationId,

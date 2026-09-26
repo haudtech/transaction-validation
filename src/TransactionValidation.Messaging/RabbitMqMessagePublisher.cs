@@ -73,7 +73,7 @@ public sealed class RabbitMqMessagePublisher : IMessagePublisher
                 throw new ConflictException("RabbitMQ did not confirm message publishing.");
             }
 
-            TransactionValidationLogger.MessagePublishCompleted(
+            MessagingLogging.MessagePublishCompleted(
                 _logger,
                 "RabbitMQ",
                 envelope.CorrelationId,
@@ -82,7 +82,7 @@ public sealed class RabbitMqMessagePublisher : IMessagePublisher
         }
         catch (Exception exception)
         {
-            TransactionValidationLogger.MessagePublishFailed(
+            MessagingLogging.MessagePublishFailed(
                 _logger,
                 exception,
                 "RabbitMQ",

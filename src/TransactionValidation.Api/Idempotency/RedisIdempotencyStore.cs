@@ -61,7 +61,7 @@ public sealed class RedisIdempotencyStore : IIdempotencyStore
         // Atomic reservation: only the first caller for this key within the TTL window wins.
         if (db.StringSet(fingerprintKey, normalizedFingerprint, _ttl, When.NotExists))
         {
-            TransactionValidationLogger.IdempotencyAcquisitionCompleted(_logger, DependencyName, nameof(IdempotencyAcquireResult.Acquired));
+            TransactionValidationLogging.IdempotencyAcquisitionCompleted(_logger, DependencyName, nameof(IdempotencyAcquireResult.Acquired));
             return IdempotencyAcquireResult.Acquired;
         }
 
@@ -69,7 +69,7 @@ public sealed class RedisIdempotencyStore : IIdempotencyStore
         var result = existingFingerprint.HasValue && existingFingerprint.ToString() == normalizedFingerprint
             ? IdempotencyAcquireResult.Duplicate
             : IdempotencyAcquireResult.KeyReusedWithDifferentPayload;
-        TransactionValidationLogger.IdempotencyAcquisitionCompleted(_logger, DependencyName, result.ToString());
+        TransactionValidationLogging.IdempotencyAcquisitionCompleted(_logger, DependencyName, result.ToString());
         return result;
     }
 
@@ -98,7 +98,7 @@ public sealed class RedisIdempotencyStore : IIdempotencyStore
         }
 
         cachedResponse = JsonSerializer.Deserialize<IdempotencyCachedResponse>(responseJson!)!;
-        TransactionValidationLogger.IdempotencyCacheLookupCompleted(_logger, DependencyName, nameof(CacheOutcome.Found));
+        TransactionValidationLogging.IdempotencyCacheLookupCompleted(_logger, DependencyName, nameof(CacheOutcome.Found));
         return true;
     }
 
@@ -121,7 +121,7 @@ public sealed class RedisIdempotencyStore : IIdempotencyStore
 
         db.StringSet(fingerprintKey, normalizedFingerprint, _ttl);
         db.StringSet(ResponseKey(key), JsonSerializer.Serialize(cachedResponse), _ttl);
-        TransactionValidationLogger.IdempotencyCacheStorageCompleted(_logger, DependencyName, nameof(CacheOutcome.Stored));
+        TransactionValidationLogging.IdempotencyCacheStorageCompleted(_logger, DependencyName, nameof(CacheOutcome.Stored));
     }
 
     public void Release(string key)
@@ -134,7 +134,7 @@ public sealed class RedisIdempotencyStore : IIdempotencyStore
         var db = _connectionMultiplexer.GetDatabase();
         db.KeyDelete(FingerprintKey(key));
         db.KeyDelete(ResponseKey(key));
-        TransactionValidationLogger.IdempotencyReleaseCompleted(_logger, DependencyName, nameof(CacheOutcome.Released));
+        TransactionValidationLogging.IdempotencyReleaseCompleted(_logger, DependencyName, nameof(CacheOutcome.Released));
     }
 
     private static string FingerprintKey(string key) => $"{KeyPrefix}{EncodeKey(key)}:fingerprint";

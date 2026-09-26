@@ -60,7 +60,7 @@ public sealed class ServiceBusMessagePublisher : IMessagePublisher
         try
         {
             await _sender.SendMessageAsync(message, cancellationToken);
-            TransactionValidationLogger.MessagePublishCompleted(
+            MessagingLogging.MessagePublishCompleted(
                 _logger,
                 "AzureServiceBus",
                 envelope.CorrelationId,
@@ -69,7 +69,7 @@ public sealed class ServiceBusMessagePublisher : IMessagePublisher
         }
         catch (Exception exception)
         {
-            TransactionValidationLogger.MessagePublishFailed(
+            MessagingLogging.MessagePublishFailed(
                 _logger,
                 exception,
                 "AzureServiceBus",

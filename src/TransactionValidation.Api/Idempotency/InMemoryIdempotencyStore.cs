@@ -86,13 +86,13 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
                 var result = string.Equals(existingEntry.RequestFingerprint, normalizedFingerprint, StringComparison.Ordinal)
                     ? IdempotencyAcquireResult.Duplicate
                     : IdempotencyAcquireResult.KeyReusedWithDifferentPayload;
-                TransactionValidationLogger.IdempotencyAcquisitionCompleted(_logger, DependencyName, result.ToString());
+                TransactionValidationLogging.IdempotencyAcquisitionCompleted(_logger, DependencyName, result.ToString());
                 return result;
             }
 
             if (_entries.TryAdd(encodedKey, new IdempotencyEntry(expiresAt, normalizedFingerprint, null)))
             {
-                TransactionValidationLogger.IdempotencyAcquisitionCompleted(_logger, DependencyName, nameof(IdempotencyAcquireResult.Acquired));
+                TransactionValidationLogging.IdempotencyAcquisitionCompleted(_logger, DependencyName, nameof(IdempotencyAcquireResult.Acquired));
                 return IdempotencyAcquireResult.Acquired;
             }
         }
@@ -135,7 +135,7 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
         }
 
         cachedResponse = existingEntry.CachedResponse;
-        TransactionValidationLogger.IdempotencyCacheLookupCompleted(
+        TransactionValidationLogging.IdempotencyCacheLookupCompleted(
             _logger,
             DependencyName,
             nameof(CacheOutcome.Found));
@@ -181,7 +181,7 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
 
                 if (_entries.TryUpdate(encodedKey, updatedEntry, existingEntry))
                 {
-                    TransactionValidationLogger.IdempotencyCacheStorageCompleted(
+                    TransactionValidationLogging.IdempotencyCacheStorageCompleted(
                         _logger,
                         DependencyName,
                         nameof(CacheOutcome.Updated));
@@ -193,7 +193,7 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
 
             if (_entries.TryAdd(encodedKey, new IdempotencyEntry(expiresAt, normalizedFingerprint, cachedResponse)))
             {
-                TransactionValidationLogger.IdempotencyCacheStorageCompleted(
+                TransactionValidationLogging.IdempotencyCacheStorageCompleted(
                     _logger,
                     DependencyName,
                     nameof(CacheOutcome.Created));
@@ -211,7 +211,7 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
 
         var encodedKey = EncodeKey(key);
         _entries.TryRemove(encodedKey, out _);
-        TransactionValidationLogger.IdempotencyReleaseCompleted(
+        TransactionValidationLogging.IdempotencyReleaseCompleted(
             _logger,
             DependencyName,
             nameof(CacheOutcome.Released));

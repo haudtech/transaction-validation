@@ -56,7 +56,7 @@ public sealed class PartnerVerifierClient : IPartnerVerifier
             var response = await _httpClient.GetAsync(requestPath, cancellationToken);
             if (response.IsSuccessStatusCode)
             {
-                TransactionValidationLogger.PartnerVerificationCompleted(
+                TransactionValidationLogging.PartnerVerificationCompleted(
                     _logger,
                     PartnerApiDependencyName,
                     partnerId,
@@ -86,7 +86,7 @@ public sealed class PartnerVerifierClient : IPartnerVerifier
         }
         catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
-            TransactionValidationLogger.PartnerVerificationFailed(
+            TransactionValidationLogging.PartnerVerificationFailed(
                 _logger,
                 exception,
                 PartnerApiDependencyName,
@@ -97,7 +97,7 @@ public sealed class PartnerVerifierClient : IPartnerVerifier
         }
         catch (HttpRequestException exception)
         {
-            TransactionValidationLogger.PartnerVerificationFailed(
+            TransactionValidationLogging.PartnerVerificationFailed(
                 _logger,
                 exception,
                 PartnerApiDependencyName,
