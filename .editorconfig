@@ -1,6 +1,8 @@
 root = true
 
 [*.cs]
+
+# File and whitespace formatting
 charset = utf-8
 end_of_line = lf
 insert_final_newline = true
@@ -9,12 +11,12 @@ indent_size = 4
 trim_trailing_whitespace = true
 max_line_length = 120
 
-# Place System directives first and sort usings
+# Using directives
 dotnet_sort_system_directives_first = true
 dotnet_separate_import_directive_groups = true
 csharp_using_directive_placement = inside_namespace
 
-# C# newline formatting
+# C# layout and indentation
 csharp_new_line_before_open_brace = all
 csharp_new_line_before_else = true
 csharp_new_line_before_catch = true
@@ -30,8 +32,17 @@ csharp_indent_labels = one_less_than_current
 csharp_indent_block_contents = true
 csharp_indent_braces = false
 
-# Prefer expression-bodied members where concise
+# C# style preferences
 csharp_style_expression_bodied_methods = when_on_single_line:suggestion
 
-# Filename casing: PascalCase for types
-dotnet_naming_rule.types_should_be_pascal_case.severity = suggestion
+# Naming rules
+dotnet_naming_symbols.types.applicable_kinds = class, struct, interface, enum, delegate
+dotnet_naming_symbols.types.applicable_accessibilities = *
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+dotnet_naming_rule.types_should_be_pascal_case.symbols = types
+dotnet_naming_rule.types_should_be_pascal_case.style = pascal_case
+dotnet_naming_rule.types_should_be_pascal_case.severity = error
+
+# Analyzer severity: source-generated logging and compile-time message templates
+dotnet_diagnostic.CA1848.severity = error
+dotnet_diagnostic.CA2254.severity = error

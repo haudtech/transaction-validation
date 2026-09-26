@@ -35,8 +35,8 @@ public sealed class RabbitMqAuditConsumerService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation(
-            "Starting audit RabbitMQ consumer. Queue={QueueName}, BindingPattern={BindingPattern}",
+        RabbitMqLogging.AuditConsumerStarting(
+            _logger,
             _options.QueueName,
             _options.BindingPattern);
 
@@ -52,7 +52,7 @@ public sealed class RabbitMqAuditConsumerService : BackgroundService
             }
             catch (Exception exception)
             {
-                TransactionValidationLogger.ConsumerRetryScheduled(_logger, exception, DependencyName, ConsumerName, _options.QueueName, 2);
+                MessagingLogging.ConsumerRetryScheduled(_logger, exception, DependencyName, ConsumerName, _options.QueueName, 2);
                 await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
             }
         }
@@ -115,7 +115,7 @@ public sealed class RabbitMqAuditConsumerService : BackgroundService
                 delivery.Redelivered ? 2 : 1,
                 DateTimeOffset.UtcNow));
 
-            TransactionValidationLogger.ConsumerMessageObserved(
+            MessagingLogging.ConsumerMessageObserved(
                 _logger,
                 DependencyName,
                 ConsumerName,
@@ -127,7 +127,7 @@ public sealed class RabbitMqAuditConsumerService : BackgroundService
             if (!_options.AutoAck && _failureControl.ShouldFailBeforeAcknowledgement(ConsumerName, envelope.MessageId))
             {
                 var failure = new InvalidOperationException("Configured audit consumer failure before acknowledgement.");
-                TransactionValidationLogger.ConsumerProcessingFailed(
+                MessagingLogging.ConsumerProcessingFailed(
                     _logger,
                     failure,
                     DependencyName,

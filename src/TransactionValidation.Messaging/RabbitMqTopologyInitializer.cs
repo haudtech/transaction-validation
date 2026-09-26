@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+using TransactionValidation.Core.Logging;
+
 namespace TransactionValidation.Messaging;
 
 /// <summary>
@@ -85,10 +87,7 @@ public sealed class RabbitMqTopologyInitializer : IHostedService
                     },
                     cancellationToken);
 
-                _logger.LogInformation(
-                    "RabbitMQ exchange declared. Exchange={ExchangeName}, Type={ExchangeType}",
-                    _exchangeName,
-                    _exchangeType);
+                RabbitMqLogging.ExchangeDeclared(_logger, _exchangeName, _exchangeType);
                 return;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -97,19 +96,16 @@ public sealed class RabbitMqTopologyInitializer : IHostedService
             }
             catch (Exception exception) when (attempt < maxAttempts)
             {
-                _logger.LogWarning(
+                RabbitMqLogging.TopologyInitializationRetrying(
+                    _logger,
                     exception,
-                    "RabbitMQ topology initialization attempt {Attempt} of {MaxAttempts} failed. Retrying.",
                     attempt,
                     maxAttempts);
                 await Task.Delay(retryDelay, cancellationToken);
             }
             catch (Exception exception)
             {
-                _logger.LogError(
-                    exception,
-                    "RabbitMQ exchange declaration failed. Exchange={ExchangeName}; application startup will continue.",
-                    _exchangeName);
+                RabbitMqLogging.ExchangeDeclarationFailed(_logger, exception, _exchangeName);
             }
         }
     }

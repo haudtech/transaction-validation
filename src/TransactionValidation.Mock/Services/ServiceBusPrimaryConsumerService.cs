@@ -35,8 +35,8 @@ public sealed class ServiceBusPrimaryConsumerService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation(
-            "Starting primary Service Bus consumer. Topic={TopicName}, Subscription={SubscriptionName}, AutoComplete={AutoComplete}",
+        ServiceBusLogging.PrimaryConsumerStarting(
+            _logger,
             _options.TopicName,
             _options.SubscriptionName,
             _options.AutoComplete);
@@ -69,7 +69,7 @@ public sealed class ServiceBusPrimaryConsumerService : BackgroundService
                 args.Message.DeliveryCount,
                 DateTimeOffset.UtcNow));
 
-            TransactionValidationLogger.ConsumerMessageObserved(
+            MessagingLogging.ConsumerMessageObserved(
                 _logger,
                 DependencyName,
                 ConsumerName,
@@ -86,7 +86,7 @@ public sealed class ServiceBusPrimaryConsumerService : BackgroundService
 
         processor.ProcessErrorAsync += args =>
         {
-            TransactionValidationLogger.ConsumerProcessingFailed(
+            MessagingLogging.ConsumerProcessingFailed(
                 _logger,
                 args.Exception,
                 DependencyName,

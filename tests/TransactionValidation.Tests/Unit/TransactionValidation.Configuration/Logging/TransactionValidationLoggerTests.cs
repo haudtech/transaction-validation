@@ -22,13 +22,13 @@ public sealed class TransactionValidationLoggerTests
 
         var events = new Action[]
         {
-            () => TransactionValidationLogger.RequestReceived(logger, "corr-123", "partner-123", "ref-001"),
-            () => TransactionValidationLogger.ValidationFailed(logger, "corr-123", "partner-123", "ref-001", "invalid"),
-            () => TransactionValidationLogger.DuplicateReplayed(logger, "corr-123", "partner-123", "ref-001", "msg-123"),
-            () => TransactionValidationLogger.IdempotencyConflict(logger, "corr-123", "partner-123", "ref-001"),
-            () => TransactionValidationLogger.PartnerVerificationCompleted(logger, "corr-123", "partner-123", "ref-001", 12.5),
-            () => TransactionValidationLogger.TransactionPublished(logger, "corr-123", "partner-123", "ref-001", "msg-123", 12.5),
-            () => TransactionValidationLogger.ProcessingFailed(logger, exception, "corr-123", "partner-123", "ref-001", 12.5)
+            () => TransactionValidationLogging.RequestReceived(logger, "corr-123", "partner-123", "ref-001"),
+            () => TransactionValidationLogging.ValidationFailed(logger, "corr-123", "partner-123", "ref-001", "invalid"),
+            () => TransactionValidationLogging.DuplicateReplayed(logger, "corr-123", "partner-123", "ref-001", "msg-123"),
+            () => TransactionValidationLogging.IdempotencyConflict(logger, "corr-123", "partner-123", "ref-001"),
+            () => TransactionValidationLogging.PartnerVerificationCompleted(logger, "corr-123", "partner-123", "ref-001", 12.5),
+            () => TransactionValidationLogging.TransactionPublished(logger, "corr-123", "partner-123", "ref-001", "msg-123", 12.5),
+            () => TransactionValidationLogging.ProcessingFailed(logger, exception, "corr-123", "partner-123", "ref-001", 12.5)
         };
 
         foreach (var logEvent in events)

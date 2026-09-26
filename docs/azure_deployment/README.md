@@ -5,6 +5,7 @@ This folder contains **Azure operational runbooks** — how to set up identity, 
 Use these documents according to the task:
 
 - [Validation and shutdown runbook](validation_and_shutdown_runbook.md) — verify the running dev environment, inspect health and logs, stop/start the services, disable deployment workflows, or delete the complete resource group.
+- [Azure CLI command guide](azure_cli_command_guide.md) — command-by-command reference for authentication, resource provisioning, Bicep deployment, failure diagnosis, Container Apps operations, Service Bus recovery, and cleanup.
 - [OIDC prerequisite setup](oidc_prerequisite_setup.md) — create and configure the Entra application, federated credentials, GitHub environments, secrets, and Azure RBAC permissions. Purely procedural; reusable for future environments.
 - [OIDC workflow diagrams](oidc_workflow_diagrams.md) — visualize authentication, infrastructure preview/apply, application deployment, and runtime authorization boundaries.
 

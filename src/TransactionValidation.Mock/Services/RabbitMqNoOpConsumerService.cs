@@ -46,8 +46,8 @@ public sealed class RabbitMqNoOpConsumerService : BackgroundService
     /// <param name="stoppingToken">Token used to terminate the consumer during host shutdown.</param>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation(
-            "Starting no-op RabbitMQ consumer. Queue={QueueName}, AutoAck={AutoAck}, PollIntervalMs={PollInterval}",
+        RabbitMqLogging.PrimaryConsumerStarting(
+            _logger,
             _options.QueueName,
             _options.AutoAck,
             _options.PollIntervalMilliseconds);
@@ -64,7 +64,7 @@ public sealed class RabbitMqNoOpConsumerService : BackgroundService
             }
             catch (Exception ex)
             {
-                TransactionValidationLogger.ConsumerRetryScheduled(_logger, ex, DependencyName, ConsumerName, _options.QueueName, 2);
+                MessagingLogging.ConsumerRetryScheduled(_logger, ex, DependencyName, ConsumerName, _options.QueueName, 2);
                 await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
             }
         }
@@ -116,7 +116,7 @@ public sealed class RabbitMqNoOpConsumerService : BackgroundService
                 1,
                 DateTimeOffset.UtcNow));
 
-            TransactionValidationLogger.ConsumerMessageObserved(
+            MessagingLogging.ConsumerMessageObserved(
                 _logger,
                 DependencyName,
                 ConsumerName,

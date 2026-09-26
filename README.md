@@ -46,6 +46,14 @@ A lightweight Backend-For-Frontend (BFF) to mediate partner integrations for tra
 | CI/CD | GitHub Actions with OIDC |
 | Secrets and identity | Azure Key Vault and managed identities |
 
+## Logging Standards
+
+Production logging uses source-generated structured logging with stable event IDs and typed parameters. Logging events are organized by domain-specific catalogs for transaction processing, broker-neutral messaging, RabbitMQ, and Azure Service Bus.
+
+Direct `ILogger` extension-method calls are rejected by the repository's built-in analyzer rules. This keeps logging consistent, structured, and suitable for operational diagnostics across all solution projects.
+
+See the [Logging Standards](docs/observability/logging_standards.md) guide for the catalog structure, usage rules, event ID conventions, and validation commands.
+
 Docker Compose includes Redis for the distributed idempotency store. The API connects to `redis:6379` inside the Compose network; when the API runs on the host, use `localhost:6379` instead.
 
 ## Supported broker modes
