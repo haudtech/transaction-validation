@@ -1,8 +1,7 @@
 namespace TransactionValidation.Core.Exceptions;
 
 /// <summary>
-/// Represents an outbound timeout while contacting the upstream partner verification endpoint.
-/// This corresponds to the HTTP 408 timeout handling described in the solution analysis.
+/// Represents an upstream dependency timeout that maps to the API timeout response category.
 /// </summary>
 public sealed class UpstreamTimeoutException : Exception
 {

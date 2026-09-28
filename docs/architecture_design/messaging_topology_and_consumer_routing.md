@@ -7,8 +7,9 @@ This document defines the current messaging architecture: one published transact
 Related documents:
 
 - Primary architecture overview: [Architecture_design.md](Architecture_design.md)
-- Runtime lifecycle: [../diagram/message_processing_lifecycle_sequence.md](../diagram/message_processing_lifecycle_sequence.md)
+- Message lifecycle details: see Section 11 below
 - Idempotency semantics: [api_idempotency_flow_and_semantics.md](api_idempotency_flow_and_semantics.md)
+- Messaging behavior and implementation patterns: [../features/messaging/README.md](../features/messaging/README.md)
 
 ---
 
@@ -23,8 +24,8 @@ The runtime broker is selected by `MESSAGING__BROKERTYPE`. Both RabbitMQ and Azu
 - one accepted event is published once
 - each consumer gets its own copy or subscription view
 - the audit path is filtered to accepted events only
-- consumers deduplicate by `message-id`
-- retries remain safe because duplicate delivery is idempotent
+- each consumer acknowledges or completes its own delivery
+- redelivery is possible when processing fails before acknowledgement
 
 ---
 
@@ -56,17 +57,13 @@ The core domain model and API behavior are independent of RabbitMQ or Azure Serv
 
 ### 3.1 Broker abstraction layer
 
-The application selects one broker implementation at runtime:
+The application selects one broker implementation at runtime through the shared registration boundary:
 
 ```csharp
-if (MESSAGING__BROKERTYPE == "AzureServiceBus")
-{
-    services.AddAzureServiceBusMessagingServices(configuration);
-}
-else
-{
-    services.AddRabbitMqMessagingServices(configuration);
-}
+services.AddConfiguredBroker(
+    configuration,
+    RegisterRabbitMq,
+    RegisterAzureServiceBus);
 ```
 
 This preserves a consistent domain contract while allowing each broker to implement the same behavior using its native topology:
@@ -113,10 +110,10 @@ This creates a true multi-consumer fan-out pattern without coupling the audit pa
 
 | Resource | Owner | Notes |
 |---|---|---|
-| Exchange | Publisher/API | Shared contract surface |
+| Main and alternate exchanges | API topology initializer and primary Mock consumer | Idempotent declarations support local self-initialization |
 | Primary queue | Primary consumer | Owns its binding and consume loop |
 | Audit queue | Audit consumer | Owns accepted-only binding |
-| Alternate exchange | Broker bootstrap | Captures unroutable traffic |
+| Unrouted queue | API topology initializer and primary Mock consumer | Receives alternate-exchange traffic |
 
 The important architectural rule is that the queue is not shared. Independent consumers must each own their own queue.
 
@@ -137,9 +134,9 @@ flowchart LR
 
 ### 5.2 Routing and filtering model
 
-Azure Service Bus uses topic subscriptions instead of RabbitMQ queues. The subscription model mirrors the same business intent:
+Azure Service Bus uses topic subscriptions instead of RabbitMQ queues. Bicep provisions the topic, subscriptions, and SQL rules:
 
-- primary subscription receives all messages in the topic
+- primary subscription receives accepted, rejected, and pending event types
 - audit subscription receives only accepted events via a SQL filter such as:
 
 ```sql
@@ -152,9 +149,9 @@ This preserves the same delivery semantics as RabbitMQ, while using Azure-native
 
 | Resource | Owner | Notes |
 |---|---|---|
-| Topic | Publisher/API | Shared publish contract |
-| Primary subscription | Primary consumer | Subscription owns its message interest |
-| Audit subscription | Audit consumer | Filtered to accepted events |
+| Namespace and topic | Bicep infrastructure | Shared publish contract and private networking |
+| Primary subscription/rule | Bicep infrastructure | Accepted, rejected, and pending event types |
+| Audit subscription/rule | Bicep infrastructure | Accepted events only |
 | Processor | Consumer service | Owns receive loop and ack behavior |
 
 Like RabbitMQ, the design depends on independent subscription ownership rather than shared competing consumers.
@@ -167,9 +164,8 @@ All brokers use the same domain envelope contract regardless of transport. The m
 
 Essential envelope metadata:
 
-- `message-id`: unique event identity for deduplication and tracing
+- `message-id`: unique event identity for delivery observation and downstream deduplication if implemented
 - `correlation-id`: end-to-end tracing across processing steps
-- `transaction-id`: domain-level transaction identity
 - `event-type` or equivalent routing metadata: used for filtering and consumer selection
 
 The envelope is created in the core domain layer and is not specific to RabbitMQ or Azure Service Bus. The broker adapters translate that contract into the native message format of the current broker.
@@ -184,10 +180,9 @@ The primary path is intended for the core business processing flow.
 
 Responsibilities:
 
-- accept the transaction message
-- record processing state
-- validate downstream business semantics
-- acknowledge the message only after successful handling
+- deserialize the transaction envelope
+- record an in-memory observation for runtime tests
+- acknowledge or complete the message after recording
 
 ### 7.2 Audit consumer
 
@@ -195,16 +190,16 @@ The audit path is intentionally narrower and is only interested in accepted outc
 
 Responsibilities:
 
-- record the accepted event
-- maintain an audit trail or evidence store
-- avoid processing unrelated event types
-- acknowledge its own copy after successful recording
+- deserialize the accepted transaction envelope
+- record an independent in-memory observation for runtime tests
+- acknowledge or complete its own copy after recording
+- support a one-shot failure-before-acknowledgement test path
 
-### 7.3 Deduplication and retry safety
+### 7.3 Redelivery and idempotency boundary
 
-At-least-once delivery is the active model. Consumers therefore apply message deduplication by `message-id` before side effects.
+At-least-once redelivery is possible. The current consumers record every observed delivery and do not deduplicate by `message-id`.
 
-This mirrors the API idempotency model and prevents duplicate business writes when a delivery is retried after a temporary failure.
+Any future durable, non-idempotent side effect must add consumer-owned deduplication or another idempotent processing boundary. API idempotency does not prevent broker redelivery.
 
 ---
 
@@ -220,7 +215,7 @@ If a consumer fails before acknowledging its message:
 
 - the message remains unacknowledged
 - the broker may redeliver it after reconnect or recovery
-- the consumer must treat the duplicate as safe via idempotency checks
+- the current observation store records both deliveries
 
 ### 8.3 Consumer failure after ack
 
@@ -228,24 +223,20 @@ If the consumer acknowledges before completion, the message is not redelivered. 
 
 ### 8.4 Unroutable traffic
 
-When a message does not match any meaningful routing rule, the broker should still surface this via a dead-letter or alternate path rather than silently dropping it.
+RabbitMQ forwards unmatched routing keys to the configured alternate exchange and unrouted queue. This is not a poison-message dead-letter queue, and no basic-return warning handler is implemented.
 
-This is part of the operational safety model.
+Azure Service Bus moves repeatedly unsuccessful deliveries to its broker-managed dead-letter subqueue after the configured maximum delivery count. The application does not implement a dead-letter processor.
 
 ---
 
-## 9. Why this architecture is the current target
+## 9. Architecture Outcome
 
-This design solves the core architectural problem of the earlier single-queue model:
+This design provides:
 
 - the API does not need to know all downstream consumers
 - new consumers can be added without modifying producer code
 - the primary and audit paths are independent and recover independently
 - message flow remains portable across supported brokers
-
-This is the architecture the solution is currently designed around, and it remains valid for both RabbitMQ and Azure Service Bus.
-
----
 
 ## 10. Design constraints
 
@@ -254,12 +245,75 @@ The active architecture intentionally keeps the following constraints:
 1. No per-consumer publisher logic in the API layer.
 2. No broker-specific concepts in the core business layer.
 3. No shared competing consumer queue for independent processing paths.
-4. No business side effects without deduplication guardrails.
+4. Current consumers are observation/test services; durable non-idempotent handlers require additional deduplication.
 5. Only one broker implementation is active at runtime, selected by configuration.
+6. Service Bus filters are infrastructure-owned; consumer `Filter` option values are not applied by runtime code.
+7. Publisher completion means broker/client acceptance, not consumer completion.
 
 ---
 
-## 11. Summary
+## 11. Message processing lifecycle
+
+The message lifecycle spans the publish path, broker delivery, consumer processing, acknowledgement, and any retry or redelivery that occurs before the consumer finishes.
+
+### 11.1 Lifecycle overview
+
+1. The API receives a transaction request and validates it.
+2. The API publishes a broker message using the configured broker implementation.
+3. The broker routes the message to the relevant queue or subscription.
+4. One or more consumers receive the message independently.
+5. Each consumer processes its own message copy.
+6. The consumer acknowledges completion if the work succeeds.
+7. If processing fails before acknowledgement, the broker may redeliver the message.
+8. The API and consumers remain decoupled from each other through the broker contract.
+
+### 11.2 Publish path
+
+The producer publishes the transactional envelope using the transport-neutral contract.
+
+Key invariants:
+
+- the producer publishes once per accepted business event
+- message metadata binds the business event to routing information and consumer selection
+- publish success proves broker acceptance, not downstream consumer completion
+- the producer does not know or care which downstream consumers are attached to the topology
+
+### 11.3 Delivery and consumer processing
+
+Once published, the broker distributes the message according to the topology rules. Each consumer owns its own delivery loop:
+
+1. receive message from broker
+2. deserialize or map to the internal contract
+3. validate message semantics and routing metadata
+4. execute its local business or observation action
+5. acknowledge the delivery if processing succeeds
+
+If a consumer fails before acknowledgement, the broker may redeliver the message later. This is intentionally separate from the producer contract.
+
+### 11.4 Acknowledgement and retry
+
+Acknowledgement is the final consumer decision. A message is considered complete only when the consumer confirms successful processing.
+
+The retry behavior is therefore:
+
+- receive -> process -> acknowledge
+- failure before acknowledgement -> redelivery or retry according to broker semantics
+- downstream side effects must be designed to tolerate at-least-once semantics when applicable
+
+### 11.5 Failure boundaries
+
+The runtime lifecycle intentionally separates:
+
+- producer acceptance from consumer completion
+- transport delivery from business success
+- routing configuration from consumer behavior
+- broker retry from durable business idempotency
+
+This means the system can tolerate transient delivery and consumer-level failures without collapsing the publish path into a single synchronous success model.
+
+---
+
+## 12. Summary
 
 The current architecture is a broker-neutral, multi-consumer fan-out design. The API publishes a single message, and the broker routes it to the relevant consumers according to topology rules.
 
@@ -267,11 +321,6 @@ The current architecture is a broker-neutral, multi-consumer fan-out design. The
 - Azure Service Bus uses a topic and subscription filters.
 - Both brokers satisfy the same business contract and operational behavior.
 - The design is intentionally independent, recoverable, and extendable.
+- Message lifecycle behavior is a runtime narrative of the same architecture, not a separate competing authority.
 
-This is the active architecture and replaces the retired default-exchange baseline described in the older design notes.
-| Queue ownership | Publisher | Consumer |
-| Adding a consumer | API change + deploy | Broker binding only |
-| Failure isolation | Shared | Per-consumer DLQ |
-| Unroutable messages | Silently dropped | Captured via alternate exchange |
-
-The default-exchange approach is retained only as a rollback reference and is retired from the active publish path. The exchange-based topology is implemented and verified with two independent consumer queues.
+The active architecture uses one publication and independent broker destinations. RabbitMQ uses a topic exchange and queues; Azure Service Bus uses a topic and subscriptions. The Mock runtime verifies routing and redelivery but is not a durable business-processing or audit store.
