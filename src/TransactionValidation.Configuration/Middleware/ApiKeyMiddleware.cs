@@ -7,7 +7,7 @@ namespace TransactionValidation.Configuration.Middleware;
 
 /// <summary>
 /// Validates the configured API key header before the request reaches the controller pipeline.
-/// This enforces the security requirement described in the solution analysis for a partner-facing BFF.
+/// This enforces the partner-facing API authentication boundary.
 /// </summary>
 public sealed class ApiKeyMiddleware
 {

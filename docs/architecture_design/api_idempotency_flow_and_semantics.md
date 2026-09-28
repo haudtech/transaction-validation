@@ -1,127 +1,167 @@
 # API Idempotency Flow and Semantics
 
+Status: Active architecture reference
+
+This document is the authoritative semantic reference for request idempotency in TransactionValidation. It defines the end-to-end contract for request identity, replay handling, response replacement, store behavior, and release semantics.
+
 ## Scope
 
-This document describes the idempotency mechanism for:
-- `POST /api/v1/partner/transactions`
-- Controller: `PartnerTransactionsController.CreateAsync`
-- In-memory store: `IIdempotencyStore` and `InMemoryIdempotencyStore`
+This document covers:
 
-It explains request-to-response behavior for:
-- happy path
-- duplicate replay with cached accepted response
-- same key with different payload
-- validation/security/integration failure paths
+- `POST /api/v1/partner/transactions`
+- `PartnerTransactionsController.CreateAsync`
+- `IIdempotencyStore`
+- `InMemoryIdempotencyStore`
+- `RedisIdempotencyStore`
+- `IdempotencyStoreRegistration`
+
+It explains the rules for:
+
+- carried request identity
+- duplicate detection within the idempotency window
+- same-key/different-payload conflict handling
+- in-memory vs Redis behavior
+- response replay and replacement semantics
+- release-after-failure behavior
+- the distinction between request replay and downstream business success
 
 ---
 
 ## Objectives
 
-The idempotency mechanism exists to:
-- prevent duplicate processing within a bounded window
-- detect replay attempts where a client reuses the same key but changes request payload
-- keep behavior deterministic under retries and network uncertainty
+The idempotency mechanism exists to guarantee that the same client intent does not result in repeated business processing within a bounded retry window.
 
-Current implementation target:
-- in-memory, single-process dedupe (demo and local flow)
-- configurable dedupe window (`Idempotency:WindowMinutes`, clamped to 10-15)
-- upgrade path to durable distributed storage (for multi-instance production)
+The current model enforces four core invariants:
+
+1. the same logical request key can be retried safely
+2. the same logical key with a different payload is rejected as a contract conflict
+3. a successful accepted response can be replayed for the same key and payload during the TTL window
+4. failed attempts do not keep a stale lock longer than necessary
+
+In practice:
+
+- empty `Redis:ConnectionString` selects the local in-memory store
+- configured `Redis:ConnectionString` selects the distributed Redis-backed store
+- `Idempotency:WindowMinutes` is clamped to a bounded range and determines the replay window
+- successful accepted responses are cached and replayed in both store modes
 
 ---
 
-## End-to-End Flow (Request to Response)
+## Architecture ownership
+
+This document owns the semantic contract for idempotency.
+
+It is intentionally separate from:
+
+- the system overview in [Architecture_design.md](Architecture_design.md)
+- the broker topology in [messaging_topology_and_consumer_routing.md](messaging_topology_and_consumer_routing.md)
+- operational deployment and runbooks in [../operations](../operations/README.md)
+
+The idempotency semantics belong to the core runtime contract, not to the deployment layer.
+
+---
+
+## End-to-end lifecycle
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Client
+    participant Middleware as Correlation / API Key Middleware
     participant API as PartnerTransactionsController
     participant Validator as FluentValidation
     participant Store as IIdempotencyStore
     participant Verifier as IPartnerVerifier
     participant Publisher as IMessagePublisher
 
-    Client->>API: POST /api/v1/partner/transactions
-    API->>Validator: Validate request body
+    Client->>Middleware: POST /api/v1/partner/transactions
+    alt Middleware rejects request
+        Middleware-->>Client: 400 or 401 JSON error
+    else Middleware accepts request
+        Middleware->>API: Forward with correlation context
+        API->>Validator: Validate request body
+        alt Validation fails
+            Validator-->>API: invalid
+            API-->>Client: 400 ProblemDetails
+        else Validation passes
+            API->>API: Build idempotency key
+            API->>API: Build request fingerprint
+            API->>Store: TryAcquire(key, fingerprint, now)
 
-    alt Validation fails
-        Validator-->>API: invalid
-        API-->>Client: 400 ProblemDetails
-    else Validation passes
-        Validator-->>API: valid
-        API->>API: Build idempotency key
-        API->>API: Build request fingerprint (SHA-256)
-        API->>Store: TryAcquire(key, fingerprint, now)
-
-        alt Acquired
-            Store-->>API: Acquired
-            API->>Verifier: VerifyAsync(partnerId)
-            API->>Publisher: PublishAsync(envelope)
-            Publisher-->>API: success
-            API->>Store: StoreCachedResponse(key,fingerprint,accepted)
-            API-->>Client: 202 Accepted
-        else Duplicate
-            Store-->>API: Duplicate
-            API->>Store: TryGetCachedResponse(key,fingerprint)
-            alt Cached response found
-                Store-->>API: cached accepted payload
-                API-->>Client: 202 Accepted (replayed)
-            else No cached response
-                API-->>Client: 409 ProblemDetails (duplicate)
+            alt Acquired
+                Store-->>API: Acquired
+                API->>Verifier: VerifyAsync(partnerId)
+                alt Verification succeeds
+                    API->>Publisher: PublishAsync(envelope)
+                    alt Publication succeeds
+                        Publisher-->>API: success
+                        API->>Store: StoreCachedResponse(key, fingerprint, accepted)
+                        API-->>Client: 202 Accepted
+                    else Publication fails
+                        Publisher-->>API: exception
+                        API->>Store: Release(key)
+                        API-->>Client: mapped error response
+                    end
+                else Verification fails
+                    Verifier-->>API: exception
+                    API->>Store: Release(key)
+                    API-->>Client: 404 / 408 / 503 ProblemDetails
+                end
+            else Duplicate
+                Store-->>API: Duplicate
+                API->>Store: TryGetCachedResponse(key, fingerprint)
+                alt Cached response exists
+                    Store-->>API: cached accepted payload
+                    API-->>Client: 202 Accepted replay
+                else No cached response
+                    API-->>Client: 409 ProblemDetails
+                end
+            else Key reused with different payload
+                Store-->>API: KeyReusedWithDifferentPayload
+                API-->>Client: 409 ProblemDetails
             end
-        else KeyReusedWithDifferentPayload
-            Store-->>API: KeyReusedWithDifferentPayload
-            API-->>Client: 409 ProblemDetails (payload mismatch)
         end
     end
 ```
 
 ---
 
-## Key Construction and Fingerprint Semantics
+## 1. Request identity model
 
-### 1) Idempotency key material
+The system defines a logical request identity as a tuple of:
 
-The controller builds a logical key as:
-- If header `Idempotency-Key` exists and is not empty:
-  - `partnerId|idempotencyHeader`
-- Else:
-  - `partnerId|transactionReference`
+- partner scope
+- idempotency key or request reference
+- canonical request payload fingerprint
 
-Notes:
-- `partnerId`, header value, and `transactionReference` are trimmed.
-- Partner scope is included to reduce cross-partner collisions.
+### 1.1 Idempotency key construction
 
-### 2) Request fingerprint
+The controller builds the logical key as:
 
-A canonical payload string is generated from:
-- `partnerId` (trimmed)
-- `transactionReference` (trimmed)
-- `amount` (invariant numeric format)
-- `currency` (uppercased)
-- `timestamp` (UTC, round-trip ISO format)
+- if `Idempotency-Key` header exists and is not empty: `partnerId|idempotencyHeader`
+- otherwise: `partnerId|transactionReference`
 
-Then:
-- SHA-256 hash is computed
-- hex string is passed to the store as `requestFingerprint`
+This keeps the idempotency scope aligned with the partner and avoids cross-partner collisions.
 
-### 3) Cache key encoding
+### 1.2 Canonical fingerprint
 
-In the in-memory store, the logical key is hashed (SHA-256 hex) before dictionary usage.
-This avoids storing raw key material in cache.
+The payload fingerprint is derived from canonicalized fields such as:
 
-### 4) Cached response payload
+- `partnerId`
+- `transactionReference`
+- numeric amount in a normalized format
+- `currency` normalized to canonical casing
+- timestamp normalized to a stable UTC representation
 
-For successful acquired requests, the controller stores a cached accepted response containing:
-- `messageId`
-- `correlationId`
-- `status` (`IdempotencyCachedResponseStatus.Accepted`)
+The resulting fingerprint is a SHA-256 hex string. Identity is therefore based on both key reuse and payload equivalence, not on the raw request body alone.
 
-On duplicate requests with the same fingerprint, this cached response is replayed as `202 Accepted` when present.
+### 1.3 Store key encoding
+
+The logical key is transformed before storage. Both stores hash the logical key as a stable SHA-256 value before writing dictionary or Redis entries. This prevents raw client-supplied values from becoming the definitive storage identity.
 
 ---
 
-## Store Acquire Results
+## 2. Idempotency decision rules
 
 `IIdempotencyStore.TryAcquire` returns one of:
 
@@ -129,177 +169,171 @@ On duplicate requests with the same fingerprint, this cached response is replaye
 - `Duplicate`
 - `KeyReusedWithDifferentPayload`
 
-### Decision logic in store
+The decision is deterministic:
 
-Given `(key, fingerprint, now)`:
+1. If no existing entry exists for the key, create one and return `Acquired`.
+2. If an entry exists and the fingerprint matches, return `Duplicate`.
+3. If an entry exists and the fingerprint differs, return `KeyReusedWithDifferentPayload`.
+4. If the entry has expired, the next request may reacquire it.
 
-1. If no active entry for key:
-- add `(expiresAt, fingerprint)`
-- return `Acquired`
-
-2. If active entry exists and fingerprint matches:
-- return `Duplicate`
-
-3. If active entry exists and fingerprint differs:
-- return `KeyReusedWithDifferentPayload`
-
-4. If entry exists but is expired:
-- remove expired entry
-- retry acquisition
-
-TTL cleanup is performed periodically (every 128 acquire calls) plus lazy expiration checks on access.
+This is the core contract that prevents duplicate processing while still detecting malicious or accidental key reuse with a different payload.
 
 ---
 
-## Response Semantics
+## 3. Store model comparison
 
-### Success
-
-- Condition:
-  - request valid
-  - idempotency acquire = `Acquired`
-  - partner verification succeeds
-  - publish succeeds
-- Response:
-  - `202 Accepted`
-  - payload includes `messageId`, `correlationId`, `status`
-
-### Duplicate replay (same key, same payload)
-
-- Condition:
-  - same key reused within TTL
-  - same fingerprint
-- Response:
-  - Preferred path: `202 Accepted` with cached payload replay (`messageId`, `correlationId`, `status`)
-  - Fallback path (cache missing): `409 Conflict` via ProblemDetails with duplicate message
-
-### Conflict: key reused with different payload
-
-- Condition:
-  - same key reused within TTL
-  - different fingerprint
-- Response:
-  - `409 Conflict` via ProblemDetails
-  - message: key already used with different payload
-
-### Validation failure
-
-- Condition:
-  - validator rejects request
-- Response:
-  - `400 Bad Request` via ProblemDetails
-
-### Security failure
-
-- Condition:
-  - missing/invalid API key (middleware)
-- Response:
-  - `401 Unauthorized`
-
-### Partner verification failure
-
-- Condition:
-  - partner verify returns non-success and client throws domain exception
-- Response:
-  - `404 Not Found` via ProblemDetails when partner is unknown
-  - `408 Request Timeout` via ProblemDetails for upstream timeout category
-  - `503 Service Unavailable` via ProblemDetails for upstream unavailability category
-
-### Publish confirm failure
-
-- Condition:
-  - message publisher throws conflict on missing broker confirm
-- Response:
-  - `409 Conflict` via ProblemDetails
-
-### Unexpected runtime failure
-
-- Condition:
-  - unhandled exception
-- Response:
-  - `500 Internal Server Error` via ProblemDetails
-
----
-
-## Release-on-Failure Policy
-
-If processing fails after key acquisition (verification/publish/other exception), controller calls:
-- `Release(idempotencyKey)`
-
-Effect:
-- request may be retried immediately with same key
-- avoids long false locks for failed attempts
-
-Current trade-off:
-- this favors retryability while replaying successful accepted responses for duplicate requests.
-- failures after acquire still release the key; failed outcomes are not cached/replayed.
-- for production-grade behavior, consider storing and replaying failure outcomes where policy requires exactly-once response semantics.
-
----
-
-## Happy Case Walkthrough
-
-1. Client sends valid transaction with `Idempotency-Key`.
-2. Controller validates request.
-3. Controller builds key and payload fingerprint.
-4. Store acquires key (`Acquired`) and stores fingerprint with TTL.
-5. Partner verification succeeds.
-6. Envelope is published and confirmed.
-7. API stores accepted response in idempotency cache.
-8. API returns `202 Accepted`.
-9. Any immediate retried request with same key+payload returns the same `202 Accepted` payload from cache until TTL expires.
-
----
-
-## Edge Cases Matrix
-
-| Case | Example | Outcome |
+| Concern | In-memory store | Redis-backed store |
 |---|---|---|
-| Same key, same payload, within TTL | Retry due to client timeout | `202 Accepted` replay from cache (or `409 Duplicate` if cache missing) |
-| Same key, different payload, within TTL | Client mutates amount/currency/timestamp | `409 Conflict` (payload mismatch) |
-| No `Idempotency-Key` header | Fallback to `partnerId|transactionReference` | Normal idempotency behavior |
-| Same transactionReference under different partnerId | Multi-tenant collisions | isolated by partner scope |
-| Expired key beyond TTL | replay after window | treated as new request (`Acquired`) |
-| Failure after acquire | verifier/publisher exception | key released, retry allowed |
-| Concurrent duplicate requests | race on same key | single acquire winner; others conflict |
+| Scope | process-local | shared across API instances |
+| Concurrency | thread-safe dictionary | Redis atomic reservation with TTL |
+| Expiry | lazy expiry + periodic cleanup | Redis TTL expiration |
+| Replay | local cached accepted response | Redis cached accepted response |
+| Failure domain | single process | multi-instance and multi-replica |
+| Winner of race | first in-process acquisition | first atomic Redis reservation |
+
+### 3.1 In-memory behavior
+
+The in-memory store uses a concurrent dictionary and an expiry-check path. It is intentionally simple and appropriate for single-node local or test execution.
+
+It does not protect against multi-instance duplicates. That is why the Redis-backed store exists for a shared runtime environment.
+
+### 3.2 Redis behavior
+
+The Redis-backed store uses atomic reservation semantics with a TTL so that multiple API instances cannot both claim the same key. This provides stronger cross-process safety for duplicate requests arriving simultaneously.
+
+The Redis store stores:
+
+- reservation metadata keyed by a hashed request key
+- a fingerprint value to assess same-payload vs payload-conflict semantics
+- a cached accepted response for replaying successful results
 
 ---
 
-## Configuration
+## 4. Response replacement semantics
 
-`IdempotencyOptions` binds from section:
+The system must distinguish between a new accepted result and a replay of an already accepted result.
 
-```json
-"Idempotency": {
-  "WindowMinutes": 15
-}
-```
+### 4.1 Successful first attempt
 
-Runtime behavior:
-- configured value is clamped to `10..15` minutes
-- default is 15 when not provided
+A request is treated as accepted when all of the following succeed:
+
+- request validated
+- idempotency key acquired
+- partner verification succeeds
+- message publish succeeds
+
+The controller stores the accepted response and returns `202 Accepted`.
+
+### 4.2 Same key, same payload replay
+
+A later request with the same logical key and matching fingerprint is treated as a replay.
+
+The controller returns the cached accepted response instead of re-processing the message. The response is semantically the same as the original result:
+
+- same `messageId`
+- same `correlationId`
+- same status
+
+This is the replacement behavior for request retries due to network uncertainty or client timeout.
+
+### 4.3 Same key, different payload conflict
+
+A later request with the same logical key but a different fingerprint is rejected as a contract conflict.
+
+This preserves deterministic semantics and prevents one payload variant from silently replacing another intentionally different request under the same key.
+
+The response is `409 Conflict` and indicates the key has already been used for a different payload.
+
+### 4.4 Cache-miss fallback
+
+If a duplicate request is detected but the accepted response cache is missing, the system returns `409 Conflict` rather than pretending the previous request succeeded. This is a fail-safe guard that avoids replaying unproven results.
 
 ---
 
-## Security and Policy Notes
+## 5. Failure and release semantics
 
-Current controls:
-- raw key is not stored directly in the dictionary (encoded key used)
-- payload mismatch detection is explicit
-- partner scoping is embedded in key material
+The idempotency key is acquired before expensive operations such as partner verification and message publication. If a later step fails, the key must be released so the system can retry without a stale lock.
 
-Recommended next hardening:
-- add key length limits and character-policy validation on `Idempotency-Key`
-- return explicit ProblemDetails error codes for duplicate vs mismatch
-- persist idempotency state in durable storage (Redis/DB) for multi-instance deployments
-- cache and replay additional response classes as needed for stricter idempotency policies
+### 5.1 Release-after-failure behavior
+
+When verification or publication throws, the controller releases the key. This means:
+
+- the request may safely be retried by the client
+- the key does not remain locked for the TTL window after an unsuccessful outcome
+- only successful accepted responses are replayed
+
+### 5.2 No replay of failed attempts
+
+A failed request is not replaced with a cached success response. Failed outcomes are never replayed as though they were accepted work.
+
+### 5.3 Limits of the guarantee
+
+This mechanism protects against duplicate request execution at the API layer. It does not guarantee that downstream external side effects are themselves deduplicated. Consumer-side idempotency remains a separate concern if a later processing stage performs non-idempotent writes.
 
 ---
 
-## Related Implementation Files
+## 6. Expiry and TTL behavior
+
+The idempotency TTL is configured through `IdempotencyOptions` and bounded to a practical range. Within that window:
+
+- the same key and fingerprint are treated as a replay
+- the accepted response may be reused
+- the same key with a different payload is treated as a conflict
+
+Outside that window:
+
+- the key is considered expired
+- a new request may acquire the key again
+
+This makes the replay semantics bounded and deterministic, while still allowing safe retry windows after a successful accepted outcome.
+
+---
+
+## 7. Complete decision matrix
+
+| Condition | Result |
+|---|---|
+| no existing key | `Acquired` |
+| existing key + same fingerprint | `Duplicate` |
+| existing key + different fingerprint | `KeyReusedWithDifferentPayload` |
+| validation failure before acquire | `400 Bad Request` |
+| invalid API key | `401 Unauthorized` |
+| correlation-id invalid | `400 Bad Request` |
+| partner verification fails | mapped domain error |
+| message publication fails after acquire | key released; mapped error |
+| successful accepted response exists within TTL | replay `202 Accepted` |
+| expired key beyond TTL | request may re-enter as a new acquire |
+
+---
+
+## 8. Security and correctness boundaries
+
+The current model has the following explicit guards:
+
+- logical key is not used directly as the final persisted storage identity
+- payload mismatch is enforced with a fingerprint comparison
+- partner scope is included in the logical key
+- successful accepted responses are cached, not failed or speculative ones
+- API-level replay is bounded and never substitutes for durable consumer-side deduplication
+
+The current design does not attempt to fully deduplicate every downstream side effect; it guarantees consistent request-level behavior at the API boundary.
+
+---
+
+## 9. Related implementation files
 
 - `src/TransactionValidation.Api/Controllers/PartnerTransactionsController.cs`
 - `src/TransactionValidation.Api/Idempotency/IIdempotencyStore.cs`
 - `src/TransactionValidation.Api/Idempotency/InMemoryIdempotencyStore.cs`
-- `src/TransactionValidation.Api/Program.cs`
+- `src/TransactionValidation.Api/Idempotency/RedisIdempotencyStore.cs`
+- `src/TransactionValidation.Api/Idempotency/IdempotencyStoreRegistration.cs`
 - `src/TransactionValidation.Configuration/Options/IdempotencyOptions.cs`
+- `src/TransactionValidation.Configuration/Options/RedisOptions.cs`
+
+## Related documentation
+
+- [Architecture_design.md](Architecture_design.md)
+- [messaging_topology_and_consumer_routing.md](messaging_topology_and_consumer_routing.md)
+- [../features/distributed-state/README.md](../features/distributed-state/README.md)
+- [../features/validation-and-security/README.md](../features/validation-and-security/README.md)
+- [../features/runtime-and-api/README.md](../features/runtime-and-api/README.md)

@@ -1,219 +1,75 @@
-# TransactionValidation — Partner Integration BFF
+# TransactionValidation - Partner Integration BFF
 
-A lightweight Backend-For-Frontend (BFF) to mediate partner integrations for transaction verification and routing.
+TransactionValidation is a Backend-for-Frontend platform that receives transaction submissions from external partners, verifies that each request can be accepted, and routes accepted transactions to independent downstream consumers.
+
+## Platform Purpose
+
+The platform provides a controlled boundary between partner-facing HTTP traffic, an external partner-verification dependency, and asynchronous internal processing. It keeps transport and infrastructure choices behind stable application contracts so the transaction flow remains consistent across local and Azure environments.
+
+## Request Orchestration
+
+For each transaction submission, the platform:
+
+1. **Authenticate and validate:** Verifies the calling partner and validates the request contract.
+2. **Protect against duplicates:** Applies idempotency so safe retries replay the accepted result while conflicting payload reuse is rejected.
+3. **Verify the partner:** Calls the external verification service through bounded resilience policies.
+4. **Create and publish:** Builds a correlated transaction envelope and publishes it through the active message broker.
+5. **Confirm acceptance:** Returns an accepted response only after the broker success boundary is reached.
+6. **Route independently:** Delivers copies to primary and audit consumers according to broker routing rules.
+
+If processing fails before acceptance, the platform returns a predictable API outcome and releases the idempotency claim so a valid retry can proceed.
+
+## Testing and Quality
+
+Quality is established through complementary validation levels:
+
+| Quality layer | Description |
+|---|---|
+| Unit tests | Cover domain validation, idempotency stores, resilience behavior, exception mapping, message publication, and structured logging contracts. |
+| Integration tests | Execute the ASP.NET Core host to verify middleware, dependency registration, authentication, idempotency, and API response behavior. |
+| End-to-end tests | Exercise containerized services, real network boundaries, broker routing, independent consumers, selective delivery, and redelivery. |
+| Automated gates | Verify formatting, compilation, unit and integration behavior, and coverage before changes are accepted. |
+| Coverage policy | Enforces an 80% target for the filtered business and application logic included in the repository coverage policy. |
+
+End-to-end validation remains separate from code coverage because it measures deployed runtime and infrastructure confidence rather than in-process line coverage.
+
+## Observability and Operations
+
+The platform emits correlated application and dependency signals for troubleshooting failures and measuring request-path performance.
+
+| Signal | Implemented behavior |
+|---|---|
+| Structured logs | Source-generated events use stable event IDs and typed properties for transaction processing, partner verification, idempotency, publishing, broker topology, and consumer outcomes. |
+| Correlation | A validated or generated correlation ID is added to the request logging scope and trace, returned with accepted responses, and propagated through transaction envelopes and broker metadata. |
+| Traces | OpenTelemetry instruments incoming ASP.NET Core requests and outbound HTTP dependencies for the API and Mock services. |
+| Metrics | OpenTelemetry records ASP.NET Core and outbound HTTP measurements, with console export available for local diagnostics. |
+| Performance timing | Structured events record elapsed time for partner verification, transaction processing, and message publication. |
+| Health checks | The API health endpoint reports publisher registration and Redis reachability when distributed idempotency is configured; the Mock service exposes a basic host health endpoint. |
+| Azure telemetry | Infrastructure provisions Log Analytics and workspace-based Application Insights; application telemetry is exported through Azure Monitor when its connection string is supplied. |
+
+The current implementation does not claim application dashboards, alerting rules, service-level objectives, or broker-consumer trace spans.
+
+## Operating Modes
+
+Local execution uses containerized application services and local infrastructure for development and end-to-end validation. Azure execution uses managed messaging, distributed idempotency, container hosting, centralized observability, managed identities, and protected delivery workflows.
+
+Only one messaging implementation is active in a deployment, while the API contract, transaction envelope, idempotency semantics, and consumer responsibilities remain consistent.
 
 ## Technology Stack
 
-### Coding and Runtime
-
-| Area | Stack |
+| Domain | Technologies and techniques |
 |---|---|
-| Runtime / Framework | .NET 8 (`net8.0`) |
-| API | ASP.NET Core Web API |
-| API documentation | Swagger / OpenAPI (`Swashbuckle.AspNetCore`) |
-| Validation | FluentValidation |
-| Security | API key authentication (`X-API-Key` middleware) |
-| Idempotency | `Idempotency-Key` support with in-memory or Redis-backed TTL dedupe, cached `202 Accepted` replay, and conflict on payload mismatch |
-| Error handling | ASP.NET Core `IExceptionHandler` + RFC 7807 `ProblemDetails` mapping |
-| Resilience | `Microsoft.Extensions.Http.Resilience` (Polly-based pipelines) |
-| Messaging | RabbitMQ (`RabbitMQ.Client`) or Azure Service Bus (`Azure.Messaging.ServiceBus`), selected by `MESSAGING__BROKERTYPE` |
-| Observability | Serilog, OpenTelemetry, optional Azure Monitor exporter, and source-generated structured logging via `LoggerMessage` |
-| Configuration | `appsettings*.json`, environment variables, `DotNetEnv` |
-| Architecture | Multi-project solution (`Api`, `Configuration`, `Core`, `Integration`, `Messaging`, `Mock`, `Tests`) |
-
-### Testing and Quality
-
-| Area | Stack / Practice |
-|---|---|
-| Unit testing | xUnit, Moq, FluentAssertions |
-| Integration testing | ASP.NET Core `WebApplicationFactory<Program>` |
-| E2E testing | Docker Compose runtime smoke tests |
-| Coverage collection | `coverlet.collector` with Cobertura XML |
-| Coverage reporting | `dotnet-reportgenerator-globaltool` with HTML, Markdown, and text reports |
-| Coverage target | At least 80% for filtered business and application logic |
-| Quality gates | Format verification, solution build, unit tests, and split unit/integration coverage workflows |
-
-### Deployment and Operations
-
-| Area | Stack / Practice |
-|---|---|
-| Containerization | Docker, Docker Compose |
-| Local infrastructure | RabbitMQ and Redis |
-| Cloud messaging | Azure Service Bus |
-| Distributed idempotency | Azure Cache for Redis |
-| Cloud runtime | Azure Container Apps |
-| Infrastructure as code | Bicep |
-| CI/CD | GitHub Actions with OIDC |
-| Secrets and identity | Azure Key Vault and managed identities |
-
-## GitHub Actions CI/CD
-
-GitHub Actions provides the path from pull request validation to the Azure deployment environment. Azure deployment authorization is an external security control provided by GitHub OIDC, Microsoft Entra federated credentials, Azure RBAC, and protected GitHub Environments; it is not implemented by the application source code.
-
-- CI and integration workflows validate code quality, tests, coverage, and formatting.
-- Infrastructure changes receive a Bicep preview before approved changes are applied.
-- Application changes build and deploy API and Mock container images to Azure.
-- GitHub OIDC provides short-lived workflow authentication without storing an Azure client secret in the repository.
-
-See the detailed [OIDC workflow diagrams](docs/azure_deployment/oidc_workflow_diagrams.md), [OIDC prerequisite setup](docs/azure_deployment/oidc_prerequisite_setup.md), and [Azure deployment documentation](docs/azure_deployment/README.md) for workflow triggers, approvals, identity, RBAC, secrets, and operational controls.
-
-## Logging Standards
-
-Production logging uses source-generated structured logging with stable event IDs and typed parameters. Logging events are organized by domain-specific catalogs for transaction processing, broker-neutral messaging, RabbitMQ, and Azure Service Bus.
-
-Direct `ILogger` extension-method calls are rejected by the repository's built-in analyzer rules. This keeps logging consistent, structured, and suitable for operational diagnostics across all solution projects.
-
-See the [Logging Standards](docs/observability/logging_standards.md) guide for the catalog structure, usage rules, event ID conventions, and validation commands.
-
-Docker Compose includes Redis for the distributed idempotency store. The API connects to `redis:6379` inside the Compose network; when the API runs on the host, use `localhost:6379` instead.
-
-## Supported broker modes
-
-The solution supports two runtime messaging modes:
-
-- `RabbitMq` — local default for Docker-based development and validation
-- `AzureServiceBus` — Azure Service Bus topic/subscription mode for cloud validation and deployment
-
-Only one broker implementation is active at a time, selected by the `MESSAGING__BROKERTYPE` environment variable.
-
-## Architecture Overview (Sequence)
-
-Primary architecture overview: [docs/architecture_design/Architecture_design.md](docs/architecture_design/Architecture_design.md)
-
-Messaging topology and routing: [docs/architecture_design/messaging_topology_and_consumer_routing.md](docs/architecture_design/messaging_topology_and_consumer_routing.md)
-
-Message lifecycle and runtime flow: [docs/diagram/message_processing_lifecycle_sequence.md](docs/diagram/message_processing_lifecycle_sequence.md)
-
-```mermaid
-sequenceDiagram
-	autonumber
-	participant P as Partner/Client
-	participant API as TransactionValidation API
-	participant Auth as API Key Middleware
-	participant Cache as Idempotency Store
-	participant Validator as Request Validator
-	participant Verifier as PartnerVerifier
-	participant Mock as MockPartnerVerification
-	participant Publisher as MessagePublisher
-	participant MQ as RabbitMQ
-	participant Primary as Primary Consumer
-	participant Audit as Audit Consumer
-
-	P->>API: POST /api/v1/partner/transactions
-	API->>Auth: Validate X-API-Key
-	Auth-->>API: Authorized
-	API->>Validator: Validate payload
-	Validator-->>API: OK / ValidationError
-	alt Invalid payload
-		API-->>P: 400 Bad Request
-	else Valid payload
-		API->>API: Build idempotency key
-		Note over API: Use Idempotency-Key header when present,\notherwise fallback to partnerId|transactionReference
-		API->>API: Build request fingerprint
-		API->>Cache: TryAcquire(key, fingerprint)
-		alt Duplicate same key and same payload
-			Cache-->>API: Duplicate
-			API->>Cache: TryGetCachedResponse(key, fingerprint)
-			alt Cached accepted response exists
-				Cache-->>API: messageId + correlationId + status
-				API-->>P: 202 Accepted (replayed cached response)
-			else Cache entry missing response
-				Cache-->>API: No cached response
-				API-->>P: 409 Conflict
-			end
-		else Same key reused with different payload
-			Cache-->>API: KeyReusedWithDifferentPayload
-			API-->>P: 409 Conflict
-		else Fresh request acquired
-			Cache-->>API: Acquired
-			API->>Verifier: Verify(partnerId)
-			Verifier->>Mock: Call mock verification endpoint
-			Mock-->>Verifier: Verified / failure
-			alt Verified
-				Verifier-->>API: Verified
-				API->>Publisher: Publish internal envelope
-				Publisher->>MQ: Publish persistent message to partner.transactions + wait confirms
-				MQ-->>Publisher: Ack
-				Publisher-->>API: Published
-				MQ->>Primary: Copy to partner-transactions
-				Primary-->>MQ: Ack
-				MQ->>Audit: Copy to partner-transactions.audit when binding matches
-				Audit-->>MQ: Ack
-				API->>Cache: StoreCachedResponse(key, fingerprint, accepted response)
-				API-->>P: 202 Accepted
-			else Verification failed
-				Verifier-->>API: NotFound / Timeout / ServiceUnavailable
-				API->>Cache: Release(key)
-				API-->>P: 404 / 408 / 503 ProblemDetails
-			end
-		end
-	end
-```
-
-
-## Coverage and Test Reports
-
-Coverage is separated by test level. Unit and integration tests produce Cobertura-based coverage reports; E2E remains a runtime validation workflow and produces TRX results rather than a coverage report.
-
-| Goal | Task | Scope | Output |
-|---|---|---|---|
-| Unit coverage | `test:coverage:unit:full` | Business and application logic | `TestResults/coverage/report` |
-| Integration coverage | `test:coverage:integration:full` | API host, middleware, health checks, and component boundaries | `TestResults/coverage/integration-report` |
-| Combined coverage | `test:coverage:full` | Unit and integration Cobertura data with business-logic filters | `TestResults/coverage/combined-report` |
-| E2E runtime validation | `test:e2e` | Docker, Redis, RabbitMQ, API, Mock, and network behavior | `TestResults/e2e/e2e-tests.trx` |
-| Full quality workflow | `quality:full` | Format verification, build, and complete coverage | Coverage reports plus build/format results |
-
-The combined report is the authoritative overall coverage result. Do not average unit and integration percentages manually.
-
-E2E is intentionally separate from `test:coverage:full`: it validates the real container and broker runtime but is not collected as Cobertura coverage.
-
-The separate `test:integration:trx` task should only be run when a dedicated integration TRX/Markdown execution report is required, because it executes the integration tests independently from coverage.
-
-## Quick local run
-
-```bash
-# build the solution
-dotnet build --nologo -m:1 TransactionValidation.sln
-```
-
-Environment setup
-```bash
-cp .env.example .env
-# then set MESSAGING__BROKERTYPE to RabbitMq or AzureServiceBus
-# and configure the matching broker settings in .env
-```
-
-Docker compose run
-```bash
-docker compose up --build
-```
-
-Service endpoints when Compose is running:
-
-- API: `http://localhost:${API_HOST_PORT:-5000}`
-- Mock partner verification API and consumer observations: `http://localhost:5002`
-- RabbitMQ management: `http://localhost:15672`
-- Redis: internal Compose service at `redis:6379`
-- Azure Service Bus: configured remotely through the selected namespace/connection string
-
-The repository README is the entry point for implementation, workflow, and architecture documentation.
+| Runtime and API | .NET 8, ASP.NET Core Web API, Swagger/OpenAPI |
+| Validation and security | FluentValidation, API-key authentication, RFC 7807 ProblemDetails |
+| Reliability | HTTP resilience pipelines, retry, timeout, circuit breaker, idempotency |
+| Messaging | RabbitMQ, Azure Service Bus, topic-based fan-out, independent consumers |
+| Distributed state | Redis, Azure Cache for Redis |
+| Observability | Serilog, source-generated logging, OpenTelemetry, Azure Monitor, Application Insights, Log Analytics |
+| Testing and quality | xUnit, Moq, FluentAssertions, WebApplicationFactory, Coverlet, ReportGenerator, Codecov |
+| Local platform | Docker, Docker Compose |
+| Azure platform | Container Apps, Key Vault, managed identities, private networking |
+| Infrastructure and delivery | Bicep, GitHub Actions, OpenID Connect |
 
 ## Documentation
 
-Start here: [docs/README.md](docs/README.md)
-
-Azure deployment entry point: [docs/azure_deployment/README.md](docs/azure_deployment/README.md)
-
-The documentation set includes architecture, topology, and runtime sequence references for both broker implementations.
-
-## Requirement to Implementation Traceability
-
-Requirement-to-implementation review summary: [docs/analysis/requirement_to_implementation_traceability_summary.md](docs/analysis/requirement_to_implementation_traceability_summary.md)
-
-Latest integration test summary report: [TestResults/integration/integration-tests-summary.md](TestResults/integration/integration-tests-summary.md)
-
-The detailed documentation map, contribution workflow, and topic navigation live in the docs index so the project README stays focused on the codebase and the primary entrypoint.
-
-## License
-
-- TBD
+Use the [documentation index](docs/README.md) for architecture, API behavior, reliability, messaging, observability, testing, development, CI/CD, and Azure operations.

@@ -2,7 +2,6 @@ namespace TransactionValidation.Configuration.Options;
 
 /// <summary>
 /// Telemetry configuration for traces and metrics emitted by the BFF.
-/// It aligns with the observability recommendations in the architecture design and solution analysis docs.
 /// </summary>
 public sealed class OpenTelemetryOptions
 {

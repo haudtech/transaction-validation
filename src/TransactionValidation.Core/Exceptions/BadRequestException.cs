@@ -1,8 +1,7 @@
 namespace TransactionValidation.Core.Exceptions;
 
 /// <summary>
-/// Signals a client input problem, mapped to HTTP 400 by the global exception handler.
-/// This follows the validation failure handling described in the solution analysis.
+/// Represents a request that fails input or request-boundary validation and maps to HTTP 400.
 /// </summary>
 public sealed class BadRequestException : Exception
 {

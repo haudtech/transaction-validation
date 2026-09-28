@@ -2,7 +2,7 @@ namespace TransactionValidation.Api.Idempotency;
 
 /// <summary>
 /// Describes whether a request was newly accepted, replayed as a duplicate, or rejected because the same idempotency key was reused with different payload data.
-/// This contract supports the duplicate-retry safeguards described in the solution analysis and architecture design.
+/// This contract supports the API's duplicate-retry and payload-conflict safeguards.
 /// </summary>
 public enum IdempotencyAcquireResult
 {
@@ -29,7 +29,7 @@ public sealed record IdempotencyCachedResponse(
 
 /// <summary>
 /// Stores transient idempotency entries for in-flight or recently accepted transaction submissions.
-/// This component is part of the BFF's replay protection described in docs/analysis/solution_analysis.md.
+/// Implementations preserve duplicate replay and payload-conflict semantics for either local or distributed state.
 /// </summary>
 public interface IIdempotencyStore
 {
