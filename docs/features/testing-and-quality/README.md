@@ -106,6 +106,17 @@ Files under `TestResults/` and CI coverage directories are generated artifacts. 
 
 ## Implementation Pattern Rules
 
+### Governance rule traceability
+
+These rule IDs identify applicable coding requirements; the linked governance catalog owns the normative text and reusable C# examples. Each approved-pattern link points to a domain-specific implementation/code example showing how this feature applies the rule.
+
+| Rule | Applicability and implementation | Approved feature pattern/code evidence | Verification evidence | Exception |
+|---|---|---|---|---|
+| [CS-TEST-01 — Test observable behavior at the owning boundary](../../governance/coding/coding_standards.md) | Applies to behavior changes; unit, host-integration, and E2E categories target their relevant boundaries. | [Test public behavior with deterministic dependencies](#pattern-test-public-behavior-with-deterministic-dependencies); [Exercise the real host for boundary integration](#pattern-exercise-the-real-host-for-boundary-integration); [Reserve E2E for runtime boundaries](#pattern-reserve-e2e-for-runtime-boundaries). | Test tasks/workflows and the corresponding unit, integration, and E2E suites. | N/A |
+| [CS-TEST-02 — Make failure scenarios deterministic and safely scoped](../../governance/coding/coding_standards.md) | Applies to rare/timing-sensitive failures; host tests use deterministic dependencies and runtime controls stay in Mock support. | [Deterministic dependency tests](#pattern-test-public-behavior-with-deterministic-dependencies); [Mock failure controls](../messaging/README.md#pattern-keep-observation-and-failure-controls-test-only). | Deterministic Mock timeout tests; E2E redelivery and observation-control tests. | N/A |
+| [CS-TEST-03 — Exercise host integration boundaries without replacing the host](../../governance/coding/coding_standards.md) | Applies to hosted .NET applications; API integration tests retain the production host/middleware pipeline and replace only external dependencies. | [Exercise the real host for boundary integration](#pattern-exercise-the-real-host-for-boundary-integration). | `ApiHostTestFactory`; API integration test suite. | N/A |
+| [CS-TEST-04 — Reserve E2E tests for critical runtime contracts](../../governance/coding/coding_standards.md) | Applies when runtime topology/network/infrastructure behavior cannot be proven in-process; this repo E2E uses Docker Compose and real HTTP/broker paths. | [Reserve E2E for runtime boundaries](#pattern-reserve-e2e-for-runtime-boundaries); [E2E runtime matrix](../../operations/testing/test/e2e_runtime_matrix.md). | E2E smoke suite and runtime prerequisites; no GitHub E2E workflow currently exists. | N/A |
+
 ### Pattern: Select unit tests by excluding external categories
 
 - **Applies to** - default local and CI unit execution; test-specific.
@@ -175,8 +186,8 @@ public async Task Request_WhenBoundaryCondition_ReturnsExpectedResponse()
 
 - **Applies to** - container/broker E2E tests; environment-specific.
 - **Intent** - detect failures that in-memory host tests cannot observe.
-- **Rule** - E2E tests MUST use `Category=E2E`, real HTTP calls, and the selected real broker path. Scenarios SHOULD remain focused on startup, network/configuration wiring, accepted flow, idempotency replay, routing, independent consumers, and redelivery.
-- **Approved code shape**:
+- **Rule** - E2E tests MUST use `Category=E2E` and exercise real externally observable behavior. When testing repository-owned multi-service topology that Compose can provide, tests MUST prefer Docker Compose and the real required services/network/broker path rather than replace those services with mocks. Scenarios SHOULD remain focused on startup, network/configuration wiring, accepted flow, idempotency replay, routing, independent consumers, and redelivery. Cloud-specific E2E that cannot be represented locally MUST document its external prerequisites and is not implicitly part of CI.
+- **Approved code shape** - start the Compose topology, call the actual API, and assert the dependent service's observable effect:
 
 ```csharp
 [Trait("Category", "E2E")]

@@ -29,4 +29,4 @@ The `apply` job is protected by the `azure-infra` environment and should remain 
 
 - [deploy_azure_workflow.md](deploy_azure_workflow.md)
 - [../../azure_deployment/README.md](../../azure_deployment/README.md)
-- [../../features/infrastructure-and-delivery/README.md](../../features/infrastructure-and-delivery/README.md)
+- [../../../../features/infrastructure-and-delivery/README.md](../../../../features/infrastructure-and-delivery/README.md)

@@ -102,5 +102,5 @@ Replace it with the appropriate source-generated catalog event.
 
 ## Related Documentation
 
-- [Observability feature](../features/observability/README.md)
-- [Repository architecture rules](../implementation/repo_architecture_rules.md)
+- [Observability feature](../../features/observability/README.md)
+- [Repository architecture rules](../../governance/coding/repository_architecture_rules.md)

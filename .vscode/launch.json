@@ -11,7 +11,10 @@
       "stopAtEntry": false,
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "http://localhost:5080"
+        "ASPNETCORE_URLS": "http://localhost:5080",
+        "RabbitMq__HostName": "127.0.0.1",
+        "RabbitMq__Port": "5672",
+        "PartnerVerification__BaseUrl": "http://localhost:5081/"
       },
       "justMyCode": true,
       "console": "internalConsole"
@@ -26,7 +29,11 @@
       "stopAtEntry": false,
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "http://localhost:5081"
+        "ASPNETCORE_URLS": "http://localhost:5081",
+        "RabbitMqConsumer__HostName": "127.0.0.1",
+        "RabbitMqConsumer__Port": "5672",
+        "RabbitMqAuditConsumer__HostName": "127.0.0.1",
+        "RabbitMqAuditConsumer__Port": "5672"
       },
       "justMyCode": true,
       "console": "internalConsole"

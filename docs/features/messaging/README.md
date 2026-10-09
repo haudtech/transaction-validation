@@ -124,6 +124,19 @@ Service Bus processors log errors through `ProcessErrorAsync`, remain active unt
 
 ## Implementation Pattern Rules
 
+### Governance rule traceability
+
+These rule IDs identify applicable coding requirements; the linked governance catalog owns the normative text and reusable C# examples. Each approved-pattern link points to a domain-specific implementation/code example showing how this feature applies the rule.
+
+| Rule | Applicability and implementation | Approved feature pattern/code evidence | Verification evidence | Exception |
+|---|---|---|---|---|
+| [CS-EXT-01 — Keep external protocol and SDK details inside adapters](../../governance/coding/coding_standards.md) | Applies to broker publication; adapters translate the shared envelope and own SDK resource behavior. | [Publish through a transport-neutral contract](#pattern-publish-through-a-transport-neutral-contract); [Send Service Bus messages through a reusable sender](#pattern-send-service-bus-messages-through-a-reusable-sender). | RabbitMQ and Service Bus publisher/adapter tests. | N/A |
+| [CS-CFG-01 — Bind and validate configuration at the composition boundary](../../governance/coding/coding_standards.md) | Applies to broker selection/options; unsupported selection fails during registration. | [Select one broker at composition time](#pattern-select-one-broker-at-composition-time). | `BrokerRegistrationExtensionsTests`; Azure-broker startup integration test. | N/A |
+| [CS-MSG-01 — Design message consumers for independent at-least-once delivery](../../governance/coding/coding_standards.md) | Applies to broker consumers; independent destinations preserve fan-out and handlers account for redelivery. | [Give independent consumers independent destinations](#pattern-give-independent-consumers-independent-destinations); [Complete only after successful handling](#pattern-complete-only-after-successful-handling). | E2E fan-out, selective-routing, and redelivery tests. | N/A |
+| [CS-OBS-01 — Propagate context while minimizing sensitive telemetry](../../governance/coding/coding_standards.md) | Applies to message identity and broker metadata; sensitive request values are excluded. | [Preserve envelope identity across transports](#pattern-preserve-envelope-identity-across-transports). | Publisher metadata tests; E2E identity assertions. | N/A |
+| [CS-TEST-01 — Test observable behavior at the owning boundary](../../governance/coding/coding_standards.md) | Applies to publisher logic and broker topology/delivery. | [Publisher unit tests](#pattern-publish-through-a-transport-neutral-contract); [broker runtime topology tests](#pattern-give-independent-consumers-independent-destinations). | Publisher unit tests and broker E2E tests. | N/A |
+| [CS-TEST-02 — Make failure scenarios deterministic and safely scoped](../../governance/coding/coding_standards.md) | Applies to failure-before-acknowledgement; controls are in Mock-host support, not the partner API. | [Keep observation and failure controls test-only](#pattern-keep-observation-and-failure-controls-test-only). | E2E audit-redelivery and consumer-isolation tests. | N/A |
+
 ### Pattern: Select one broker at composition time
 
 - **Applies to** - API publisher and Mock consumers; cross-cutting.
@@ -392,8 +405,8 @@ RabbitMQ primary and audit consumers use separate `RabbitMqConsumer` and `Rabbit
 
 ## Related Supporting Documents
 
-- [Architecture design overview](../architecture_design/Architecture_design.md)
-- [Messaging topology and consumer routing](../architecture_design/messaging_topology_and_consumer_routing.md)
-- [Message processing lifecycle](../architecture_design/messaging_topology_and_consumer_routing.md#11-message-processing-lifecycle)
+- [Architecture design overview](../../architecture/Architecture_design.md)
+- [Messaging topology and consumer routing](../../architecture/messaging_topology_and_consumer_routing.md)
+- [Message processing lifecycle](../../architecture/messaging_topology_and_consumer_routing.md#11-message-processing-lifecycle)
 - [Runtime and API](../runtime-and-api/README.md)
 - [Reliability](../reliability/README.md)

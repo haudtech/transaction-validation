@@ -46,4 +46,4 @@ The job uses `environment: azure-dev`, which allows environment protections to b
 
 - [infra_workflow.md](infra_workflow.md)
 - [../../azure_deployment/README.md](../../azure_deployment/README.md)
-- [../../features/infrastructure-and-delivery/README.md](../../features/infrastructure-and-delivery/README.md)
+- [../../../../features/infrastructure-and-delivery/README.md](../../../../features/infrastructure-and-delivery/README.md)

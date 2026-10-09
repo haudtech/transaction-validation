@@ -72,6 +72,18 @@ Middleware responses and exception-handler responses intentionally have differen
 
 ## Implementation Pattern Rules
 
+### Governance rule traceability
+
+These rule IDs identify applicable coding requirements; the linked governance catalog owns the normative text and reusable C# examples. Each approved-pattern link points to a domain-specific implementation/code example showing how this feature applies the rule.
+
+| Rule | Applicability and implementation | Approved feature pattern/code evidence | Verification evidence | Exception |
+|---|---|---|---|---|
+| [CS-CFG-01 — Bind and validate configuration at the composition boundary](../../governance/coding/coding_standards.md) | Applies to API-key behavior driven by bound options and shared host registration. | [Middleware-owned API-key gate](#pattern-middleware-owned-api-key-gate). | `ApiKeyMiddlewareTests`; API security host tests. | N/A |
+| [CS-FLOW-01 — Validate before side effects and make state transitions explicit](../../governance/coding/coding_standards.md) | Applies to partner requests; validation runs before idempotency acquisition, verification, or publication. | [Validate before side effects](#pattern-validate-before-side-effects). | `PartnerTransactionRequestValidatorTests`; `PartnerTransactionsControllerTests`. | N/A |
+| [CS-OBS-01 — Propagate context while minimizing sensitive telemetry](../../governance/coding/coding_standards.md) | Applies to correlation ingress and downstream propagation; raw idempotency keys are not logged. | [Validate correlation at the request boundary](#pattern-validate-correlation-at-the-request-boundary). | `CorrelationContextMiddlewareTests`; controller correlation tests. | N/A |
+| [CS-HTTP-01 — Normalize ASP.NET Core errors with ProblemDetails](../../governance/coding/coding_standards.md) | Applies to API exception mapping; known exceptions preserve their message as `Detail`, while unknown failures use the generic safe detail. | [Central exception-to-HTTP translation](#pattern-central-exception-to-http-translation). | `ApiExceptionHandlerTests`; `ApiExceptionMappingHostTests` verify the HTTP ProblemDetails contract. | N/A |
+| [CS-TEST-01 — Test observable behavior at the owning boundary](../../governance/coding/coding_standards.md) | Applies to middleware and exception behavior. | [Real-host boundary integration](../testing-and-quality/README.md#pattern-exercise-the-real-host-for-boundary-integration). | Middleware tests; API security and exception host tests. | N/A |
+
 ### Pattern: Validate before side effects
 
 - **Applies to** - partner transaction requests; API and Core boundary.
@@ -159,13 +171,19 @@ using (LogContext.PushProperty("CorrelationId", correlationId))
 ```csharp
 var problem = exception switch
 {
-    BadRequestException value => Problem(400, "Bad Request", value.Message),
-    NotFoundException value => Problem(404, "Not Found", value.Message),
-    ConflictException value => Problem(409, "Conflict", value.Message),
-    UpstreamTimeoutException value => Problem(408, "Request Timeout", value.Message),
-    UpstreamServiceUnavailableException value => Problem(503, "Service Unavailable", value.Message),
-    _ => Problem(500, "Internal Server Error", "An unexpected error occurred.")
+    BadRequestException value => new ProblemDetails { Status = 400, Title = "Bad Request", Detail = value.Message, Type = "https://httpstatuses.com/400" },
+    NotFoundException value => new ProblemDetails { Status = 404, Title = "Not Found", Detail = value.Message, Type = "https://httpstatuses.com/404" },
+    ConflictException value => new ProblemDetails { Status = 409, Title = "Conflict", Detail = value.Message, Type = "https://httpstatuses.com/409" },
+    UnauthorizedAccessException value => new ProblemDetails { Status = 401, Title = "Unauthorized", Detail = value.Message, Type = "https://httpstatuses.com/401" },
+    UpstreamTimeoutException value => new ProblemDetails { Status = 408, Title = "Request Timeout", Detail = value.Message, Type = "https://httpstatuses.com/408" },
+    UpstreamServiceUnavailableException value => new ProblemDetails { Status = 503, Title = "Service Unavailable", Detail = value.Message, Type = "https://httpstatuses.com/503" },
+    _ => new ProblemDetails { Status = 500, Title = "Internal Server Error", Detail = "An unexpected error occurred.", Type = "https://httpstatuses.com/500" }
 };
+
+context.Response.StatusCode = problem.Status!.Value;
+context.Response.ContentType = "application/problem+json";
+var payload = JsonSerializer.Serialize(problem);
+await context.Response.WriteAsync(payload, cancellationToken);
 ```
 
 - **Avoid** - repeated try/catch-to-response mappings in controllers, leaking stack traces, or documenting middleware-owned JSON rejections as ProblemDetails.
@@ -212,6 +230,6 @@ var problem = exception switch
 ## Related Supporting Documents
 
 - [Runtime and API](../runtime-and-api/README.md)
-- [Architecture design overview](../architecture_design/Architecture_design.md)
-- [API idempotency flow and semantics](../architecture_design/api_idempotency_flow_and_semantics.md)
+- [Architecture design overview](../../architecture/Architecture_design.md)
+- [API idempotency flow and semantics](../../architecture/api_idempotency_flow_and_semantics.md)
 - [Logging standards](../../operations/diagnostics/logging_standards.md)

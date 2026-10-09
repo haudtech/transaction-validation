@@ -63,6 +63,19 @@ Host startup proves that configuration and dependency registration can build the
 
 ## Implementation Pattern Rules
 
+### Governance rule traceability
+
+These rule IDs identify applicable coding requirements; the linked governance catalog owns the normative text and reusable C# examples. Each approved-pattern link points to a domain-specific implementation/code example showing how this feature applies the rule.
+
+| Rule | Applicability and implementation | Approved feature pattern/code evidence | Verification evidence | Exception |
+|---|---|---|---|---|
+| [CS-EXT-01 — Keep external protocol and SDK details inside adapters](../../governance/coding/coding_standards.md) | Applies to dependency calls and broker interaction; host/controller workflows use application contracts. | [Thin executable composition root](#pattern-thin-executable-composition-root); [Versioned controller boundary](#pattern-versioned-controller-boundary). | `PartnerTransactionsControllerTests`; publisher/verifier tests. | N/A |
+| [CS-CFG-01 — Bind and validate configuration at the composition boundary](../../governance/coding/coding_standards.md) | Applies to host and runtime implementation selection; API and Mock use layered configuration. | [Shared layered configuration](#pattern-shared-layered-configuration); [Single runtime implementation selection](#pattern-single-runtime-implementation-selection). | `BrokerRegistrationExtensionsTests`; `IdempotencyStoreRegistrationTests`; startup host tests. | N/A |
+| [CS-CFG-02 — Keep secrets out of source-controlled configuration](../../governance/coding/coding_standards.md) | Applies to host and feature credentials; real secrets are supplied through runtime/local secret sources, not committed settings. | [Shared layered configuration](#pattern-shared-layered-configuration); [configuration and environment reference](../../governance/configuration/configuration_and_environment.md). | Settings/secret review; API startup and configuration tests. | N/A |
+| [CS-DEBUG-01 — Keep local debug profiles safe and reproducible](../../governance/coding/coding_standards.md) | Applies to local API/Mock startup profiles; profiles select Development and non-secret local URLs. | [VS Code debugging profiles](../../operations/local/local_development.md#launch-profiles); [launch profile reference](../../governance/configuration/repository_configuration_reference.md). | Start each documented profile and verify target project/environment; review profile for credentials. | N/A |
+| [CS-HOST-01 — Keep executable hosts thin and explicit](../../governance/coding/coding_standards.md) | Applies to API and Mock startup composition; executable hosts register services and map pipelines/endpoints without implementing feature workflows. | [Thin executable composition root](#pattern-thin-executable-composition-root). | `ApiStartupHostTests`; solution build. | N/A |
+| [CS-TEST-01 — Test observable behavior at the owning boundary](../../governance/coding/coding_standards.md) | Applies to host registration and middleware behavior. | [Real-host boundary integration](../testing-and-quality/README.md#pattern-exercise-the-real-host-for-boundary-integration). | `ApiStartupHostTests`; configuration registration tests. | N/A |
+
 ### Pattern: Thin executable composition root
 
 - **Applies to** - API and Mock host startup; cross-cutting.
@@ -238,6 +251,6 @@ Feature-specific sections such as `Security`, `Idempotency`, `Redis`, `PartnerVe
 
 ## Related Supporting Documents
 
-- [Architecture design overview](../architecture_design/Architecture_design.md)
-- [API idempotency flow and semantics](../architecture_design/api_idempotency_flow_and_semantics.md)
+- [Architecture design overview](../../architecture/Architecture_design.md)
+- [API idempotency flow and semantics](../../architecture/api_idempotency_flow_and_semantics.md)
 - [Documentation index](../README.md)

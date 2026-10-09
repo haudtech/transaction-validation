@@ -79,7 +79,7 @@ flowchart LR
 
 ## 3. Infrastructure workflow: preview then apply
 
-[infra.yml](../../.github/workflows/infra.yml) manages Bicep changes. It is intentionally separate from the application-image deployment workflow because network, identity, and data-plane infrastructure changes have a larger blast radius.
+The [Infrastructure workflow guide](../workflows/github/infra_workflow.md) manages Bicep changes. It is intentionally separate from the application-image deployment workflow because network, identity, and data-plane infrastructure changes have a larger blast radius.
 
 ```mermaid
 flowchart TB
@@ -99,7 +99,7 @@ flowchart TB
 
 ## 4. Application workflow: build, push, and update revisions
 
-[deploy-azure.yml](../../.github/workflows/deploy-azure.yml) is triggered by application-source changes on `main`. It does not reapply Bicep infrastructure.
+The [Deploy to Azure workflow guide](../workflows/github/deploy_azure_workflow.md) is triggered by application-source changes on `main`. It does not reapply Bicep infrastructure.
 
 ```mermaid
 sequenceDiagram
@@ -207,5 +207,5 @@ OIDC federation is strict. These values must agree or the workflow login fails:
 - [x] Required GitHub repository secrets exist.
 - [x] Run `infra.yml` successfully through its approved apply job.
 - [x] Run `deploy-azure.yml` successfully and confirm both revisions pull their tagged ACR images.
-- [x] Complete deployed-environment validation in [azure_deployment_plan.md](../implementation/azure_deployment_plan.md).
+- [x] Complete deployed-environment validation in the [validation and shutdown runbook](validation_and_shutdown_runbook.md).
 - [ ] Run the repository E2E suite and audit-consumer redelivery check from a runner that can reach the Mock app's internal-only ingress.

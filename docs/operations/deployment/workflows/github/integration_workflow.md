@@ -38,5 +38,5 @@ gh workflow run integration.yml --ref main
 ## Related docs
 
 - [ci_workflow.md](ci_workflow.md)
-- [testing-and-quality.md](../../features/testing-and-quality/README.md)
-- [../../docs/README.md](../../README.md)
+- [testing-and-quality.md](../../../../features/testing-and-quality/README.md)
+- [../../../../README.md](../../../../README.md)

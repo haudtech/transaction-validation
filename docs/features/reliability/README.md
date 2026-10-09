@@ -90,6 +90,17 @@ The Mock endpoint returns HTTP `408` for approximately 30% of calls when no over
 
 ## Implementation Pattern Rules
 
+### Governance rule traceability
+
+These rule IDs identify applicable coding requirements; the linked governance catalog owns the normative text and reusable C# examples. Each approved-pattern link points to a domain-specific implementation/code example showing how this feature applies the rule.
+
+| Rule | Applicability and implementation | Approved feature pattern/code evidence | Verification evidence | Exception |
+|---|---|---|---|---|
+| [CS-EXT-01 — Keep external protocol and SDK details inside adapters](../../governance/coding/coding_standards.md) | Applies to partner HTTP calls; `PartnerVerifierClient` translates terminal outcomes while API orchestration uses `IPartnerVerifier`. | [Translate terminal dependency outcomes at the adapter](#pattern-translate-terminal-dependency-outcomes-at-the-adapter). | `PartnerVerifierClientTests`; API exception mapping tests. | N/A |
+| [CS-RES-01 — Centralize dependency resilience and preserve cancellation](../../governance/coding/coding_standards.md) | Applies to partner verification; typed client pipeline bounds retries/timeouts and preserves cancellation semantics. | [Centralize resilience in the typed HTTP pipeline](#pattern-centralize-resilience-in-the-typed-http-pipeline); [Preserve caller cancellation](#pattern-preserve-caller-cancellation). | `PartnerVerifierResilienceRetryTests`; timeout guardrail and cancellation tests. | N/A |
+| [CS-FLOW-01 — Validate before side effects and make state transitions explicit](../../governance/coding/coding_standards.md) | Applies after idempotency acquisition; failures release the reservation and only accepted outcomes are cached. | [Release request reservation after downstream failure](#pattern-release-request-reservation-after-downstream-failure). | Controller verification-failure and publish-failure tests. | N/A |
+| [CS-TEST-02 — Make failure scenarios deterministic and safely scoped](../../governance/coding/coding_standards.md) | Applies to simulated dependency timeouts; explicit overrides avoid random-only test outcomes. | [Deterministic failure control for tests](#pattern-deterministic-failure-control-for-tests). | `MockPartnerVerificationControllerTests`; verifier request-path tests. | N/A |
+
 ### Pattern: Centralize resilience in the typed HTTP pipeline
 
 - **Applies to** - partner-verification HTTP calls; cross-project Configuration/Integration boundary.
@@ -283,4 +294,4 @@ return shouldTimeout
 - [Runtime and API](../runtime-and-api/README.md)
 - [Validation and security](../validation-and-security/README.md)
 - [Distributed state](../distributed-state/README.md)
-- [API idempotency flow and semantics](../architecture_design/api_idempotency_flow_and_semantics.md)
+- [API idempotency flow and semantics](../../architecture/api_idempotency_flow_and_semantics.md)

@@ -14,10 +14,10 @@ This is the main navigation entry point for the TransactionValidation documentat
 
 These documents define the stable design boundaries, runtime contracts, and cross-cutting semantics.
 
-- [Architecture design overview](architecture_design/Architecture_design.md): system context, project responsibilities, runtime flow, configuration, and deployment modes. Primary owners: all solution projects.
-- [API idempotency flow and semantics](architecture_design/api_idempotency_flow_and_semantics.md): request identity, payload fingerprinting, replay rules, conflict handling, expiry, and accepted-response replacement. Primary owner: `TransactionValidation.Api`.
-- [Failure, timeout, and retry flow](architecture_design/failure_timeout_retry_flow.md): recovery behavior, timeout handling, release-after-failure, and safe re-entry after partial outcomes. Primary owner: `TransactionValidation.Api`.
-- [Messaging topology and consumer routing](architecture_design/messaging_topology_and_consumer_routing.md): topology, routing, independent consumer paths, lifecycle behavior, and ownership boundaries. Primary owners: `TransactionValidation.Messaging` and `TransactionValidation.Mock`.
+- [Architecture overview](architecture/Architecture_design.md): system context, project responsibilities, runtime flow, configuration, and deployment modes. Primary owners: all solution projects.
+- [API idempotency flow and semantics](architecture/api_idempotency_flow_and_semantics.md): request identity, payload fingerprinting, replay rules, conflict handling, expiry, and accepted-response replacement. Primary owner: `TransactionValidation.Api`.
+- [Failure, timeout, and retry flow](architecture/failure_timeout_retry_flow.md): recovery behavior, timeout handling, release-after-failure, and safe re-entry after partial outcomes. Primary owner: `TransactionValidation.Api`.
+- [Messaging topology and consumer routing](architecture/messaging_topology_and_consumer_routing.md): topology, routing, independent consumer paths, lifecycle behavior, and ownership boundaries. Primary owners: `TransactionValidation.Messaging` and `TransactionValidation.Mock`.
 
 ## 2. Feature domains
 
@@ -46,7 +46,7 @@ These are the authoritative behavioral and domain guides for the implemented sys
 These docs explain how to run, validate, diagnose, and maintain the system in local and deployed environments.
 
 - [Operations documentation](operations/README.md): entry point for local startup, deployment, testing, diagnostics, and runtime support.
-- [Local development guide](operations/local/local_development.md): SDK setup, Docker Compose startup, environment configuration, health checks, and shutdown flow.
+- [Local development, debugging, and runtime guide](operations/local/local_development.md): Docker Compose and native startup, environment configuration, Swagger/API-key behavior, health checks, logs, troubleshooting, and cleanup.
 - [Test execution and coverage guide](operations/testing/test/test_execution_and_coverage_guide.md): unit, integration, E2E, coverage, and report generation workflows. Primary owner: `TransactionValidation.Tests`.
 - [E2E runtime matrix](operations/testing/test/e2e_runtime_matrix.md): deployed-runtime scenarios for HTTP, idempotency, broker fan-out, routing, and redelivery.
 - [GitHub Actions documentation](operations/deployment/workflows/github/README.md): CI, integration, infrastructure, and deployment workflow entry points.
@@ -58,8 +58,23 @@ These docs explain how to run, validate, diagnose, and maintain the system in lo
 These docs define durable repo-wide rules, ownership boundaries, and documentation policy.
 
 - [Repository governance](governance/README.md): durable repository standards, policy boundaries, and governing rules.
-- [Documentation standards](governance/documentation_standards.md): authoring rules, ownership boundaries, and evidence-first policies.
-- [Repository architecture rules](governance/repository_architecture_rules.md): project boundaries, dependency direction, and repository-specific engineering constraints.
+- [Feature delivery workflow](governance/feature_delivery_workflow.md): applies relevant governance patterns from requirements through implementation, verification, and feature documentation.
+- [Documentation standards](governance/documentation/documentation_standards.md): authoring rules, ownership boundaries, and evidence-first policies.
+- [Engineering documentation standard](governance/documentation/engineering_documentation_standard.md): the canonical engineering-standard document for layer ownership, documentation boundaries, and source-of-truth rules.
+- [Coding standards](governance/coding/coding_standards.md): reusable coding principles and applicable, evidence-based implementation patterns.
+- [Repository architecture rules](governance/coding/repository_architecture_rules.md): project boundaries, dependency direction, and repository-specific engineering constraints.
+- [Repository configuration reference](governance/configuration/repository_configuration_reference.md): root .NET, build, formatting, and coverage configuration.
+- [Documentation templates and scaffolding checklist](governance/documentation/documentation_templates.md): ready-to-use repo scaffolding steps and exact markdown templates for each documentation type.
+
+## 5. Reference and configuration
+
+These docs are supporting references for repository-wide configuration, environment contracts, and cross-cutting concerns.
+
+- [Reference documentation](reference/README.md): repository configuration, environment, and supporting reference material.
+- [Configuration and environment reference](governance/configuration/configuration_and_environment.md): environment contracts, runtime assumptions, and configuration conventions.
+- [Local environment reference](reference/environment/local_environment.md): local setup assumptions, developer topology, and environment-specific guidance.
+- [Deployment environment reference](reference/environment/deployment_environment.md): deployed runtime assumptions and support references.
+- [Application settings reference](reference/configuration/appsettings_reference.md): shared configuration-setting conventions and usage notes.
 
 ## Recommended reading flow
 

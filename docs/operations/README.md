@@ -15,7 +15,7 @@ Operational docs answer how to:
 ## Subfolders
 
 - [deployment](deployment/README.md): Azure deployment, identity, resource provisioning, release workflows, and environment operations.
-- [local](local/README.md): local developer environment setup, Compose topology, startup, and shutdown guidance.
+- [local](local/README.md): local development and runtime guide for Compose/native startup, debugging, validation, logs, and cleanup.
 - [testing](testing/README.md): unit, integration, E2E, and coverage execution guidance.
 - [diagnostics](diagnostics/README.md): health checks, troubleshooting, logs, and runtime investigation guidance.
 
@@ -24,7 +24,8 @@ Operational docs answer how to:
 This layer is intentionally separate from:
 
 - feature behavior in [docs/features](../features/README.md)
-- system architecture in [docs/architecture_design](../architecture_design/Architecture_design.md)
+- system architecture in [docs/architecture](../architecture/Architecture_design.md)
 - repo governance and authoring standards in [docs/governance](../governance/README.md)
+- repository-wide reference material in [docs/reference](../reference/README.md)
 
 Operational docs should describe procedures and environment concerns, not feature behavior or long-term system design.

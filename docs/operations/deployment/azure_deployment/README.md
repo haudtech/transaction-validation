@@ -1,6 +1,6 @@
 # Azure Deployment Documentation
 
-This folder contains the repository's Azure operations guidance: identity setup, infrastructure validation, and live-environment maintenance. Pipeline mechanics live in [../workflow_actions/github/](../workflow_actions/github/), and the architecture and runtime model live in the feature docs.
+This folder contains the repository's Azure operations guidance: identity setup, infrastructure validation, and live-environment maintenance. Pipeline mechanics live in [../workflows/github/README.md](../workflows/github/README.md), and the architecture and runtime model live in the feature docs.
 
 Use these documents according to the task:
 
@@ -11,12 +11,12 @@ Use these documents according to the task:
 
 Related documentation:
 
-- Azure platform overview: [../features/azure-platform/README.md](../features/azure-platform/README.md) — architecture, naming, identity, and deployment boundaries.
-- Pipeline guides: [Deploy to Azure workflow](../workflow_actions/github/deploy_azure_workflow.md) and [Infrastructure workflow](../workflow_actions/github/infra_workflow.md) — workflow triggers, environment gates, and deployment boundaries.
+- Azure platform overview: [../../../features/azure-platform/README.md](../../../features/azure-platform/README.md) — architecture, naming, identity, and deployment boundaries.
+- Pipeline guides: [Deploy to Azure workflow](../workflows/github/deploy_azure_workflow.md) and [Infrastructure workflow](../workflows/github/infra_workflow.md) — workflow triggers, environment gates, and deployment boundaries.
 
 ## Recommended order
 
 1. Use the [validation and shutdown runbook](validation_and_shutdown_runbook.md) when the environment already exists.
 2. Use the [OIDC prerequisite setup](oidc_prerequisite_setup.md) only when configuring a new repository or environment.
-3. Refer to the [workflow guides](../workflow_actions/github/) to understand or modify the pipelines.
-4. Use the [Azure platform feature](../features/azure-platform/README.md) to understand the resource model and output contract.
+3. Refer to the [workflow guides](../workflows/github/README.md) to understand or modify the pipelines.
+4. Use the [Azure platform feature](../../../features/azure-platform/README.md) to understand the resource model and output contract.

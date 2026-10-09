@@ -157,6 +157,15 @@ The Mock `/healthz` endpoint exposes the default host health registration withou
 
 ## Implementation Pattern Rules
 
+### Governance rule traceability
+
+These rule IDs identify applicable coding requirements; the linked governance catalog owns the normative text and reusable C# examples. Each approved-pattern link points to a domain-specific implementation/code example showing how this feature applies the rule.
+
+| Rule | Applicability and implementation | Approved feature pattern/code evidence | Verification evidence | Exception |
+|---|---|---|---|---|
+| [CS-OBS-01 — Propagate context while minimizing sensitive telemetry](../../governance/coding/coding_standards.md) | Applies across request and message boundaries; IDs are structured while sensitive values are excluded. | [Define production events with source generation](#pattern-define-production-events-with-source-generation); [Keep structured telemetry free of sensitive values](#pattern-keep-structured-telemetry-free-of-sensitive-values); [Establish correlation once at the API boundary](#pattern-establish-correlation-once-at-the-api-boundary). | Correlation middleware, logging-contract, and publisher metadata tests. | N/A |
+| [CS-TEST-01 — Test observable behavior at the owning boundary](../../governance/coding/coding_standards.md) | Applies to telemetry registration and logging contracts; health is not treated as end-to-end proof. | [Focused telemetry registration and logger-contract patterns](#pattern-register-one-shared-telemetry-pipeline-per-host). | Observability registration and logger contract tests. | N/A |
+
 ### Pattern: Define production events with source generation
 
 - **Applies to** - application logging in `src`; cross-cutting.
@@ -414,4 +423,4 @@ app.MapHealthChecks("/healthz");
 - [Runtime and API](../runtime-and-api/README.md)
 - [Validation and security](../validation-and-security/README.md)
 - [Messaging](../messaging/README.md)
-- [Architecture design overview](../architecture_design/Architecture_design.md)
+- [Architecture design overview](../../architecture/Architecture_design.md)
