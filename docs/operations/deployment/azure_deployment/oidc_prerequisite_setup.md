@@ -1,8 +1,8 @@
 # Azure AD OIDC Prerequisite Setup — Runbook
 
-This is a **reusable, purely procedural runbook**: the exact commands to satisfy the "Prerequisite: one-time Azure AD OIDC setup" checklist in [azure_deployment_plan.md](../implementation/azure_deployment_plan.md), with the expected result for each step. Use it for a new repository, a new Azure tenant/subscription, or a new environment (e.g. `staging`/`prod`).
+This is a **reusable, purely procedural runbook**: the exact commands to satisfy the Azure OIDC prerequisite steps for the repository's deployment workflows, with the expected result for each step. Use it for a new repository, a new Azure tenant/subscription, or a new environment (e.g. `staging`/`prod`).
 
-One-time execution status and live validation evidence are recorded in [azure_deployment_plan.md](../implementation/azure_deployment_plan.md), not here.
+One-time execution status and live validation evidence are recorded in the deployment validation and shutdown runbook, not here.
 
 Replace every placeholder in angle brackets before running a command. The values are intentionally omitted from this reusable guide:
 
@@ -77,8 +77,8 @@ Approve the `azure-infra` environment when the run pauses. The workflow recreate
 
 Related workflows that depend on this setup:
 
-- [.github/workflows/infra.yml](../../.github/workflows/infra.yml)
-- [.github/workflows/deploy-azure.yml](../../.github/workflows/deploy-azure.yml)
+- [Infrastructure workflow guide](../workflows/github/infra_workflow.md)
+- [Deploy to Azure workflow guide](../workflows/github/deploy_azure_workflow.md)
 
 ## Why this setup is required
 
@@ -324,7 +324,7 @@ gh secret list
 | GitHub environments | `azure-infra` (required reviewer: `<GITHUB_REVIEWER_LOGIN>`), `azure-dev` |
 | GitHub secrets | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `API_KEY_SECRET_VALUE` |
 
-Both [infra.yml](../../.github/workflows/infra.yml) and [deploy-azure.yml](../../.github/workflows/deploy-azure.yml) authenticate via OIDC. For the record of the dev-environment validation performed after this setup (including the checks still blocked by the Mock app's internal-only ingress), see Phase 7 in [azure_deployment_plan.md](../implementation/azure_deployment_plan.md).
+Both the [Infrastructure workflow guide](../workflows/github/infra_workflow.md) and the [Deploy to Azure workflow guide](../workflows/github/deploy_azure_workflow.md) authenticate via OIDC. For the record of the dev-environment validation performed after this setup, use the operational validation and shutdown runbook.
 
 ## Repeating this for a future environment (e.g. `staging`)
 

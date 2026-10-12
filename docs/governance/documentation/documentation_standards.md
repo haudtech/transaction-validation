@@ -6,16 +6,35 @@ This document defines the repository's permanent documentation standards for fea
 
 This standard is intentionally stable. It governs the feature documentation tree and the document boundaries across the repository. It does not describe historical cleanup activity or implementation-era work.
 
+## Governance authority and precedence
+
+Use the governance document that owns the concern; do not create a competing authority by copying its rules into another standard or feature guide.
+
+| Concern | Governing authority | What it governs |
+|---|---|---|
+| Documentation ownership, structure, evidence, and maintenance | This document | How active documentation is authored and maintained. |
+| Reusable coding principles and implementation patterns | [../coding/coding_standards.md](../coding/coding_standards.md) | How implementation should be structured when a rule applies. |
+| Project boundaries and repository-specific invariants | [../coding/repository_architecture_rules.md](../coding/repository_architecture_rules.md) | Constraints specific to this solution. |
+| Configuration conventions and contracts | [../configuration/configuration_and_environment.md](../configuration/configuration_and_environment.md), [../configuration/repository_configuration_reference.md](../configuration/repository_configuration_reference.md), and the owning feature guide | Shared conventions, root-level machine configuration, and feature settings respectively. |
+| Quality gates and coverage expectations | [../quality/quality_policy.md](../quality/quality_policy.md) and [../quality/coverage_policy.md](../quality/coverage_policy.md) | Required validation and coverage intent. |
+| Document scaffolds | [documentation_templates.md](documentation_templates.md) | Authoring aids that must remain consistent with this policy and do not supersede it. |
+
+For claims about current runtime behavior, inspect source code, configuration, tests, workflow definitions, and infrastructure definitions. If documentation conflicts with those implementation artifacts, treat the artifacts as evidence of current behavior and correct the documentation or implementation intentionally; do not silently treat a descriptive document as proof that code behaves as stated. Governance rules remain policy authorities for how future changes should be made.
+
+General recommendations and TransactionValidation-specific requirements MUST be labeled distinctly in governance material. Repository-specific constraints apply to this solution; they MUST NOT be presented as universal .NET requirements without justification.
+
 ## Documentation layers
 
 The repository uses a clear separation of concerns across documentation layers:
 
-1. Feature docs: describe implemented behavior and the current product contract.
-2. Architecture docs: describe system composition, ownership, and cross-cutting runtime relationships.
-3. Operational docs: describe setup, deployment, workflows, diagnostics, and runbooks.
-4. Historical or implementation records: not part of the active documentation set.
+1. Architecture docs: describe system design, runtime boundaries, and cross-cutting semantics.
+2. Feature docs: describe implemented behavior, domain semantics, and the current product contract.
+3. Operations docs: describe setup, deployment, workflows, diagnostics, and runbooks.
+4. Governance docs: define standards, repository rules, and durable policy.
+5. Reference docs: describe shared configuration, environment conventions, and supporting reference material.
 
 The rule is simple: a document should live in the layer that owns the concern it explains.
+Historical or implementation records are not an active documentation layer or source of authority. Keep temporary plans, generated evidence, and superseded records out of the active documentation navigation unless they have an explicit archival purpose.
 
 ## Source of truth
 
@@ -128,6 +147,6 @@ The active documentation set should remain focused on current truth, not prior m
 ## Related documentation
 
 - [README.md](../README.md)
-- [repository_architecture_rules.md](repository_architecture_rules.md)
+- [../coding/repository_architecture_rules.md](../coding/repository_architecture_rules.md)
 - [../README.md](../README.md)
-- [../features/README.md](../features/README.md)
+- [../../features/README.md](../../features/README.md)

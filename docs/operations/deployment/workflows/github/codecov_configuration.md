@@ -1,6 +1,6 @@
 # Codecov Configuration Guide (`codecov.yml`)
 
-This guide describes the repository-level Codecov policy that complements the CI workflow. The authoritative coverage gate remains in `codecov.yml`, while the publishing step is defined in [.github/workflows/ci.yml](../../../.github/workflows/ci.yml).
+This guide describes the repository-level Codecov policy that complements the CI workflow. The authoritative coverage gate remains in `codecov.yml`, while the publishing step is defined in the [CI workflow guide](ci_workflow.md).
 
 ## What the repository configures
 
@@ -32,4 +32,4 @@ Codecov posts project and patch status checks on the PR when the upload succeeds
 
 - [ci_workflow.md](ci_workflow.md)
 - [branch_protection_setup.md](branch_protection_setup.md)
-- [../../features/testing-and-quality/README.md](../../features/testing-and-quality/README.md)
+- [../../../../features/testing-and-quality/README.md](../../../../features/testing-and-quality/README.md)

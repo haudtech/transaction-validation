@@ -111,6 +111,16 @@ The following checks prove the delivery model:
 
 ## Implementation Pattern Rules
 
+### Governance rule traceability
+
+These Rule IDs are TransactionValidation-specific constraints, not universal .NET deployment requirements. The repository architecture rules own the normative constraints; the patterns below provide workflow code evidence.
+
+| Rule | Applicability and implementation | Approved feature pattern/code evidence | Verification evidence | Exception |
+|---|---|---|---|---|
+| [TXV-DEL-01 — Separate infrastructure provisioning from application rollout](../../governance/coding/repository_architecture_rules.md) | Applies because this repository maintains separate Bicep infrastructure and application image workflows. | [Keep infrastructure and application delivery in separate workflows](#pattern-keep-infrastructure-and-application-delivery-in-separate-workflows). | Workflow trigger-path and deployment-responsibility review. | Approved delivery/architecture decision required. |
+| [TXV-DEL-02 — Use federated identity for GitHub-to-Azure workflows](../../governance/coding/repository_architecture_rules.md) | Applies to GitHub Actions workflows authenticating to Azure. | [Use OIDC for Azure access](#pattern-use-oidc-for-azure-access). | Workflow permissions, environment protection, federation, and RBAC review. | Security/platform approval required. |
+| [TXV-DEL-03 — Verify the deployed revision before reporting success](../../governance/coding/repository_architecture_rules.md) | Applies to Azure Container App deployment and readiness verification. | [Resolve deployment outputs](#pattern-resolve-deployment-outputs-before-app-rollout); [verify deployment health](#pattern-verify-deployment-health-before-declaring-success). | Workflow output resolution, running-revision wait, and `/healthz` probe review. | Approved delivery/architecture decision required. |
+
 ### Pattern: Keep infrastructure and application delivery in separate workflows
 
 - **Applies to** - Azure delivery lifecycle.

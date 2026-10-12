@@ -147,7 +147,7 @@ Expected result: HTTP `202` and a response containing a `messageId`.
 
 Repeat the same request with the same `Idempotency-Key` and payload. The response should demonstrate the configured duplicate/replay behavior. Send the same key with a different payload to confirm the conflict response (`409`).
 
-For a repeatable test sequence, use the existing request examples in [transaction_validation_api_manual.http](../../tests/TransactionValidation.Tests/Integration/http/transaction_validation_api_manual.http). Change its `apiHost` to the value of `API_URL` and provide the API key through the editor's environment support rather than committing it to the file.
+For a repeatable test sequence, use the existing request examples in [transaction_validation_api_manual.http](../../../../tests/TransactionValidation.Tests/Integration/http/transaction_validation_api_manual.http). Change its `apiHost` to the value of `API_URL` and provide the API key through the editor's environment support rather than committing it to the file.
 
 ## 5. Inspect runtime logs and messaging outcomes
 

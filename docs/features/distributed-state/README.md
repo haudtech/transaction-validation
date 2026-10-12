@@ -78,6 +78,17 @@ The in-memory store is suitable only when one API process owns all relevant retr
 
 ## Implementation Pattern Rules
 
+### Governance rule traceability
+
+These rule IDs identify applicable coding requirements; the linked governance catalog owns the normative text and reusable C# examples. Each approved-pattern link points to a domain-specific implementation/code example showing how this feature applies the rule.
+
+| Rule | Applicability and implementation | Approved feature pattern/code evidence | Verification evidence | Exception |
+|---|---|---|---|---|
+| [CS-EXT-01 — Keep external protocol and SDK details inside adapters](../../governance/coding/coding_standards.md) | Applies to storage implementations; controllers depend on `IIdempotencyStore`, while stores own storage details. | [Store behind one workflow contract](#pattern-store-behind-one-workflow-contract). | Controller tests; in-memory and Redis store tests. | N/A |
+| [CS-CFG-01 — Bind and validate configuration at the composition boundary](../../governance/coding/coding_standards.md) | Applies to state implementation selection; Redis presence selects distributed state at API composition. | [Select state implementation at composition time](#pattern-select-state-implementation-at-composition-time). | `IdempotencyStoreRegistrationTests`. | N/A |
+| [CS-FLOW-01 — Validate before side effects and make state transitions explicit](../../governance/coding/coding_standards.md) | Applies to acquire/conflict/replay/expiry/release transitions. | [Atomic first-writer reservation](#pattern-atomic-first-writer-reservation); [Bounded accepted-response replay](#pattern-bounded-accepted-response-replay); [Release reservation on failed processing](#pattern-release-reservation-on-failed-processing). | Store concurrency/TTL/release tests; controller duplicate and failure tests. | N/A |
+| [CS-TEST-01 — Test observable behavior at the owning boundary](../../governance/coding/coding_standards.md) | Applies to store semantics and API idempotency workflow. | [Store implementation examples](#pattern-store-behind-one-workflow-contract). | Store unit tests; controller and API idempotency host tests. | N/A |
+
 ### Pattern: Store behind one workflow contract
 
 - **Applies to** - idempotency persistence; cross-cutting API state.
@@ -280,5 +291,5 @@ The Redis connection string is sensitive configuration and must be supplied thro
 ## Related Supporting Documents
 
 - [Runtime and API](../runtime-and-api/README.md)
-- [API idempotency flow and semantics](../architecture_design/api_idempotency_flow_and_semantics.md)
-- [Architecture design overview](../architecture_design/Architecture_design.md)
+- [API idempotency flow and semantics](../../architecture/api_idempotency_flow_and_semantics.md)
+- [Architecture design overview](../../architecture/Architecture_design.md)

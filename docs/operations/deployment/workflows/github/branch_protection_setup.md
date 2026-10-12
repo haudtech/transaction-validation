@@ -31,8 +31,8 @@ The key settings for the goal: `bypass_actors: []` (empty) + `required_status_ch
 
 The required checks map to workflow job names:
 
-- `build` → job `build` in [ci.yml](../../../.github/workflows/ci.yml) (workflow name `CI`, shown in PR UI as `CI / build`)
-- `integration` → job `integration` in [integration.yml](../../../.github/workflows/integration.yml) (workflow name `Integration Tests`, shown as `Integration Tests / integration`)
+- `build` → job `build` in [CI workflow guide](ci_workflow.md) (workflow name `CI`, shown in PR UI as `CI / build`)
+- `integration` → job `integration` in [Integration workflow guide](integration_workflow.md) (workflow name `Integration Tests`, shown as `Integration Tests / integration`)
 
 Important: the ruleset stores the **job name** as the check context (`build`, `integration`), not the display string (`CI / build (pull_request)`). Getting this wrong causes required checks to stay in "Expected — Waiting for status to be reported" forever even though the same-named checks succeed.
 
@@ -51,7 +51,7 @@ Anyone with `push` permission on the repo (currently only `haudtech`, admin), **
 
 ## Workflow Triggers (context)
 
-[ci.yml](../../../.github/workflows/ci.yml) runs on `push` to `main` and on `pull_request` to `main`. [integration.yml](../../../.github/workflows/integration.yml) runs on `push` to `main`, `pull_request` to `main`, and `workflow_dispatch` (it uses `environment: integration`). Both workflows define a `concurrency` group keyed on workflow + PR number (or ref) with `cancel-in-progress: true`, so pushing a follow-up commit cancels the obsolete in-progress run.
+The [CI workflow guide](ci_workflow.md) runs on `push` to `main` and on `pull_request` to `main`. The [Integration workflow guide](integration_workflow.md) runs on `push` to `main`, `pull_request` to `main`, and `workflow_dispatch` (it uses `environment: integration`). Both workflows define a `concurrency` group keyed on workflow + PR number (or ref) with `cancel-in-progress: true`, so pushing a follow-up commit cancels the obsolete in-progress run.
 
 Deliberately, CI does not run on feature-branch pushes: with a PR open, the push run would duplicate the `pull_request` run (same commit, same steps), doubling runner minutes and cluttering the PR check list. Pre-PR feedback is covered by the local `check` task (format:verify → build → test:unit).
 
