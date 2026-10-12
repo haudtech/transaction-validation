@@ -71,38 +71,39 @@ Describe how the system runs in local and deployed environments.
 ## 3. Standard markdown template for docs/README.md
 
 ```md
-# Documentation Tree
+# Documentation
 
-This is the main navigation entry point for the project documentation.
+Use the [project overview](../README.md) to get started, then follow the links below to the README maintained by the relevant documentation area. Each area README is the entry point for its authoritative content.
 
-## 1. Architecture
+## Architecture
 
-- Architecture overview
-- API flow and contracts
-- Data and persistence
+Authoritative documentation for system structure, project boundaries, and cross-component design.
 
-## 2. Features
+- [Architecture documentation](architecture/README.md)
 
-- Feature area
-- API behavior
-- Observability
+## Features
 
-## 3. Operations
+Authoritative documentation for implemented feature behavior and domain-specific responsibilities.
 
-- Operations
-- Local development
-- Testing
+- [Feature documentation](features/README.md)
 
-## 4. Governance
+## Operations
 
-- Governance
-- Documentation standards
-- Repository architecture rules
+Authoritative guidance for running, deploying, testing, and diagnosing the system.
 
-## 5. Reference
+- [Operations documentation](operations/README.md)
 
-- Reference
-- Configuration and environment
+## Governance
+
+Authoritative repository-wide engineering standards, policies, and documentation rules.
+
+- [Governance documentation](governance/README.md)
+
+## Reference
+
+Authoritative supporting references for shared configuration, environment contracts, and conventions.
+
+- [Reference documentation](reference/README.md)
 ```
 
 ## 4. Standard markdown template for architecture docs

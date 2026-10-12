@@ -1,85 +1,33 @@
-# Documentation Tree
+# Documentation
 
-This is the main navigation entry point for the TransactionValidation documentation set. Start with the [platform overview](../README.md), then use this tree to find the authoritative guide for the relevant concern.
+Use the [project overview](../README.md) to get started, then follow the links below to the README maintained by the relevant documentation area. Each area README is the entry point for its authoritative content.
 
-## Documentation authority
+## Architecture
 
-- Application code, configuration, workflows, and infrastructure definitions remain the source of truth for runtime behavior.
-- The root project README explains the platform and supported capabilities.
-- This page is the documentation index and navigation map.
-- Each domain area owns the authoritative content for its concern and links to neighboring domains instead of duplicating them.
-- Generated reports and historical implementation records are not permanent system documentation.
+Authoritative documentation for system structure, project boundaries, and cross-component design.
 
-## 1. Architecture and system semantics
+- [Architecture documentation](architecture/README.md)
 
-These documents define the stable design boundaries, runtime contracts, and cross-cutting semantics.
+## Features
 
-- [Architecture overview](architecture/Architecture_design.md): system context, project responsibilities, runtime flow, configuration, and deployment modes. Primary owners: all solution projects.
-- [API idempotency flow and semantics](architecture/api_idempotency_flow_and_semantics.md): request identity, payload fingerprinting, replay rules, conflict handling, expiry, and accepted-response replacement. Primary owner: `TransactionValidation.Api`.
-- [Failure, timeout, and retry flow](architecture/failure_timeout_retry_flow.md): recovery behavior, timeout handling, release-after-failure, and safe re-entry after partial outcomes. Primary owner: `TransactionValidation.Api`.
-- [Messaging topology and consumer routing](architecture/messaging_topology_and_consumer_routing.md): topology, routing, independent consumer paths, lifecycle behavior, and ownership boundaries. Primary owners: `TransactionValidation.Messaging` and `TransactionValidation.Mock`.
+Authoritative documentation for implemented feature behavior and domain-specific responsibilities.
 
-## 2. Feature domains
+- [Feature documentation](features/README.md)
 
-These are the authoritative behavioral and domain guides for the implemented system.
+## Operations
 
-### API and runtime behavior
-- [Runtime and API](features/runtime-and-api/README.md): executable hosts, endpoint contract, API discovery, configuration precedence, and runtime composition.
-- [Validation and security](features/validation-and-security/README.md): request validation, API-key and correlation middleware, and HTTP error boundaries.
-- [Reliability](features/reliability/README.md): partner verification, timeout decisions, circuit breakers, outcome translation, cancellation, and retry-safe behavior.
+Authoritative guidance for running, deploying, testing, and diagnosing the system.
 
-### Messaging and state
-- [Messaging feature](features/messaging/README.md): broker selection, publication contracts, metadata, implementation patterns, config shape, and verification boundaries.
-- [Distributed state](features/distributed-state/README.md): in-memory and Redis idempotency storage, TTL, concurrency, replay state, and failure-release semantics.
+- [Operations documentation](operations/README.md)
 
-### Observability and quality
-- [Observability feature](features/observability/README.md): logging, correlation, tracing, metrics, timing, health, and export boundaries.
-- [Testing and Quality feature](features/testing-and-quality/README.md): unit, integration-host, and E2E responsibilities; coverage collection; quality gates; and evidence policy.
+## Governance
 
-### Platform and delivery
-- [Local platform feature](features/local-platform/README.md): local runtime topology, environment composition, and local platform boundaries.
-- [Azure platform feature](features/azure-platform/README.md): Azure resource model, identity boundaries, deployment outputs, and platform responsibilities.
-- [Infrastructure and delivery feature](features/infrastructure-and-delivery/README.md): CI, Azure OIDC, infrastructure preview/apply flow, and application deployment boundaries.
+Authoritative repository-wide engineering standards, policies, and documentation rules.
 
-## 3. Operations and support
+- [Governance documentation](governance/README.md)
 
-These docs explain how to run, validate, diagnose, and maintain the system in local and deployed environments.
+## Reference
 
-- [Operations documentation](operations/README.md): entry point for local startup, deployment, testing, diagnostics, and runtime support.
-- [Local development, debugging, and runtime guide](operations/local/local_development.md): Docker Compose and native startup, environment configuration, Swagger/API-key behavior, health checks, logs, troubleshooting, and cleanup.
-- [Test execution and coverage guide](operations/testing/test/test_execution_and_coverage_guide.md): unit, integration, E2E, coverage, and report generation workflows. Primary owner: `TransactionValidation.Tests`.
-- [E2E runtime matrix](operations/testing/test/e2e_runtime_matrix.md): deployed-runtime scenarios for HTTP, idempotency, broker fan-out, routing, and redelivery.
-- [GitHub Actions documentation](operations/deployment/workflows/github/README.md): CI, integration, infrastructure, and deployment workflow entry points.
-- [Azure deployment documentation](operations/deployment/azure_deployment/README.md): identity setup, Azure CLI commands, environment validation, and operational recovery procedures.
-- [Logging standards](operations/diagnostics/logging_standards.md): source-generated logging catalog, event IDs, structured fields, privacy rules, and analyzer enforcement. Primary owner: `TransactionValidation.Core`.
+Authoritative supporting references for shared configuration, environment contracts, and conventions.
 
-## 4. Governance and standards
-
-These docs define durable repo-wide rules, ownership boundaries, and documentation policy.
-
-- [Repository governance](governance/README.md): durable repository standards, policy boundaries, and governing rules.
-- [Feature delivery workflow](governance/feature_delivery_workflow.md): applies relevant governance patterns from requirements through implementation, verification, and feature documentation.
-- [Documentation standards](governance/documentation/documentation_standards.md): authoring rules, ownership boundaries, and evidence-first policies.
-- [Engineering documentation standard](governance/documentation/engineering_documentation_standard.md): the canonical engineering-standard document for layer ownership, documentation boundaries, and source-of-truth rules.
-- [Coding standards](governance/coding/coding_standards.md): reusable coding principles and applicable, evidence-based implementation patterns.
-- [Repository architecture rules](governance/coding/repository_architecture_rules.md): project boundaries, dependency direction, and repository-specific engineering constraints.
-- [Repository configuration reference](governance/configuration/repository_configuration_reference.md): root .NET, build, formatting, and coverage configuration.
-- [Documentation templates and scaffolding checklist](governance/documentation/documentation_templates.md): ready-to-use repo scaffolding steps and exact markdown templates for each documentation type.
-
-## 5. Reference and configuration
-
-These docs are supporting references for repository-wide configuration, environment contracts, and cross-cutting concerns.
-
-- [Reference documentation](reference/README.md): repository configuration, environment, and supporting reference material.
-- [Configuration and environment reference](governance/configuration/configuration_and_environment.md): environment contracts, runtime assumptions, and configuration conventions.
-- [Local environment reference](reference/environment/local_environment.md): local setup assumptions, developer topology, and environment-specific guidance.
-- [Deployment environment reference](reference/environment/deployment_environment.md): deployed runtime assumptions and support references.
-- [Application settings reference](reference/configuration/appsettings_reference.md): shared configuration-setting conventions and usage notes.
-
-## Recommended reading flow
-
-1. Read the project overview and architecture overview.
-2. Review the API idempotency semantics and messaging topology.
-3. Choose the relevant domain feature guide for runtime behavior.
-4. Use the operations docs for execution, diagnosis, and deployment support.
-5. Consult governance only for repo-wide rules and documentation authority.
+- [Reference documentation](reference/README.md)
