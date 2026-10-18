@@ -1,6 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<ItemGroup>
+		<!-- Domain validation -->
 		<PackageReference Include="FluentValidation" />
+
+		<!-- Logging abstraction -->
 		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
 	</ItemGroup>
 </Project>

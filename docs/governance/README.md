@@ -16,7 +16,7 @@ This folder holds the repository's durable policy, standards, and architectural 
 ## Configuration
 
 - [Configuration and environment reference](configuration/configuration_and_environment.md): environment contracts, runtime assumptions, and repo-wide configuration conventions.
-- [Repository configuration reference](configuration/repository_configuration_reference.md): root-level build, SDK, formatting, and coverage configuration for the repository as a whole.
+- [Repository configuration reference](configuration/repository_configuration_reference.md): root-level build, SDK, package management, project-reference grouping, formatting, and coverage configuration for the repository as a whole.
 
 ## Quality
 

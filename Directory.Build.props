@@ -4,6 +4,8 @@
     <TargetFramework Condition="'$(TargetFramework)' == ''">net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <CodeAnalysisTreatWarningsAsErrors>true</CodeAnalysisTreatWarningsAsErrors>
 
     <!-- Improve reproducibility across local and CI builds -->
     <Deterministic>true</Deterministic>
