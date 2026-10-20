@@ -2,9 +2,22 @@
 
 This document provides authoring scaffolds for the repository documentation set. Templates are aids, not policy authorities: when a template and a governing standard differ, follow the standard and update the template. Select technologies and document sections based on requirements; do not retain irrelevant sections as empty boilerplate.
 
+## Agenda
+
+- [Ready-to-use scaffolding checklist](#1-ready-to-use-scaffolding-checklist)
+- [Root README template](#2-standard-markdown-template-for-the-root-readme)
+- [Documentation index template](#3-standard-markdown-template-for-docsreadmemd)
+- [Architecture template](#4-standard-markdown-template-for-architecture-docs)
+- [Feature README template](#5-standard-markdown-template-for-feature-readme-files)
+- [Operations template](#6-standard-markdown-template-for-operations-docs)
+- [Governance template](#7-standard-markdown-template-for-governance-docs)
+- [Reference template](#8-standard-markdown-template-for-reference-docs)
+- [Authoring guidelines](#9-standard-authoring-guidelines)
+- [Related documentation](#related-documentation)
+
 ## 1. Ready-to-use scaffolding checklist
 
-Use this checklist when creating or reshaping a .NET solution. Choose the SDK version, persistence technology, hosting model, and infrastructure from the business, security, and operational requirements; EF Core and other example technologies are optional.
+Use this checklist when creating or reshaping a .NET solution. For the required order and governance-readiness gate, follow the [New Project Governance Bootstrap](../project_governance_bootstrap.md) first. This checklist is scaffolding, not a substitute for that workflow. Choose the SDK version, persistence technology, hosting model, and infrastructure from the business, security, and operational requirements; EF Core and other example technologies are optional.
 
 - [ ] Create the root README.md with purpose, platform summary, and technology stack
 - [ ] Create docs/README.md as the documentation index

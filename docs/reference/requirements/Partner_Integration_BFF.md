@@ -21,7 +21,7 @@ JSON
 "timestamp": "2024-05-10T14:30:00Z"
 }
 
-- Validates the payload: Amount must be > 0, currency must be valid, all fields required
+- Validates the payload: Amount must be > 0, currency must be one of the system-supported codes (USD or EUR), and all fields are required
 
 2. External Service Integration
 - Before accepting the transaction, the service must verify the partnerId against a mock "Partner Verification API".

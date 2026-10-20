@@ -29,28 +29,28 @@ public class PartnerTransactionRequestValidatorTests
     }
 
     /// <summary>
-    /// Scenario: the currency is not a supported ISO-4217 code.
+    /// Scenario: the currency is a valid ISO-4217 code but is not enabled by the system.
     /// Expected: validation reports a currency error.
     /// </summary>
     [Fact]
     public void Validate_WhenCurrencyIsUnsupported_ReturnsCurrencyError()
     {
-        var request = CreateValidRequest(currency: "XYZ");
+        var request = CreateValidRequest(currency: "GBP");
 
         var result = validator.Validate(request);
 
         result.IsValid.Should().BeFalse();
         result.Errors.Should().ContainSingle(e =>
             e.PropertyName == nameof(PartnerTransactionRequest.Currency)
-            && e.ErrorMessage == "currency must be a valid ISO-4217 code.");
+            && e.ErrorMessage == "currency must be a supported currency code (USD or EUR).");
     }
 
     /// <summary>
-    /// Scenario: the currency uses lowercase letters for a valid ISO code.
+    /// Scenario: the currency uses lowercase letters for an enabled currency code.
     /// Expected: validation succeeds case-insensitively.
     /// </summary>
     [Fact]
-    public void Validate_WhenCurrencyIsLowercaseIso_IsValid()
+    public void Validate_WhenCurrencyIsLowercaseSupportedCode_IsValid()
     {
         var request = CreateValidRequest(currency: "usd");
 

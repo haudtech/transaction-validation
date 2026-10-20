@@ -2,11 +2,24 @@
 
 ## Purpose and authority
 
-Use this workflow to take a feature from an approved business requirement through implementation, verification, and domain-specific documentation. It makes the applicable governance rules explicit without requiring irrelevant patterns or duplicating feature behavior.
+Use this workflow to take a feature from an approved business requirement through implementation, verification, and domain-specific documentation. It makes the applicable governance rules explicit without requiring irrelevant patterns or duplicating feature behavior. For a new project that has not established its governance baseline, complete the [new project governance bootstrap](project_governance_bootstrap.md) first.
 
 This workflow is a delivery checklist, not an architecture decision record or feature specification. The applicable governance standard owns each rule; the feature guide owns current feature behavior. See [governance authority and precedence](documentation/documentation_standards.md#governance-authority-and-precedence).
 
+### Agenda
+
+- [Workflow](#workflow)
+- [New-project prerequisite](#new-project-prerequisite)
+- [AI-assisted implementation](#ai-assisted-implementation)
+- [Definition of done](#definition-of-done)
+- [Exception record](#exception-record)
+- [Related governance](#related-governance)
+
 ## Workflow
+
+### New-project prerequisite
+
+When creating a project with no established governance, follow the ordered [New Project Governance Bootstrap](project_governance_bootstrap.md) and pass its readiness gate before the first implementation change. For an established project, continue with the feature workflow below and consult the applicable authorities.
 
 ### 1. Understand and bound the requirement
 
@@ -57,6 +70,8 @@ Implement through the owning boundary, keeping host composition, business orches
 
 Keep the feature guide current during implementation where practical. Do not wait until the end to reconstruct behavior from code.
 
+When an AI assistant generates or modifies implementation artifacts, it MUST follow the [AI-assisted development standard](ai-assisted-development.md) and its [reusable implementation prompt](ai-assisted-development.md#reusable-implementation-prompt). AI use does not change the governance requirements or reduce the human review obligation.
+
 ### 5. Verify behavior at the owning boundaries
 
 Plan verification against the requirement and its invariants:
@@ -77,6 +92,10 @@ Update architecture documentation only for cross-cutting system design or runtim
 ### 7. Review and complete
 
 Use the definition-of-done checklist below. For each applicable rule, reviewers should be able to follow the evidence from the rule to implementation and verification. Resolve contradictions before merging; do not treat documentation updates as a substitute for code or tests.
+
+## AI-assisted implementation
+
+For AI-generated or AI-edited changes, use the [AI-assisted development standard](ai-assisted-development.md). The prompt requires the assistant to inspect repository state, identify applicable governance rules before editing, stop on unresolved conflicts, implement only the approved scope, run verification, and report evidence and limitations. Prompts guide the workflow but cannot guarantee correctness; a human reviewer must inspect the resulting diff.
 
 ## Definition of done
 

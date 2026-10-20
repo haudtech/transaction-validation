@@ -13,6 +13,14 @@ The files in the repository root define the baseline behavior used across all pr
 - coverage scope and policy for Codecov
 - the test coverage configuration used by local and CI tasks
 
+### Agenda
+
+- [Root-level configuration files](#root-level-configuration-files)
+- [How and when these files matter](#how-and-when-these-files-matter)
+- [Required rules for repository configuration artifacts](#required-rules-for-repository-configuration-artifacts)
+- [Ownership boundary](#ownership-boundary)
+- [Related governance documents](#related-governance-documents)
+
 ## Root-level configuration files
 
 | File | Purpose | Applied when | Typical consumer | Governing rule |

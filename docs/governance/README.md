@@ -25,7 +25,9 @@ This folder holds the repository's durable policy, standards, and architectural 
 
 ## Feature delivery
 
+- [New project governance bootstrap](project_governance_bootstrap.md): ordered readiness checklist for defining project governance before the first implementation.
 - [Feature delivery workflow](feature_delivery_workflow.md): requirement-to-implementation workflow, governance applicability, verification, documentation, definition of done, and exception handling.
+- [AI-assisted development standard](ai-assisted-development.md): required ordered governance review, implementation, verification, and reporting sequence plus a reusable prompt for AI-generated changes.
 
 ## Ownership boundary
 

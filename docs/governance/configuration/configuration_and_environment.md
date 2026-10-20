@@ -2,6 +2,14 @@
 
 This document is the repository-level reference for environment contracts, configuration conventions, and runtime assumptions that are shared across projects.
 
+## Agenda
+
+- [Configuration ownership](#configuration-ownership)
+- [Typical configuration domains](#typical-configuration-domains)
+- [Environment conventions](#environment-conventions)
+- [Relationship to other docs](#relationship-to-other-docs)
+- [Summary](#summary)
+
 ## Configuration ownership
 
 Repository-wide configuration is governed by the standards in [repository_configuration_reference.md](repository_configuration_reference.md).

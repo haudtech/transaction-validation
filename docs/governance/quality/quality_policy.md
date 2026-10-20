@@ -2,6 +2,12 @@
 
 This document describes the expected quality baseline for the repository.
 
+## Agenda
+
+- [Required checks](#required-checks)
+- [Quality gate principles](#quality-gate-principles)
+- [Related docs](#related-docs)
+
 ## Required checks
 
 - format verification

@@ -8,6 +8,14 @@ The repository follows a pragmatic service-oriented design with separately compo
 
 The standards below are not theoretical; they reflect the actual implementation model used across the API, configuration, messaging, integration, and mock host projects.
 
+### Agenda
+
+- [Core engineering principles](#core-engineering-principles)
+- [Applicable pattern rules](#applicable-pattern-rules)
+- [Reusable patterns derived from this repository](#reusable-patterns-derived-from-this-repository)
+- [Standards for reuse in other .NET projects](#standards-for-reuse-in-other-net-projects)
+- [Related docs](#related-docs)
+
 ## Core engineering principles
 
 ### 1. Keep the executable host thin and explicit
@@ -255,6 +263,8 @@ public sealed class ProfileHttpClient : IProfileClient
 
 **Illustrative .NET client-pipeline shape:**
 
+This example is for an idempotent read operation. Do not enable automatic retries for a write unless its idempotency/duplicate-side-effect contract is explicit.
+
 ```csharp
 services.AddHttpClient<IProfileClient, ProfileHttpClient>()
     .AddStandardResilienceHandler(options =>
@@ -290,9 +300,26 @@ catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
 ```csharp
 services.AddOptions<ProfileServiceOptions>()
     .BindConfiguration(ProfileServiceOptions.SectionName)
-    .Validate(options => Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out _),
-        "BaseUrl must be an absolute URI.")
+    .Validate(options =>
+            Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out _)
+            && options.Timeout > TimeSpan.Zero,
+        "BaseUrl must be absolute and Timeout must be positive.")
     .ValidateOnStart();
+
+services.AddSingleton<IProfileClient>(serviceProvider =>
+{
+    var options = serviceProvider
+        .GetRequiredService<IOptions<ProfileServiceOptions>>()
+        .Value;
+
+    return options.Implementation switch
+    {
+        "Primary" => serviceProvider.GetRequiredService<PrimaryProfileClient>(),
+        "Backup" => serviceProvider.GetRequiredService<BackupProfileClient>(),
+        _ => throw new InvalidOperationException(
+            $"Unsupported profile client implementation '{options.Implementation}'.")
+    };
+});
 ```
 
 ### CS-CFG-02 — Keep secrets out of source-controlled configuration
@@ -360,9 +387,16 @@ builder.Services.AddOptions<PartnerClientOptions>()
 await validator.ValidateAndThrowAsync(request, cancellationToken);
 
 var acquisition = await store.TryAcquireAsync(request.Key, cancellationToken);
-if (acquisition.IsDuplicate)
+switch (acquisition.Status)
 {
-    return acquisition.CachedResult;
+    case AcquisitionStatus.Acquired:
+        break;
+    case AcquisitionStatus.DuplicateWithCachedSuccess:
+        return acquisition.CachedResult;
+    case AcquisitionStatus.KeyReusedWithDifferentPayload:
+        throw new ConflictException("The idempotency key was used for a different payload.");
+    default:
+        throw new InvalidOperationException("Unexpected acquisition result.");
 }
 
 try
@@ -378,6 +412,61 @@ catch
 }
 ```
 
+### CS-VAL-01 — Parse finite external values into typed domain values
+
+- **Applicability** - an external textual value (for example, an API field, configuration value, or message field) represents one value from a finite set of domain-supported choices and downstream behavior depends on that choice.
+- **Requirement** - the owning boundary MUST normalize and parse the external representation into a typed domain value before applying domain-specific rules or behavior. Parsing MUST reject malformed and unsupported values; normalization (such as trimming or case folding) MUST be explicit and consistent with the external contract. The parsed value SHOULD be carried forward so downstream logic does not independently re-parse the same input. A finite enum or equivalent closed type MUST represent an allowlist when that matches the domain. This rule MUST NOT be used to force enums/parsers onto open-ended text, free-form identifiers, or values better expressed by ordinary predicates such as numeric ranges.
+- **Rationale** - one explicit conversion boundary prevents inconsistent normalization, accidental acceptance of unsupported values, runtime/environment-dependent allowlists, and repeated string comparisons across features.
+- **Approved pattern** - keep externally compatible DTO fields in their wire representation when necessary; parse them once through a domain-named parser into a supported enum/value type, then validate or process that typed value. Keep shared types and implementation grouped by responsibility (for example, `Enums`, `Parsers`, and `Validation`) under the owning project, with domain-specific names rather than a catch-all `Common` namespace.
+- **Code example** - provide a canonical `TryParse` method and a convenience `IsSupported` predicate:
+
+```csharp
+using System;
+
+public enum DeliveryMode
+{
+    Standard,
+    Express
+}
+
+public static class DeliveryModeParser
+{
+    public static bool IsSupported(string? text)
+    {
+        return TryParse(text, out _);
+    }
+
+    public static bool TryParse(string? text, out DeliveryMode mode)
+    {
+        mode = default;
+        var normalized = text?.Trim();
+
+        if (string.IsNullOrEmpty(normalized))
+        {
+            return false;
+        }
+
+        foreach (var name in Enum.GetNames<DeliveryMode>())
+        {
+            if (string.Equals(name, normalized, StringComparison.OrdinalIgnoreCase)
+                && Enum.TryParse(name, out DeliveryMode parsed)
+                && Enum.IsDefined(parsed))
+            {
+                mode = parsed;
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+```
+
+Parser API convention: `TryParse` MUST be the canonical operation and return the normalized typed value through an `out` parameter; on every failure path, it MUST leave that output as `default` and return `false`. For enum-backed allowlists, it MUST reject numeric representations unless the external contract explicitly permits them. `IsSupported` MAY be exposed as a convenience predicate, but MUST delegate to `TryParse` so parsing and support checks cannot diverge. Callers that need the typed value MUST use the result of `TryParse` for subsequent domain validation rather than parsing the original text again.
+
+- **Verification** - test supported values, casing/whitespace normalization where allowed, malformed values, unsupported values, numeric enum text where it is not allowed, and `default` output after each parse failure; verify the owning API/message/configuration boundary reports the defined validation failure and downstream logic uses the parsed value. Review that no second, divergent parser or environment-derived allowlist exists.
+- **Exception process** - document the Rule ID, reason, impact, approver, review condition, and compensating verification using the [feature-delivery exception record](../feature_delivery_workflow.md#exception-record).
+
 ### CS-HOST-01 — Keep executable hosts thin and explicit
 
 - **Applicability** - a .NET application has an executable host or entry point that composes runtime services.
@@ -392,7 +481,7 @@ catch
 ### CS-HTTP-01 — Normalize ASP.NET Core errors with ProblemDetails
 
 - **Applicability** - an ASP.NET Core HTTP API translates application or dependency failures into HTTP responses.
-- **Requirement** - known application exception categories MUST map to stable HTTP status/title/type values in `ProblemDetails`; each recognized exception MUST use its specific message as `Detail`. Unknown exceptions MUST return a generic `500` `ProblemDetails` without internal exception details. Middleware-generated failures MUST use the same representation when they are part of the API's error contract.
+- **Requirement** - known application exception categories MUST map to stable HTTP status/title/type values in `ProblemDetails`; each recognized exception MUST use its specific message as `Detail`. Unknown exceptions MUST return a generic `500` `ProblemDetails` without internal exception details. Middleware-generated failures MUST use `ProblemDetails` when they share that error representation contract; a deliberately separate middleware response contract MAY use another stable shape, but MUST be documented and tested distinctly.
 - **Rationale** - clients receive a consistent machine-readable error shape while useful known failure context is preserved and implementation details remain private.
 - **Avoid** - constructing different ad hoc error payloads in controllers, returning exception stack traces, or using an exception's raw message for an unrecognized `500`.
 - **Approved pattern** - centralize exception mapping in ASP.NET Core `IExceptionHandler`; see the [ProblemDetails pattern and code example](#reusable-patterns-derived-from-this-repository).
@@ -414,10 +503,19 @@ catch
 **Illustrative consumer shape:**
 
 ```csharp
+// Each fan-out consumer has its own subscription/queue.
+services.AddConsumer<BillingHandler>("billing-events");
+services.AddConsumer<AuditHandler>("audit-events");
+
 var delivery = await receiver.ReceiveAsync(cancellationToken);
 var message = deserializer.Deserialize(delivery.Body);
 
-await handler.HandleAsync(message, cancellationToken);
+// Illustrative inbox contract: its implementation must atomically persist the processed ID
+// with the side effect, or otherwise make the handler operation itself idempotent.
+await processedMessages.ExecuteOnceAsync(
+    message.Id,
+    () => handler.HandleAsync(message, cancellationToken),
+    cancellationToken);
 await delivery.AcknowledgeAsync(cancellationToken);
 ```
 
@@ -435,6 +533,10 @@ await delivery.AcknowledgeAsync(cancellationToken);
 **Illustrative structured-logging shape:**
 
 ```csharp
+// Reuse the incoming/canonical correlation ID; do not generate a new ID per hop.
+outboundRequest.Headers.TryAddWithoutValidation("Correlation-Id", correlationId);
+message.Metadata["correlationId"] = correlationId;
+
 public static partial class RequestLog
 {
     [LoggerMessage(
@@ -445,7 +547,7 @@ public static partial class RequestLog
 }
 
 Activity.Current?.SetTag("app.correlation_id", correlationId);
-RequestLog.Accepted(logger, correlationId); // Do not add credentials or raw payloads.
+RequestLog.Accepted(logger, correlationId); // Do not add credentials, idempotency keys, or raw payloads.
 ```
 
 ### CS-TEST-01 — Test observable behavior at the owning boundary
@@ -463,11 +565,12 @@ RequestLog.Accepted(logger, correlationId); // Do not add credentials or raw pay
 
 ```csharp
 [Fact]
-public async Task HandleAsync_WhenRequestIsValid_ReturnsAcceptedResult()
+public async Task HandleAsync_WhenRequestIsInvalid_RejectsWithoutPublishing()
 {
-    var result = await _sut.HandleAsync(_validRequest, CancellationToken.None);
+    var result = await _sut.HandleAsync(_invalidRequest, CancellationToken.None);
 
-    Assert.Equal(ProcessingStatus.Accepted, result.Status);
+    Assert.Equal(ProcessingStatus.Rejected, result.Status);
+    Assert.Empty(_publisher.PublishedMessages);
 }
 ```
 
@@ -596,7 +699,7 @@ The portable workflow example is the [CS-FLOW-01 state-transition example](#cs-f
 
 - **Scope** - ASP.NET Core HTTP APIs.
 - **Applies when** - an ASP.NET Core API needs a stable error contract across middleware, controllers, and application services.
-- **Reusable shape** - translate each known application exception at the HTTP boundary into `ProblemDetails` with its mapped status/title/type and the exception's specific `Message` as `Detail`. Unexpected failures MUST produce a generic `500` `ProblemDetails` with a safe fixed detail, never the internal exception message. Middleware-generated errors MUST use the same representation when they participate in the same API error contract. Non-HTTP .NET hosts should use the equivalent error representation for their transport.
+- **Reusable shape** - translate each known application exception at the HTTP boundary into `ProblemDetails` with its mapped status/title/type and the exception's specific `Message` as `Detail`. Unexpected failures MUST produce a generic `500` `ProblemDetails` with a safe fixed detail, never the internal exception message. Middleware-generated failures MUST use `ProblemDetails` when they share that error representation contract; a deliberately separate middleware response contract MAY use another stable shape, but MUST be documented and tested distinctly. Non-HTTP .NET hosts should use the equivalent error representation for their transport.
 
 ```csharp
 public sealed class ApiExceptionHandler : IExceptionHandler

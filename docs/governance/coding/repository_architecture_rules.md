@@ -6,6 +6,17 @@ This document records the repository-specific architecture and dependency rules 
 
 The rules below describe responsibilities and boundaries that are currently verified by the code and tests in this solution.
 
+### Agenda
+
+- [Core project and component boundaries](#core-boundaries)
+- [Architecture terminology and service boundaries](#architecture-terminology-and-service-boundaries)
+- [Canonical coding patterns applied by this architecture](#canonical-coding-patterns-applied-by-this-architecture)
+- [Enforced repository rules](#enforced-rules)
+- [Repository-specific infrastructure and delivery rules](#repository-specific-infrastructure-and-delivery-rules)
+- [Dependency direction](#dependency-direction)
+- [Runtime invariants](#runtime-invariants)
+- [Related documentation](#related-documentation)
+
 ## Core boundaries
 
 ### API host boundary
@@ -15,6 +26,38 @@ The `TransactionValidation.Api` project owns the HTTP host, middleware compositi
 ### Core validation and orchestration boundary
 
 The `TransactionValidation.Core` project owns the domain validation, data contracts, and orchestration semantics that are independent of the broker transport and hosting layer. It should remain stable under both local and Azure deployment modes.
+
+### Core responsibility-based folder structure
+
+Core types MUST be placed in the top-level folder that matches their primary implementation responsibility:
+
+| Folder | Owns | Current example |
+|---|---|---|
+| `Enums/` | Closed domain value sets represented as enums. Keep enum member names and meaning domain-specific. | `CurrencyCode` defines the supported `USD` and `EUR` values. |
+| `Parsers/` | Conversion of external representations into canonical typed values, including explicit normalization and rejection of unsupported input. | `CurrencyCodeParser.TryParse` trims and parses supported currency codes; `IsSupported` delegates to it. |
+| `Validation/` | Validation rules for domain/request models and composition of parser results with other field rules. | `PartnerTransactionRequestValidator` owns request validation and calls `CurrencyCodeParser.IsSupported`. |
+
+These folders are responsibility-based, not domain silos: keep types domain-named (`CurrencyCode`, `CurrencyCodeParser`, `PartnerTransactionRequestValidator`) and group files by what they do. Use `TryParse` when downstream behavior needs the typed value; use an `IsSupported` predicate only when a pass/fail check is sufficient. Preserve external DTO/wire types when required for API compatibility, and do not re-parse the original input in downstream logic when a parsed value is already available.
+
+Do not use `Common/` as a general-purpose home for enums, parsers, or validators. Add a new responsibility folder only when the project has types that belong to that responsibility; do not create nested `Common/Enums`, `Common/Parsers`, or `Common/Validations` folders. Keep simple or single-purpose domain behavior in its existing owner when moving it would obscure ownership.
+
+The Core source tree is organized by responsibility, not by C# accessibility. Do not add `Public/`, `Internal/`, or `Private/` directory branches: folders and namespaces do not enforce visibility. Use `public` only for contracts and types intentionally consumed outside the assembly, `internal` for assembly-scoped implementation types when they do not need to cross project boundaries, and `private` for implementation details at member/nested-type scope. Keep a type in the responsibility folder that owns it regardless of its access modifier. For example:
+
+```text
+TransactionValidation.Core/
+├── Enums/
+│   └── CurrencyCode.cs                 (public domain value set)
+├── Parsers/
+│   └── CurrencyCodeParser.cs           (public Core parsing contract)
+├── Validation/
+│   └── PartnerTransactionRequestValidator.cs
+├── Models/
+├── Interfaces/
+├── Exceptions/
+└── Logging/
+```
+
+This is an illustrative responsibility tree, not a requirement to create empty folders. Keep the public API as small as practical; prefer `internal` or private helpers when consumers outside the Core assembly do not need them. If a type must be consumed by another project, its accessibility must permit that use—the folder structure itself grants no access.
 
 ### Configuration boundary
 
@@ -45,6 +88,7 @@ Reusable implementation rules and C# examples are owned by [Coding Standards](co
 | [CS-HOST-01 — Keep executable hosts thin and explicit](coding_standards.md#cs-host-01-keep-executable-hosts-thin-and-explicit) | API and Mock hosts compose shared services and runtime-specific registrations; they are separately hosted components, not thereby independent microservices. | [Runtime and API host composition](../../features/runtime-and-api/README.md#pattern-thin-executable-composition-root). |
 | [CS-EXT-01 — Keep external protocol and SDK details inside adapters](coding_standards.md#cs-ext-01-keep-external-protocol-and-sdk-details-inside-adapters) | Core-facing contracts remain broker-neutral; `Integration` translates partner HTTP outcomes and `Messaging` owns RabbitMQ/Service Bus adapters. | [Messaging publication contract](../../features/messaging/README.md#pattern-publish-through-a-transport-neutral-contract); [partner outcome translation](../../features/reliability/README.md#pattern-translate-terminal-dependency-outcomes-at-the-adapter). |
 | [CS-CFG-01 — Bind and validate configuration at the composition boundary](coding_standards.md#cs-cfg-01-bind-and-validate-configuration-at-the-composition-boundary) | Typed options and broker/state implementation selection are bound and composed at host startup. | [Runtime selection](../../features/runtime-and-api/README.md#pattern-single-runtime-implementation-selection); [repository configuration rules](../configuration/repository_configuration_reference.md). |
+| [CS-VAL-01 — Parse finite external values into typed domain values](coding_standards.md#cs-val-01-parse-finite-external-values-into-typed-domain-values) | Currency request text is normalized and checked against the explicit `CurrencyCode` allowlist through `CurrencyCodeParser`; the API wire field remains a string. | [Currency request contract](../../features/validation-and-security/README.md#request-contract). |
 | [CS-FLOW-01 — Validate before side effects and make state transitions explicit](coding_standards.md#cs-flow-01-validate-before-side-effects-and-make-state-transitions-explicit) | The API validates requests before acquiring idempotency state and releases acquired state after downstream failure. | [Validation-before-side-effects](../../features/validation-and-security/README.md#pattern-validate-before-side-effects); [distributed state contract](../../features/distributed-state/README.md#pattern-store-behind-one-workflow-contract). |
 | [CS-OBS-01 — Propagate context while minimizing sensitive telemetry](coding_standards.md#cs-obs-01-propagate-context-while-minimizing-sensitive-telemetry) | Correlation and message identity cross the API and broker boundaries; generated logging catalogs are used for operational events. | [Observability patterns](../../features/observability/README.md#governance-rule-traceability); [logging standards](../../operations/diagnostics/logging_standards.md). |
 | [CS-TEST-01 — Test observable behavior at the owning boundary](coding_standards.md#cs-test-01-test-observable-behavior-at-the-owning-boundary) | Unit, real-host integration, and broker-backed E2E tests verify different contracts. | [Testing and quality patterns](../../features/testing-and-quality/README.md#governance-rule-traceability). |
@@ -63,6 +107,8 @@ The [Observability feature](../../features/observability/README.md) owns the imp
 6. Runtime behavior claims MUST be based on current code/configuration/tests/workflows/infrastructure; generated `TestResults/` output is evidence, not design authority.
 7. Feature documentation MUST describe current implemented behavior; architecture and policy documentation MUST not turn historical or speculative plans into current constraints.
 8. For reusable implementation practices, defer to the canonical Rule ID in [Coding Standards](coding_standards.md); this document adds only repository-specific constraints and mappings.
+9. Core enums, parsers, and domain/request validators MUST live in their respective top-level responsibility folders (`Enums/`, `Parsers/`, and `Validation/`) and MUST use domain-specific type names; `Common/` MUST NOT become a catch-all for these responsibilities.
+10. Core source folders MUST reflect implementation responsibility rather than C# visibility. Visibility MUST be controlled with C# access modifiers; separate `Public/`, `Internal/`, or `Private/` folder branches MUST NOT be introduced as an access-control mechanism.
 
 ## Repository-specific infrastructure and delivery rules
 
