@@ -553,24 +553,30 @@ RequestLog.Accepted(logger, correlationId); // Do not add credentials, idempoten
 ### CS-TEST-01 — Test observable behavior at the owning boundary
 
 - **Applicability** - adding or changing feature behavior.
-- **Requirement** - unit tests MUST prove owned decision logic; host/integration tests MUST prove relevant composition and middleware behavior; runtime tests SHOULD prove infrastructure topology or protocol behavior when the requirement depends on it. Failure paths and invariants MUST be covered, not only the happy path.
+- **Requirement** - unit tests MUST prove owned decision logic; host/integration tests MUST prove relevant composition and middleware behavior; runtime tests SHOULD prove infrastructure topology or protocol behavior when the requirement depends on it. Failure paths and invariants MUST be covered, not only the happy path. When xUnit is used and several inputs exercise the same behavior and assertions, tests SHOULD use `[Theory]` with `[InlineData]` for a small, static dataset. Use `[MemberData]`, `[ClassData]`, or separate tests when data is complex, computed, shared, or represents distinct behavior; parameterization MUST NOT obscure scenario intent.
 - **Rationale** - confidence should come from the boundary that owns the behavior, while avoiding slow infrastructure tests for logic that can be tested deterministically.
 - **Avoid** - asserting only mock interactions when an observable result can be tested, using E2E as the sole coverage for business logic, or adding test-only production APIs to simplify assertions.
-- **Approved pattern** - verify owned decisions with focused tests, host composition at the host boundary, and infrastructure contracts with runtime tests only when required; see [testing and quality](../../features/testing-and-quality/README.md).
-- **Code example** - see the illustrative behavior-focused unit-test shape below.
+- **Approved pattern** - verify owned decisions with focused tests, host composition at the host boundary, and infrastructure contracts with runtime tests only when required. Use data-driven tests to reduce repeated setup/assertions for related cases, while keeping semantically different outcomes clear; see [testing and quality](../../features/testing-and-quality/README.md).
+- **Code example** - the following xUnit example parameterizes a compact set of related parser cases:
 - **Verification** - follow [quality policy](../quality/quality_policy.md) and use the repository's [test execution guide](../../operations/testing/test/test_execution_and_coverage_guide.md) for supported commands.
 - **Exception process** - document the rule ID, reason, impact, approver, review condition, and compensating verification using the [feature-delivery exception record](../feature_delivery_workflow.md#exception-record).
 
-**Illustrative behavior-focused unit-test shape:**
+**Illustrative parameterized behavior-test shape:**
 
 ```csharp
-[Fact]
-public async Task HandleAsync_WhenRequestIsInvalid_RejectsWithoutPublishing()
-{
-    var result = await _sut.HandleAsync(_invalidRequest, CancellationToken.None);
+using TransactionValidation.Core.Parsers;
+using Xunit;
 
-    Assert.Equal(ProcessingStatus.Rejected, result.Status);
-    Assert.Empty(_publisher.PublishedMessages);
+[Theory]
+[InlineData("USD", true)]
+[InlineData(" usd ", true)]
+[InlineData("GBP", false)]
+[InlineData("123", false)]
+public void IsSupported_WhenGivenCurrencyText_ReturnsExpectedResult(
+    string value,
+    bool expected)
+{
+    Assert.Equal(expected, CurrencyCodeParser.IsSupported(value));
 }
 ```
 
