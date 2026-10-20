@@ -2,6 +2,12 @@
 
 This document defines the repository's intended coverage posture and quality expectations.
 
+## Agenda
+
+- [Coverage mindset](#coverage-mindset)
+- [Standard expectations](#standard-expectations)
+- [Related docs](#related-docs)
+
 ## Coverage mindset
 
 Coverage is not only a metric; it is a signal of risk reduction and confidence in changed behavior.

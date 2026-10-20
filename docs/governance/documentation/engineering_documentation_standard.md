@@ -4,6 +4,18 @@
 
 This document is the concise, repo-level summary of the engineering documentation model. It defines this repository's layout and ownership boundaries and acts as the quick-reference version of the detailed guidance in [documentation_standards.md](documentation_standards.md). It is not a universal .NET project template; adapt the structure and technology choices to the requirements of each solution.
 
+### Agenda
+
+- [Standard documentation layers](#standard-documentation-layers)
+- [Canonical repository structure](#canonical-repository-structure)
+- [Core rules](#core-rules)
+- [Source of truth](#source-of-truth)
+- [Choose documentation and technology by requirements](#choose-documentation-and-technology-by-requirements)
+- [Repository entry points](#repository-entry-points)
+- [Governance relationship](#governance-relationship)
+- [Governance authority map](#governance-authority-map)
+- [Related documentation](#related-documentation)
+
 ## Standard documentation layers
 
 This repository uses the following five-layer model. Other solutions may adapt it to their needs while preserving clear ownership and avoiding duplicate authority:

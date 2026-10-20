@@ -4,7 +4,10 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
+    <!-- API and integration-host test support -->
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+
+    <!-- Test execution and coverage -->
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="coverlet.collector">
       <PrivateAssets>all</PrivateAssets>
@@ -15,6 +18,8 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+
+    <!-- Assertions, mocking, and mock proxy support -->
     <PackageReference Include="Castle.Core" />
     <PackageReference Include="Moq" />
     <PackageReference Include="FluentAssertions" />

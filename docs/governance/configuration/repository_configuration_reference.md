@@ -13,15 +13,24 @@ The files in the repository root define the baseline behavior used across all pr
 - coverage scope and policy for Codecov
 - the test coverage configuration used by local and CI tasks
 
+### Agenda
+
+- [Root-level configuration files](#root-level-configuration-files)
+- [How and when these files matter](#how-and-when-these-files-matter)
+- [Required rules for repository configuration artifacts](#required-rules-for-repository-configuration-artifacts)
+- [Ownership boundary](#ownership-boundary)
+- [Related governance documents](#related-governance-documents)
+
 ## Root-level configuration files
 
 | File | Purpose | Applied when | Typical consumer | Governing rule |
 |---|---|---|---|---|
 | [../../../global.json](../../../global.json) | Pins the required .NET SDK version and roll-forward behavior. | `dotnet restore`, `dotnet build`, `dotnet test`, and SDK selection in tools. | .NET CLI and CI agents | RCFG-BASELINE-01 |
 | [../../../Directory.Build.props](../../../Directory.Build.props) | Defines repository-wide MSBuild defaults such as target framework, nullable, implicit usings, and deterministic builds. | Every build and restore for SDK-style projects. | MSBuild and all project builds | RCFG-BASELINE-01 |
-| [../../../Directory.Packages.props](../../../Directory.Packages.props) | Centralizes package version definitions for the whole solution. | Restore and package resolution. | NuGet restore and all projects | RCFG-BASELINE-01 |
+| [../../../Directory.Packages.props](../../../Directory.Packages.props) | Centralizes package version definitions grouped by package responsibility. | Restore and package resolution. | NuGet restore and all projects | RCFG-BASELINE-01; RCFG-DEPENDENCY-01 |
+| Project files (`**/*.csproj`) | Declare project package and project dependencies in distinct item groups. | Project evaluation, restore, and build. | MSBuild and NuGet | RCFG-DEPENDENCY-01 |
 | [../../../docker-compose.yml](../../../docker-compose.yml) | Defines the local multi-service runtime topology used for development and Docker-backed E2E verification. | Local Compose startup and E2E workflows that require the repository service topology. | Docker Compose and contributors | RCFG-COMPOSE-01 |
-| [../../../.editorconfig](../../../.editorconfig) | Enforces coding style, indentation, newline rules, and analyzer severity. | During editing, formatting, and analyzer execution. | IDEs, formatters, and build analyzers | RCFG-STYLE-01 |
+| [../../../.editorconfig](../../../.editorconfig) | Defines coding style, indentation, newline rules, and analyzer severity. | During editing, explicit formatting checks, and build-time analyzer checks. | IDEs, `dotnet format`, and build analyzers | RCFG-STYLE-01 |
 | [../../../.github/workflows](../../../.github/workflows) | Defines automated CI, integration, infrastructure, and application-delivery behavior. | GitHub workflow events and protected deployment environments. | GitHub Actions | RCFG-WORKFLOW-01; TXV-DEL-01/02/03 where applicable |
 | [../../../.vscode/tasks.json](../../../.vscode/tasks.json) | Registers the repo's common development, build, and test workflows as VS Code tasks. | Local development, debugging, and quality verification from the editor. | VS Code task runner and contributors | RCFG-VSCODE-01 |
 | [../../../.vscode/launch.json](../../../.vscode/launch.json) | Defines debug profiles for the API, mock endpoints, and browser-driven local debugging flows. | Local debugging and inspection of the application runtime. | VS Code debugger | CS-DEBUG-01; RCFG-VSCODE-01 |
@@ -44,7 +53,7 @@ These files are part of the build contract. They should be changed only when the
 
 ### Code style and quality rules
 
-`.editorconfig` defines the formatting and analyzer expectations for C# code. It is the editor and tooling boundary for consistent style, whitespace, naming, and severity enforcement.
+`.editorconfig` defines the formatting and analyzer expectations for C# code. It is the editor and tooling boundary for consistent style, whitespace, naming, and severity enforcement. `EnforceCodeStyleInBuild` enables build-time code-style analyzers, and `CodeAnalysisTreatWarningsAsErrors` promotes analyzer warnings to build errors without changing ordinary compiler-warning handling. Formatting preferences are checked separately by the repository's `dotnet format` verification task and CI step; `dotnet build` does not run a whitespace-format check. Suggestion-level preferences remain advisory.
 
 The file is not a feature doc and not a runtime configuration file. It is a repository-wide engineering standard that applies during authoring and analysis.
 
@@ -100,6 +109,34 @@ The rules below govern the listed machine-readable files in this repository. The
 
 - **Verification** - confirm `dotnet --version` selects the pinned SDK, then run restore/build; review project files for duplicated package versions and unexplained overrides.
 - **Exception process** - document the affected project, reason, scope, approver, and future review condition; update CI/local tooling consistently.
+
+### RCFG-DEPENDENCY-01 — Group package and project references by responsibility
+
+- **Applicability** - a .NET project declares `PackageReference` or `ProjectReference` items, or the repository centrally manages package versions in `Directory.Packages.props`.
+- **Requirement** - project files MUST keep `PackageReference` and `ProjectReference` items in separate `ItemGroup` elements; an item group MUST NOT mix the two reference kinds. `Directory.Packages.props` MUST organize package versions into clearly labeled responsibility/domain groups using XML comments. Categories SHOULD reflect the repository's actual dependencies (for example, API/hosting, validation, observability, messaging/state, and testing), rather than forcing packages into unsuitable generic labels.
+- **Rationale** - distinct dependency groups make project composition and package ownership easier to scan and review while retaining central version governance.
+- **Approved pattern** - put each reference kind in its own item group, and add a short comment before each responsibility group in the central package-version file.
+- **Configuration example**:
+
+```xml
+<!-- Project.csproj -->
+<ItemGroup>
+	<!-- Runtime package dependencies -->
+	<PackageReference Include="Example.Library" />
+</ItemGroup>
+
+<ItemGroup>
+	<!-- Internal project dependencies -->
+	<ProjectReference Include="../Example.Core/Example.Core.csproj" />
+</ItemGroup>
+
+<!-- Directory.Packages.props -->
+<!-- Observability -->
+<PackageVersion Include="Example.Telemetry" Version="1.2.3" />
+```
+
+- **Verification** - inspect each changed project file to confirm package and project references occupy separate item groups; confirm `Directory.Packages.props` retains one centrally governed version per package and that each entry appears under an appropriate responsibility comment; run `dotnet restore` or `dotnet build` to validate MSBuild/NuGet evaluation.
+- **Exception process** - if a project or package cannot fit this grouping without obscuring its role, document the affected file and rationale in review; do not duplicate or locally override centrally managed package versions as a workaround.
 
 ### RCFG-COMPOSE-01 — Use Compose as the local multi-service E2E topology
 
@@ -171,9 +208,9 @@ coverage:
 ### RCFG-STYLE-01 — Use `.editorconfig` as the repository style authority
 
 - **Applicability** - contributors use IDEs, formatters, or analyzers that honor EditorConfig.
-- **Requirement** - shared formatting, naming, and analyzer severities MUST be declared in the root `.editorconfig`. Suppressions or project-specific overrides MUST be narrow, justified, and reviewable. Formatting/analyzer policy MUST be validated by repository checks.
+- **Requirement** - shared formatting, naming, and analyzer severities MUST be declared in the root `.editorconfig`. Suppressions or project-specific overrides MUST be narrow, justified, and reviewable. Build-blocking analyzer rules MUST be validated by `dotnet build`; formatting preferences MUST be checked by the repository's explicit format-verification workflow; advisory preferences MAY remain suggestion-level.
 - **Rationale** - one machine-readable style authority reduces tool and contributor drift.
-- **Approved pattern** - set common editor rules at the root and run `dotnet format --verify-no-changes` plus build analyzers in validation.
+- **Approved pattern** - set common editor rules at the root and enable `EnforceCodeStyleInBuild` and `CodeAnalysisTreatWarningsAsErrors` for analyzer enforcement during builds. Run `dotnet format --verify-no-changes` as a separate formatting verification step.
 - **Configuration example**:
 
 ```ini
@@ -183,7 +220,7 @@ insert_final_newline = true
 dotnet_diagnostic.CA1848.severity = error
 ```
 
-- **Verification** - run the configured format task and build; verify the relevant analyzer diagnostics are enforced.
+- **Verification** - run `dotnet build` and the configured format verification task separately; confirm analyzer diagnostics fail the build at the configured severity and formatting differences fail format verification.
 - **Exception process** - justify any severity downgrade or scoped suppression in review and preserve coverage of equivalent checks.
 
 ### RCFG-WORKFLOW-01 — Keep GitHub workflow responsibilities explicit and least-privileged

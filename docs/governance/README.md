@@ -16,7 +16,7 @@ This folder holds the repository's durable policy, standards, and architectural 
 ## Configuration
 
 - [Configuration and environment reference](configuration/configuration_and_environment.md): environment contracts, runtime assumptions, and repo-wide configuration conventions.
-- [Repository configuration reference](configuration/repository_configuration_reference.md): root-level build, SDK, formatting, and coverage configuration for the repository as a whole.
+- [Repository configuration reference](configuration/repository_configuration_reference.md): root-level build, SDK, package management, project-reference grouping, formatting, and coverage configuration for the repository as a whole.
 
 ## Quality
 
@@ -25,7 +25,9 @@ This folder holds the repository's durable policy, standards, and architectural 
 
 ## Feature delivery
 
+- [New project governance bootstrap](project_governance_bootstrap.md): ordered readiness checklist for defining project governance before the first implementation.
 - [Feature delivery workflow](feature_delivery_workflow.md): requirement-to-implementation workflow, governance applicability, verification, documentation, definition of done, and exception handling.
+- [AI-assisted development standard](ai-assisted-development.md): required ordered governance review, implementation, verification, and reporting sequence plus a reusable prompt for AI-generated changes.
 
 ## Ownership boundary
 

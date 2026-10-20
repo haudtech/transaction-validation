@@ -6,6 +6,20 @@ This document defines the repository's permanent documentation standards for fea
 
 This standard is intentionally stable. It governs the feature documentation tree and the document boundaries across the repository. It does not describe historical cleanup activity or implementation-era work.
 
+### Agenda
+
+- [Governance authority and precedence](#governance-authority-and-precedence)
+- [Documentation layers](#documentation-layers)
+- [Source of truth](#source-of-truth)
+- [Feature documentation model](#feature-documentation-model)
+- [Ownership boundaries](#ownership-boundaries)
+- [Required feature content rules](#required-feature-content-rules)
+- [Pattern authoring rules](#pattern-authoring-rules)
+- [Evidence-first rule](#evidence-first-rule)
+- [No duplication rule](#no-duplication-rule)
+- [Maintenance rule](#maintenance-rule)
+- [Related documentation](#related-documentation)
+
 ## Governance authority and precedence
 
 Use the governance document that owns the concern; do not create a competing authority by copying its rules into another standard or feature guide.

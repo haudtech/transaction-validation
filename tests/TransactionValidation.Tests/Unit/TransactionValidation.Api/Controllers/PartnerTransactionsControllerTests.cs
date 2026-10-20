@@ -52,7 +52,7 @@ public sealed class PartnerTransactionsControllerTests
         var action = async () => await sut.CreateAsync(request, CancellationToken.None);
 
         await action.Should().ThrowAsync<BadRequestException>()
-            .WithMessage("*currency must be a valid ISO-4217 code.*");
+            .WithMessage("*currency must be a supported currency code (USD or EUR).*");
     }
 
     /// <summary>
@@ -75,17 +75,17 @@ public sealed class PartnerTransactionsControllerTests
     }
 
     /// <summary>
-    /// Scenario: validation fails because the request has missing partner and transaction metadata.
-    /// Expected: the controller still builds an error context using empty strings for null values.
+    /// Scenario: validation fails because the request has empty partner and transaction metadata.
+    /// Expected: the controller still builds an error context using the empty values.
     /// </summary>
     [Fact]
-    public async Task CreateAsync_WhenValidationFailsWithNullPartnerAndReference_UsesEmptyStringsInContext()
+    public async Task CreateAsync_WhenValidationFailsWithEmptyPartnerAndReference_UsesEmptyStringsInContext()
     {
         var sut = CreateSut(new PartnerTransactionRequestValidator(), Moq.Mock.Of<IPartnerVerifier>(), Moq.Mock.Of<IMessagePublisher>(), Moq.Mock.Of<IIdempotencyStore>());
         var request = new PartnerTransactionRequest
         {
-            PartnerId = null,
-            TransactionReference = null,
+            PartnerId = string.Empty,
+            TransactionReference = string.Empty,
             Amount = 99m,
             Currency = "USD",
             Timestamp = DateTime.UtcNow
@@ -438,11 +438,11 @@ public sealed class PartnerTransactionsControllerTests
     }
 
     /// <summary>
-    /// Scenario: the idempotency key builder sees a blank idempotency header.
-    /// Expected: the fallback request reference is used and blank request values collapse to empty strings.
+    /// Scenario: the idempotency key builder sees a blank idempotency header and empty request fields.
+    /// Expected: the fallback request reference is used and empty request values remain empty in the key.
     /// </summary>
     [Fact]
-    public void BuildIdempotencyKey_WhenHeaderIsBlankOrRequestFieldsAreNull_UsesFallbackAndEmptyStrings()
+    public void BuildIdempotencyKey_WhenHeaderIsBlankOrRequestFieldsAreEmpty_UsesFallbackAndEmptyStrings()
     {
         var sut = CreateSut(new PartnerTransactionRequestValidator(), new Mock<IPartnerVerifier>().Object, new Mock<IMessagePublisher>().Object, new Mock<IIdempotencyStore>().Object);
         var method = typeof(PartnerTransactionsController).GetMethod("BuildIdempotencyKey", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -460,18 +460,18 @@ public sealed class PartnerTransactionsControllerTests
         var resultFromBlankHeader = (string)method!.Invoke(sut, [blankHeaderRequest])!;
         resultFromBlankHeader.Should().Be("partner-123|ref-001");
 
-        var nullRequest = new PartnerTransactionRequest
+        var emptyRequest = new PartnerTransactionRequest
         {
-            PartnerId = null!,
-            TransactionReference = null!,
+            PartnerId = string.Empty,
+            TransactionReference = string.Empty,
             Amount = 10m,
             Currency = "USD",
             Timestamp = DateTime.UtcNow
         };
         sut.ControllerContext.HttpContext.Request.Headers.Remove("Idempotency-Key");
 
-        var resultFromNulls = (string)method.Invoke(sut, [nullRequest])!;
-        resultFromNulls.Should().Be("|");
+        var resultFromEmptyValues = (string)method.Invoke(sut, [emptyRequest])!;
+        resultFromEmptyValues.Should().Be("|");
     }
 
     private static PartnerTransactionsController CreateSut(
