@@ -18,6 +18,7 @@ using TransactionValidation.Configuration.Middleware;
 using TransactionValidation.Configuration.Options;
 using TransactionValidation.Core.Interfaces;
 using TransactionValidation.Core.Validation;
+using TransactionValidation.Gateway.Contracts;
 using TransactionValidation.Integration;
 using TransactionValidation.Messaging;
 
@@ -38,11 +39,16 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddTransactionValidationCommonServices(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<ApiKeyOptions>(configuration.GetSection(ApiKeyOptions.SectionName));
+        services.AddOptions<BackendAuthenticationOptions>()
+            .Bind(configuration.GetSection(BackendAuthenticationOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<IValidateOptions<BackendAuthenticationOptions>, BackendAuthenticationOptionsValidator>();
         services.Configure<IdempotencyOptions>(configuration.GetSection(IdempotencyOptions.SectionName));
         services.Configure<PartnerVerificationOptions>(configuration.GetSection(PartnerVerificationOptions.SectionName));
         services.Configure<SerilogOptions>(configuration.GetSection(SerilogOptions.SectionName));
 
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<ApiKeyOptions>>().Value);
+        services.AddSingleton<IGatewayCredentialVerifier, ConfiguredGatewayCredentialVerifier>();
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<IdempotencyOptions>>().Value);
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<PartnerVerificationOptions>>().Value);
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<SerilogOptions>>().Value);
@@ -147,7 +153,7 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Adds the common middleware pipeline used across the application, including centralized exception handling and API-key validation.
+    /// Adds the common middleware pipeline used across the application, including centralized exception handling and backend authentication.
     /// </summary>
     /// <param name="app">The application builder.</param>
     /// <returns>The same app builder so middleware can be chained fluently.</returns>
@@ -155,7 +161,7 @@ public static class ServiceCollectionExtensions
     {
         app.UseExceptionHandler();
         app.UseMiddleware<CorrelationContextMiddleware>();
-        app.UseMiddleware<ApiKeyMiddleware>();
+        app.UseMiddleware<BackendAuthenticationMiddleware>();
         return app;
     }
 

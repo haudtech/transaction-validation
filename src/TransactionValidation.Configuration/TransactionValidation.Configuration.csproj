@@ -29,6 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\TransactionValidation.Gateway.Contracts\TransactionValidation.Gateway.Contracts.csproj" />
     <ProjectReference Include="..\TransactionValidation.Core\TransactionValidation.Core.csproj" />
     <ProjectReference Include="..\TransactionValidation.Integration\TransactionValidation.Integration.csproj" />
     <ProjectReference Include="..\TransactionValidation.Messaging\TransactionValidation.Messaging.csproj" />

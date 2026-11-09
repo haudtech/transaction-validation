@@ -9,7 +9,5 @@ public sealed class ApiKeyOptions
 
     public string ApiKey { get; set; } = string.Empty;
 
-    public bool Enabled { get; set; } = true;
-
     public string HeaderName { get; set; } = "X-API-Key";
 }
