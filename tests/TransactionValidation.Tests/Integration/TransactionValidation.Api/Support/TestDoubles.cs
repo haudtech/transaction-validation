@@ -37,6 +37,19 @@ internal sealed class NoOpMessagePublisher : IMessagePublisher
         => Task.CompletedTask;
 }
 
+internal sealed class RecordingMessagePublisher : IMessagePublisher
+{
+    private int _publishCount;
+
+    public int PublishCount => Volatile.Read(ref _publishCount);
+
+    public Task PublishAsync(TransactionEnvelope envelope, CancellationToken cancellationToken = default)
+    {
+        Interlocked.Increment(ref _publishCount);
+        return Task.CompletedTask;
+    }
+}
+
 /// <summary>
 /// Test message publisher that throws a preconfigured exception for publish calls.
 /// </summary>

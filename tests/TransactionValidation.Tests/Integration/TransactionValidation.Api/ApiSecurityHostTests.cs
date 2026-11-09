@@ -1,53 +1,86 @@
 using System.Net;
 using System.Net.Http.Json;
 
+using TransactionValidation.Gateway.Contracts;
 using TransactionValidation.Tests.Integration.TransactionValidation.Api.Support;
 
 using Xunit;
 
 namespace TransactionValidation.Tests.Integration.TransactionValidation.Api;
 
-/// <summary>
-/// Verifies API key middleware behavior at host level for transaction submission requests.
-/// </summary>
 public sealed class ApiSecurityHostTests
 {
-    /// <summary>
-    /// Scenario: a transaction is submitted without an API key.
-    /// Expected: the host returns HTTP 401 Unauthorized.
-    /// </summary>
     [Trait("Category", "Integration")]
     [Trait("Feature", "Security")]
-    [Fact(DisplayName = "API host returns 401 when X-API-Key header is missing")]
-    public async Task PostTransactions_WhenApiKeyMissing_ReturnsUnauthorized()
+    [Fact(DisplayName = "API host rejects gateway requests without a gateway credential")]
+    public async Task PostTransactions_WhenGatewayCredentialIsMissing_ReturnsUnauthorizedWithoutPublishing()
     {
-        using var factory = new ApiHostTestFactory();
+        var publisher = new RecordingMessagePublisher();
+        using var factory = new ApiHostTestFactory(messagePublisher: publisher, useGatewayAuthentication: true);
         using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(GatewayAuthenticationHeaders.AuthenticatedClientId, "client-123");
 
-        var payload = RequestFactory.CreateValidRequest("tx-missing-key");
-
-        var response = await client.PostAsJsonAsync("/api/v1/partner/transactions", payload);
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/partner/transactions",
+            RequestFactory.CreateValidRequest("tx-missing-gateway-key"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(0, publisher.PublishCount);
     }
 
-    /// <summary>
-    /// Scenario: a valid API key accompanies a valid transaction.
-    /// Expected: the host accepts the request with HTTP 202.
-    /// </summary>
     [Trait("Category", "Integration")]
     [Trait("Feature", "Security")]
-    [Fact(DisplayName = "API host returns 202 when valid X-API-Key is provided")]
-    public async Task PostTransactions_WhenApiKeyPresent_ReturnsAccepted()
+    [Fact(DisplayName = "API host rejects invalid gateway credentials without publishing")]
+    public async Task PostTransactions_WhenGatewayCredentialIsInvalid_ReturnsUnauthorizedWithoutPublishing()
     {
-        using var factory = new ApiHostTestFactory();
+        var publisher = new RecordingMessagePublisher();
+        using var factory = new ApiHostTestFactory(messagePublisher: publisher, useGatewayAuthentication: true);
         using var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Add("X-API-Key", ApiHostTestFactory.ApiKey);
+        client.DefaultRequestHeaders.Add(GatewayAuthenticationHeaders.GatewayKey, "wrong-gateway-key");
+        client.DefaultRequestHeaders.Add(GatewayAuthenticationHeaders.AuthenticatedClientId, "client-123");
 
-        var payload = RequestFactory.CreateValidRequest("tx-accepted");
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/partner/transactions",
+            RequestFactory.CreateValidRequest("tx-invalid-gateway-key"));
 
-        var response = await client.PostAsJsonAsync("/api/v1/partner/transactions", payload);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(0, publisher.PublishCount);
+    }
+
+    [Trait("Category", "Integration")]
+    [Trait("Feature", "Security")]
+    [Fact(DisplayName = "API host rejects gateway requests without a trusted client ID")]
+    public async Task PostTransactions_WhenClientIdIsMissing_ReturnsUnauthorizedWithoutPublishing()
+    {
+        var publisher = new RecordingMessagePublisher();
+        using var factory = new ApiHostTestFactory(messagePublisher: publisher, useGatewayAuthentication: true);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(GatewayAuthenticationHeaders.GatewayKey, ApiHostTestFactory.GatewayKey);
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/partner/transactions",
+            RequestFactory.CreateValidRequest("tx-missing-client-id"));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(0, publisher.PublishCount);
+    }
+
+    [Trait("Category", "Integration")]
+    [Trait("Feature", "Security")]
+    [Fact(DisplayName = "API host accepts valid gateway credentials and client identity")]
+    public async Task PostTransactions_WhenGatewayCredentialAndClientIdAreValid_ReturnsAccepted()
+    {
+        var publisher = new RecordingMessagePublisher();
+        using var factory = new ApiHostTestFactory(messagePublisher: publisher, useGatewayAuthentication: true);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add(GatewayAuthenticationHeaders.GatewayKey, ApiHostTestFactory.GatewayKey);
+        client.DefaultRequestHeaders.Add(GatewayAuthenticationHeaders.AuthenticatedClientId, "client-123");
+
+        var response = await client.PostAsJsonAsync(
+            "/api/v1/partner/transactions",
+            RequestFactory.CreateValidRequest("tx-gateway-accepted"));
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.Equal(1, publisher.PublishCount);
     }
 }

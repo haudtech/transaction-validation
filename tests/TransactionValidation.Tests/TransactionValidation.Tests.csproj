@@ -27,6 +27,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\TransactionValidation.Core\TransactionValidation.Core.csproj" />
     <ProjectReference Include="..\..\src\TransactionValidation.Api\TransactionValidation.Api.csproj" />
+    <ProjectReference Include="..\..\src\TransactionValidation.Gateway\TransactionValidation.Gateway.csproj" />
+    <ProjectReference Include="..\..\src\TransactionValidation.Gateway.Management\TransactionValidation.Gateway.Management.csproj" />
     <ProjectReference Include="..\..\src\TransactionValidation.Integration\TransactionValidation.Integration.csproj" />
     <ProjectReference Include="..\..\src\TransactionValidation.Mock\TransactionValidation.Mock.csproj" />
     <ProjectReference Include="..\..\src\TransactionValidation.Messaging\TransactionValidation.Messaging.csproj" />

@@ -17,21 +17,25 @@ namespace TransactionValidation.Tests.Integration.TransactionValidation.Api.Supp
 internal sealed class ApiHostTestFactory : WebApplicationFactory<ApiEntryPoint>
 {
     public const string ApiKey = "integration-test-api-key";
+    public const string GatewayKey = "integration-test-gateway-key";
 
     private readonly IPartnerVerifier _partnerVerifier;
     private readonly IMessagePublisher _messagePublisher;
     private readonly bool _useAzureServiceBus;
+    private readonly bool _useGatewayAuthentication;
     private readonly string? _environmentName;
 
     public ApiHostTestFactory(
         IPartnerVerifier? partnerVerifier = null,
         IMessagePublisher? messagePublisher = null,
         bool useAzureServiceBus = false,
-        string? environmentName = null)
+        string? environmentName = null,
+        bool useGatewayAuthentication = false)
     {
         _partnerVerifier = partnerVerifier ?? new AlwaysVerifiedPartnerVerifier();
         _messagePublisher = messagePublisher ?? new NoOpMessagePublisher();
         _useAzureServiceBus = useAzureServiceBus;
+        _useGatewayAuthentication = useGatewayAuthentication;
         _environmentName = environmentName;
     }
 
@@ -47,7 +51,8 @@ internal sealed class ApiHostTestFactory : WebApplicationFactory<ApiEntryPoint>
             var settings = new Dictionary<string, string?>
             {
                 ["Security:ApiKey"] = ApiKey,
-                ["Security:Enabled"] = "true",
+                ["Security:AuthenticationMode"] = _useGatewayAuthentication ? "Gateway" : "DirectApiKey",
+                ["Security:GatewayKey"] = _useGatewayAuthentication ? GatewayKey : string.Empty,
                 ["Security:HeaderName"] = "X-API-Key",
                 ["Redis:ConnectionString"] = string.Empty
             };
