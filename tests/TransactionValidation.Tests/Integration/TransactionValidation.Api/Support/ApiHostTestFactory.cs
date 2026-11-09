@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 
+using TransactionValidation.Api;
 using TransactionValidation.Api.Idempotency;
 using TransactionValidation.Core.Interfaces;
 
@@ -13,7 +14,7 @@ namespace TransactionValidation.Tests.Integration.TransactionValidation.Api.Supp
 /// <summary>
 /// Configures an in-memory API host with replaceable verifier and publisher doubles for integration tests.
 /// </summary>
-internal sealed class ApiHostTestFactory : WebApplicationFactory<Program>
+internal sealed class ApiHostTestFactory : WebApplicationFactory<ApiEntryPoint>
 {
     public const string ApiKey = "integration-test-api-key";
 

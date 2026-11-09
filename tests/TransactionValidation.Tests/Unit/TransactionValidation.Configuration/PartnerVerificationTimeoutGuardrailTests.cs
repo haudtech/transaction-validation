@@ -1,13 +1,12 @@
-using System.Reflection;
-
 using FluentAssertions;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Options;
 
 using TransactionValidation.Configuration.Extensions;
 using TransactionValidation.Core.Interfaces;
-using TransactionValidation.Integration;
 
 using Xunit;
 
@@ -23,7 +22,7 @@ public sealed class PartnerVerificationTimeoutGuardrailTests
     /// Expected: total timeout is derived from the attempt timeout and retry count.
     /// </summary>
     [Fact]
-    public void HttpClientTimeout_WhenTotalTimeoutMissing_DerivesFromAttemptAndRetry()
+    public void TotalRequestTimeout_WhenTotalTimeoutMissing_DerivesFromAttemptAndRetry()
     {
         using var provider = BuildProvider(new Dictionary<string, string?>
         {
@@ -44,7 +43,7 @@ public sealed class PartnerVerificationTimeoutGuardrailTests
     /// Expected: total timeout is raised to one second above the attempt timeout.
     /// </summary>
     [Fact]
-    public void HttpClientTimeout_WhenTotalTimeoutIsNotGreaterThanAttempt_UsesAttemptPlusOneSecond()
+    public void TotalRequestTimeout_WhenTotalTimeoutIsNotGreaterThanAttempt_UsesAttemptPlusOneSecond()
     {
         using var provider = BuildProvider(new Dictionary<string, string?>
         {
@@ -65,7 +64,7 @@ public sealed class PartnerVerificationTimeoutGuardrailTests
     /// Expected: the configured total timeout is used unchanged.
     /// </summary>
     [Fact]
-    public void HttpClientTimeout_WhenTotalTimeoutProvided_UsesConfiguredValue()
+    public void TotalRequestTimeout_WhenTotalTimeoutProvided_UsesConfiguredValue()
     {
         using var provider = BuildProvider(new Dictionary<string, string?>
         {
@@ -95,14 +94,9 @@ public sealed class PartnerVerificationTimeoutGuardrailTests
 
     private static TimeSpan ReadPartnerVerifierHttpClientTimeout(ServiceProvider provider)
     {
-        var verifier = provider.GetRequiredService<IPartnerVerifier>();
-        verifier.Should().BeOfType<PartnerVerifierClient>();
-
-        var field = typeof(PartnerVerifierClient)
-            .GetField("_httpClient", BindingFlags.Instance | BindingFlags.NonPublic);
-
-        field.Should().NotBeNull();
-        var httpClient = field!.GetValue(verifier).Should().BeOfType<HttpClient>().Subject;
-        return httpClient.Timeout;
+        // The standard resilience handler leaves HttpClient.Timeout infinite and enforces this budget instead.
+        var options = provider.GetRequiredService<IOptionsMonitor<HttpStandardResilienceOptions>>()
+            .Get($"{nameof(IPartnerVerifier)}-standard");
+        return options.TotalRequestTimeout.Timeout;
     }
 }

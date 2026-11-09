@@ -97,7 +97,7 @@ public sealed class RedisIdempotencyStore : IIdempotencyStore
             return false;
         }
 
-        cachedResponse = JsonSerializer.Deserialize<IdempotencyCachedResponse>(responseJson!)!;
+        cachedResponse = JsonSerializer.Deserialize<IdempotencyCachedResponse>(responseJson.ToString())!;
         TransactionValidationLogging.IdempotencyCacheLookupCompleted(_logger, DependencyName, nameof(CacheOutcome.Found));
         return true;
     }

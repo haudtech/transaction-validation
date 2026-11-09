@@ -6,7 +6,7 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "program": "${workspaceFolder}/src/TransactionValidation.Api/bin/Debug/net8.0/TransactionValidation.Api.dll",
+      "program": "${workspaceFolder}/src/TransactionValidation.Api/bin/Debug/net10.0/TransactionValidation.Api.dll",
       "cwd": "${workspaceFolder}/src/TransactionValidation.Api",
       "stopAtEntry": false,
       "env": {
@@ -24,7 +24,7 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "program": "${workspaceFolder}/src/TransactionValidation.Mock/bin/Debug/net8.0/TransactionValidation.Mock.dll",
+      "program": "${workspaceFolder}/src/TransactionValidation.Mock/bin/Debug/net10.0/TransactionValidation.Mock.dll",
       "cwd": "${workspaceFolder}/src/TransactionValidation.Mock",
       "stopAtEntry": false,
       "env": {

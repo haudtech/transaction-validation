@@ -19,7 +19,7 @@ It does not define validation/security rules, resilience internals, idempotency 
 
 | Functionality or behavior | Technology | Technique | Implementation owner | Verification |
 |---|---|---|---|---|
-| API hosting | .NET 8 and ASP.NET Core Web API | Minimal composition root with controller endpoints | `TransactionValidation.Api` `Program` | Solution build and API startup integration tests |
+| API hosting | .NET 10 and ASP.NET Core Web API | Minimal composition root with controller endpoints | `TransactionValidation.Api` `Program` | Solution build and API startup integration tests |
 | Transaction endpoint | ASP.NET Core MVC | Versioned controller route with asynchronous orchestration | `PartnerTransactionsController.CreateAsync` | Controller unit tests and API host integration tests |
 | API discovery | Swashbuckle/OpenAPI | Swagger services with Development-only middleware | API `Program` | `ApiStartupHostTests.GetSwagger_WhenEnvironmentIsDevelopment_ReturnsSuccess` |
 | Shared configuration | ASP.NET Core configuration and DotNetEnv | Ordered JSON, local `.env`, environment-variable, and command-line sources | `ConfigurationBuilderExtensions` | Configuration-focused build/startup behavior |

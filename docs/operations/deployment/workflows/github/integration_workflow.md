@@ -17,7 +17,7 @@ It defines a concurrency group and cancels stale runs for the same branch or PR.
 The pipeline does the following in order:
 
 1. checkout the repo
-2. install the .NET 8 SDK and restore packages
+2. install the .NET 10 SDK and restore packages
 3. `dotnet build --no-restore --configuration Release`
 4. run `dotnet test ... --filter "Category=Integration"`
 
