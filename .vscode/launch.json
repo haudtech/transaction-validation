@@ -2,6 +2,36 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "TransactionValidation.Gateway",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/TransactionValidation.Gateway/bin/Debug/net10.0/TransactionValidation.Gateway.dll",
+      "cwd": "${workspaceFolder}/src/TransactionValidation.Gateway",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5082"
+      },
+      "justMyCode": true,
+      "console": "internalConsole"
+    },
+    {
+      "name": "TransactionValidation.Gateway.Management",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/TransactionValidation.Gateway.Management/bin/Debug/net10.0/TransactionValidation.Gateway.Management.dll",
+      "cwd": "${workspaceFolder}/src/TransactionValidation.Gateway.Management",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5083"
+      },
+      "justMyCode": true,
+      "console": "internalConsole"
+    },
+    {
       "name": "TransactionValidation.Api",
       "type": "coreclr",
       "request": "launch",

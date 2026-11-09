@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <PackageReference Include="Yarp.ReverseProxy" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TransactionValidation.Gateway.Contracts\TransactionValidation.Gateway.Contracts.csproj" />
+    <ProjectReference Include="..\TransactionValidation.Gateway.PolicyStore\TransactionValidation.Gateway.PolicyStore.csproj" />
+  </ItemGroup>
+</Project>

@@ -40,6 +40,7 @@
 
     <!-- API documentation -->
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.3.1" />
+    <PackageVersion Include="Yarp.ReverseProxy" Version="2.3.0" />
 
     <!-- Test platform, coverage, assertions, and test doubles -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
