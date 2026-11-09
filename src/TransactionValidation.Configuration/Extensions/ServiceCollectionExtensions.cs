@@ -69,7 +69,6 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient<IPartnerVerifier, PartnerVerifierClient>(client =>
         {
             client.BaseAddress = new Uri(partnerVerificationOptions.BaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(totalTimeoutSeconds);
         })
         .AddStandardResilienceHandler(options =>
         {

@@ -28,7 +28,7 @@ Project- and environment-specific configuration should be documented in the owni
 
 ## Environment conventions
 
-For a .NET 8 solution, the common standard is:
+For a .NET 10 solution, the common standard is:
 
 - use a single .NET SDK version via `global.json`
 - centralize package versions via `Directory.Packages.props`

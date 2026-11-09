@@ -19,7 +19,7 @@ It is the repository gate for:
 The job flow is intentionally narrow and matches the local quality contract:
 
 1. checkout the repo
-2. install the .NET 8 SDK with NuGet cache enabled
+2. install the .NET 10 SDK with NuGet cache enabled
 3. `dotnet restore`
 4. `dotnet build --no-restore --configuration Release`
 5. run only unit tests with `Category!=Integration&Category!=E2E`

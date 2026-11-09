@@ -59,7 +59,7 @@ Only one messaging implementation is active in a deployment, while the API contr
 
 | Domain | Technologies and techniques |
 |---|---|
-| Runtime and API | .NET 8, ASP.NET Core Web API, Swagger/OpenAPI |
+| Runtime and API | .NET 10, ASP.NET Core Web API, Swagger/OpenAPI |
 | Validation and security | FluentValidation, API-key authentication, RFC 7807 ProblemDetails |
 | Reliability | HTTP resilience pipelines, retry, timeout, circuit breaker, idempotency |
 | Messaging | RabbitMQ, Azure Service Bus, topic-based fan-out, independent consumers |

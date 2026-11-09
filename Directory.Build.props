@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
     <!-- Shared defaults for all SDK-style projects in this repository -->
-    <TargetFramework Condition="'$(TargetFramework)' == ''">net8.0</TargetFramework>
+    <TargetFramework Condition="'$(TargetFramework)' == ''">net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
