@@ -63,6 +63,7 @@ Library/
 Thumbs.db
 
 # Secrets and user-specific
+.secrets/
 secrets.json
 secrets.*.json
 *.pem

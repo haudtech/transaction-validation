@@ -28,6 +28,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{7A74CEA0
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestReportGenerator", "tools\TestReportGenerator\TestReportGenerator.csproj", "{140BC8BA-66C5-4031-A4BB-6507E356662B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TransactionValidation.Gateway.Secrets", "src\TransactionValidation.Gateway.Secrets\TransactionValidation.Gateway.Secrets.csproj", "{A04F024A-46F0-4D00-806B-1EF74F505458}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -82,6 +84,10 @@ Global
 		{140BC8BA-66C5-4031-A4BB-6507E356662B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{140BC8BA-66C5-4031-A4BB-6507E356662B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{140BC8BA-66C5-4031-A4BB-6507E356662B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A04F024A-46F0-4D00-806B-1EF74F505458}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A04F024A-46F0-4D00-806B-1EF74F505458}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A04F024A-46F0-4D00-806B-1EF74F505458}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A04F024A-46F0-4D00-806B-1EF74F505458}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

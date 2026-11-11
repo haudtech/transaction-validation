@@ -9,6 +9,7 @@
 
     <!-- Test execution and coverage -->
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="coverlet.collector">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -28,6 +29,8 @@
     <ProjectReference Include="..\..\src\TransactionValidation.Core\TransactionValidation.Core.csproj" />
     <ProjectReference Include="..\..\src\TransactionValidation.Api\TransactionValidation.Api.csproj" />
     <ProjectReference Include="..\..\src\TransactionValidation.Gateway\TransactionValidation.Gateway.csproj" />
+    <ProjectReference Include="..\..\src\TransactionValidation.Gateway.PolicyStore\TransactionValidation.Gateway.PolicyStore.csproj" />
+    <ProjectReference Include="..\..\src\TransactionValidation.Gateway.Secrets\TransactionValidation.Gateway.Secrets.csproj" />
     <ProjectReference Include="..\..\src\TransactionValidation.Gateway.Management\TransactionValidation.Gateway.Management.csproj" />
     <ProjectReference Include="..\..\src\TransactionValidation.Integration\TransactionValidation.Integration.csproj" />
     <ProjectReference Include="..\..\src\TransactionValidation.Mock\TransactionValidation.Mock.csproj" />

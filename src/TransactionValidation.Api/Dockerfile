@@ -12,6 +12,7 @@ COPY ["src/TransactionValidation.Gateway/TransactionValidation.Gateway.csproj", 
 COPY ["src/TransactionValidation.Gateway.Contracts/TransactionValidation.Gateway.Contracts.csproj", "src/TransactionValidation.Gateway.Contracts/"]
 COPY ["src/TransactionValidation.Gateway.Management/TransactionValidation.Gateway.Management.csproj", "src/TransactionValidation.Gateway.Management/"]
 COPY ["src/TransactionValidation.Gateway.PolicyStore/TransactionValidation.Gateway.PolicyStore.csproj", "src/TransactionValidation.Gateway.PolicyStore/"]
+COPY ["src/TransactionValidation.Gateway.Secrets/TransactionValidation.Gateway.Secrets.csproj", "src/TransactionValidation.Gateway.Secrets/"]
 COPY ["src/TransactionValidation.Integration/TransactionValidation.Integration.csproj", "src/TransactionValidation.Integration/"]
 COPY ["src/TransactionValidation.Messaging/TransactionValidation.Messaging.csproj", "src/TransactionValidation.Messaging/"]
 COPY ["src/TransactionValidation.Mock/TransactionValidation.Mock.csproj", "src/TransactionValidation.Mock/"]

@@ -5,6 +5,7 @@ This directory groups the authoritative feature guides by domain-specific concer
 ## Available feature folders
 
 - [runtime-and-api](runtime-and-api/README.md)
+- [gateway](gateway/README.md)
 - [validation-and-security](validation-and-security/README.md)
 - [reliability](reliability/README.md)
 - [messaging](messaging/README.md)
