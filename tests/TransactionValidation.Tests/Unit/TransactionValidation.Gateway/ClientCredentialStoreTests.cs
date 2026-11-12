@@ -4,9 +4,11 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 using Npgsql;
 
-using TransactionValidation.Gateway.Contracts;
-using TransactionValidation.Gateway.PolicyStore;
+using TransactionValidation.Gateway.Contracts.Interfaces;
+using TransactionValidation.Gateway.Contracts.Models;
+using TransactionValidation.Gateway.PolicyStore.Context;
 using TransactionValidation.Gateway.PolicyStore.Entities;
+using TransactionValidation.Gateway.PolicyStore.Stores;
 
 using Xunit;
 

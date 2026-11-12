@@ -1,3 +1,5 @@
+using TransactionValidation.Gateway.Management.Hosting;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHealthChecks();

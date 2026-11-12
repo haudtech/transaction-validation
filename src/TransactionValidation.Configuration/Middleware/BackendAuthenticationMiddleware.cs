@@ -2,7 +2,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 
 using TransactionValidation.Configuration.Options;
-using TransactionValidation.Gateway.Contracts;
+using TransactionValidation.Gateway.Contracts.Interfaces;
+using TransactionValidation.Gateway.Contracts.Models;
 
 namespace TransactionValidation.Configuration.Middleware;
 

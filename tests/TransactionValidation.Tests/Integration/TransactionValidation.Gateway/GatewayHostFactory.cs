@@ -8,8 +8,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-using TransactionValidation.Gateway;
-using TransactionValidation.Gateway.Contracts;
+using TransactionValidation.Gateway.Contracts.Interfaces;
+using TransactionValidation.Gateway.Contracts.Models;
+using TransactionValidation.Gateway.Hosting;
 
 namespace TransactionValidation.Tests.Integration.TransactionValidation.Gateway;
 

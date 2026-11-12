@@ -1,4 +1,4 @@
-namespace TransactionValidation.Gateway.Contracts;
+namespace TransactionValidation.Gateway.Contracts.Interfaces;
 
 public interface IGatewayCredentialVerifier
 {

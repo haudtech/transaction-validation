@@ -1,9 +1,11 @@
 using System.Security.Cryptography;
 using System.Text;
 
-using TransactionValidation.Gateway.Contracts;
+using TransactionValidation.Gateway.Contracts.Exceptions;
+using TransactionValidation.Gateway.Contracts.Interfaces;
+using TransactionValidation.Gateway.Contracts.Models;
 
-namespace TransactionValidation.Gateway;
+namespace TransactionValidation.Gateway.Authentication;
 
 public sealed class GatewayClientAuthenticator(
     IClientCredentialStore credentialStore,

@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Options;
 
-namespace TransactionValidation.Gateway;
+using TransactionValidation.Gateway.Options;
+
+namespace TransactionValidation.Gateway.Validators;
 
 public sealed class GatewayRuntimeOptionsValidator : IValidateOptions<GatewayRuntimeOptions>
 {

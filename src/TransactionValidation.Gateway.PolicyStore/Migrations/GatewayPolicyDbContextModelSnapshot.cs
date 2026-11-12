@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 
-using TransactionValidation.Gateway.Contracts;
-using TransactionValidation.Gateway.PolicyStore;
+using TransactionValidation.Gateway.Contracts.Models;
+using TransactionValidation.Gateway.PolicyStore.Context;
 
 namespace TransactionValidation.Gateway.PolicyStore.Migrations;
 

@@ -2,8 +2,7 @@ using System.Net;
 
 using Microsoft.AspNetCore.Mvc.Testing;
 
-using TransactionValidation.Gateway;
-using TransactionValidation.Gateway.Management;
+using TransactionValidation.Gateway.Management.Hosting;
 
 using Xunit;
 

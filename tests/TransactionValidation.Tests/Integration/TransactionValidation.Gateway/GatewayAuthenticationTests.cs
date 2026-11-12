@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Headers;
 
-using TransactionValidation.Gateway.Contracts;
+using TransactionValidation.Gateway.Contracts.Exceptions;
+using TransactionValidation.Gateway.Contracts.Interfaces;
+using TransactionValidation.Gateway.Contracts.Models;
 
 using Xunit;
 

@@ -1,4 +1,4 @@
-using TransactionValidation.Gateway.Secrets;
+using TransactionValidation.Gateway.Secrets.Providers;
 
 using Xunit;
 

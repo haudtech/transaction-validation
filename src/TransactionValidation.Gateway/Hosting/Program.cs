@@ -1,4 +1,5 @@
-using TransactionValidation.Gateway;
+using TransactionValidation.Gateway.Extensions;
+using TransactionValidation.Gateway.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 

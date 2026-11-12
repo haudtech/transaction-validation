@@ -10,8 +10,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-using TransactionValidation.Gateway;
-using TransactionValidation.Gateway.Contracts;
+using TransactionValidation.Gateway.Contracts.Models;
 
 using Xunit;
 

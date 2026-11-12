@@ -4,9 +4,11 @@ using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 
-using TransactionValidation.Gateway.Contracts;
+using TransactionValidation.Gateway.Contracts.Interfaces;
+using TransactionValidation.Gateway.Contracts.Models;
+using TransactionValidation.Gateway.Options;
 
-namespace TransactionValidation.Gateway;
+namespace TransactionValidation.Gateway.Middleware;
 
 public sealed class GatewayAuthorizationMiddleware(
     RequestDelegate next,

@@ -1,4 +1,4 @@
-namespace TransactionValidation.Gateway.PolicyStore;
+namespace TransactionValidation.Gateway.PolicyStore.Options;
 
 public sealed class GatewayPolicyStoreOptions
 {

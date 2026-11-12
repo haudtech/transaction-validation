@@ -3,11 +3,14 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
-using TransactionValidation.Gateway.Contracts;
+using TransactionValidation.Gateway.Authentication;
+using TransactionValidation.Gateway.Contracts.Interfaces;
+using TransactionValidation.Gateway.Options;
 using TransactionValidation.Gateway.PolicyStore.Extensions;
-using TransactionValidation.Gateway.Secrets;
+using TransactionValidation.Gateway.Secrets.Providers;
+using TransactionValidation.Gateway.Validators;
 
-namespace TransactionValidation.Gateway;
+namespace TransactionValidation.Gateway.Extensions;
 
 public static class GatewayServiceCollectionExtensions
 {

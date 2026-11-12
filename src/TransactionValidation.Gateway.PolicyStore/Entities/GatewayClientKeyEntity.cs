@@ -1,4 +1,4 @@
-using TransactionValidation.Gateway.Contracts;
+using TransactionValidation.Gateway.Contracts.Models;
 
 namespace TransactionValidation.Gateway.PolicyStore.Entities;
 

@@ -1,7 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 
-using TransactionValidation.Gateway.Contracts;
+using TransactionValidation.Gateway.Contracts.Interfaces;
+using TransactionValidation.Gateway.Contracts.Models;
 using TransactionValidation.Tests.Integration.TransactionValidation.Api.Support;
 
 using Xunit;

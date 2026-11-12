@@ -1,4 +1,4 @@
-namespace TransactionValidation.Gateway;
+namespace TransactionValidation.Gateway.Options;
 
 public sealed class GatewayRuntimeOptions
 {

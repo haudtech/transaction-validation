@@ -4,9 +4,9 @@ using System.Text;
 using Microsoft.Extensions.Options;
 
 using TransactionValidation.Configuration.Options;
-using TransactionValidation.Gateway.Contracts;
+using TransactionValidation.Gateway.Contracts.Interfaces;
 
-namespace TransactionValidation.Configuration.Middleware;
+namespace TransactionValidation.Configuration.Authentication;
 
 public sealed class ConfiguredGatewayCredentialVerifier : IGatewayCredentialVerifier
 {

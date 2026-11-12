@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
+using TransactionValidation.Gateway.PolicyStore.Context;
+
 namespace TransactionValidation.Gateway.PolicyStore.Migrations;
 
 [DbContext(typeof(GatewayPolicyDbContext))]

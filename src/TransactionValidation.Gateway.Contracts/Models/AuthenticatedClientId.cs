@@ -1,4 +1,4 @@
-namespace TransactionValidation.Gateway.Contracts;
+namespace TransactionValidation.Gateway.Contracts.Models;
 
 public readonly record struct AuthenticatedClientId
 {

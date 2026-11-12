@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Http;
 
-using TransactionValidation.Gateway.Contracts;
+using TransactionValidation.Gateway.Authentication;
+using TransactionValidation.Gateway.Contracts.Interfaces;
+using TransactionValidation.Gateway.Contracts.Models;
 
-namespace TransactionValidation.Gateway;
+namespace TransactionValidation.Gateway.Middleware;
 
 public sealed class GatewayAuthenticationMiddleware(RequestDelegate next)
 {

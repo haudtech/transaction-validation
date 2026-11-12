@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 using Microsoft.AspNetCore.Http;
 
-namespace TransactionValidation.Gateway;
+namespace TransactionValidation.Gateway.Middleware;
 
 public sealed class GatewayCorrelationMiddleware(RequestDelegate next)
 {

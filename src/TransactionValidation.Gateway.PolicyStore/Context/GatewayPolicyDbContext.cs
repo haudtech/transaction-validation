@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 
-using TransactionValidation.Gateway.Contracts;
+using TransactionValidation.Gateway.Contracts.Models;
 using TransactionValidation.Gateway.PolicyStore.Entities;
 
-namespace TransactionValidation.Gateway.PolicyStore;
+namespace TransactionValidation.Gateway.PolicyStore.Context;
 
 public sealed class GatewayPolicyDbContext(DbContextOptions<GatewayPolicyDbContext> options) : DbContext(options)
 {

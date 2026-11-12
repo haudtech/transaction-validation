@@ -1,9 +1,4 @@
-namespace TransactionValidation.Gateway.Contracts;
-
-public interface IClientCredentialStore
-{
-    Task<ClientCredentialRecord?> GetByKeyIdAsync(string keyId, CancellationToken cancellationToken);
-}
+namespace TransactionValidation.Gateway.Contracts.Models;
 
 public sealed record ClientCredentialRecord(
     string KeyId,

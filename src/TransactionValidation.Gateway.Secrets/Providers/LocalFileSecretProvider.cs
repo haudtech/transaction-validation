@@ -1,6 +1,6 @@
-using TransactionValidation.Gateway.Contracts;
+using TransactionValidation.Gateway.Contracts.Interfaces;
 
-namespace TransactionValidation.Gateway.Secrets;
+namespace TransactionValidation.Gateway.Secrets.Providers;
 
 public sealed class LocalFileSecretProvider : ISecretProvider
 {

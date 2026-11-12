@@ -1,8 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 
-using TransactionValidation.Gateway.Contracts;
+using TransactionValidation.Gateway.Contracts.Exceptions;
+using TransactionValidation.Gateway.Contracts.Interfaces;
+using TransactionValidation.Gateway.Contracts.Models;
+using TransactionValidation.Gateway.PolicyStore.Context;
 
-namespace TransactionValidation.Gateway.PolicyStore;
+namespace TransactionValidation.Gateway.PolicyStore.Stores;
 
 public sealed class EfClientCredentialStore(GatewayPolicyDbContext dbContext) : IClientCredentialStore
 {

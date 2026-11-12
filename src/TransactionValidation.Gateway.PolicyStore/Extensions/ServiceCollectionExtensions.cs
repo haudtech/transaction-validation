@@ -5,7 +5,10 @@ using Microsoft.Extensions.Options;
 
 using Npgsql;
 
-using TransactionValidation.Gateway.Contracts;
+using TransactionValidation.Gateway.Contracts.Interfaces;
+using TransactionValidation.Gateway.PolicyStore.Context;
+using TransactionValidation.Gateway.PolicyStore.Options;
+using TransactionValidation.Gateway.PolicyStore.Stores;
 
 namespace TransactionValidation.Gateway.PolicyStore.Extensions;
 

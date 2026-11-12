@@ -4,7 +4,8 @@ using Microsoft.AspNetCore.Http;
 
 using TransactionValidation.Configuration.Middleware;
 using TransactionValidation.Configuration.Options;
-using TransactionValidation.Gateway.Contracts;
+using TransactionValidation.Gateway.Contracts.Interfaces;
+using TransactionValidation.Gateway.Contracts.Models;
 
 using Xunit;
 

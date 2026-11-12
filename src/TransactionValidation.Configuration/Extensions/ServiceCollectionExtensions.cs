@@ -14,11 +14,12 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
+using TransactionValidation.Configuration.Authentication;
 using TransactionValidation.Configuration.Middleware;
 using TransactionValidation.Configuration.Options;
 using TransactionValidation.Core.Interfaces;
 using TransactionValidation.Core.Validation;
-using TransactionValidation.Gateway.Contracts;
+using TransactionValidation.Gateway.Contracts.Interfaces;
 using TransactionValidation.Integration;
 using TransactionValidation.Messaging;
 
