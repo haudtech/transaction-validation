@@ -11,7 +11,6 @@ namespace TransactionValidation.Gateway.Middleware;
 
 public sealed class GatewayAuthorizationMiddleware(
     RequestDelegate next,
-    IBackendCredentialStore backendCredentialStore,
     ISecretProvider secretProvider)
 {
     private const string TransactionPath = "/transactions/v1/partner/transactions";
@@ -29,7 +28,8 @@ public sealed class GatewayAuthorizationMiddleware(
         "User-Agent"
     };
 
-    public async Task InvokeAsync(HttpContext context)
+    // Scoped services must be injected per request; middleware is constructed once.
+    public async Task InvokeAsync(HttpContext context, IBackendCredentialStore backendCredentialStore)
     {
         if (context.Request.Path.Equals("/healthz", StringComparison.OrdinalIgnoreCase))
         {

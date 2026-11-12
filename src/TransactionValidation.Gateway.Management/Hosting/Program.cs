@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 using TransactionValidation.Gateway.Contracts.Interfaces;
-using TransactionValidation.Gateway.Management.Hosting;
 using TransactionValidation.Gateway.Management.Endpoints;
+using TransactionValidation.Gateway.Management.Hosting;
 using TransactionValidation.Gateway.Management.Options;
 using TransactionValidation.Gateway.Management.Services;
 using TransactionValidation.Gateway.PolicyStore.Extensions;

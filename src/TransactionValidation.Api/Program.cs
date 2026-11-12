@@ -5,9 +5,9 @@ using Microsoft.Extensions.Options;
 
 using TransactionValidation.Api.HealthChecks;
 using TransactionValidation.Api.Idempotency;
+using TransactionValidation.Configuration.Authentication;
 using TransactionValidation.Configuration.Extensions;
 using TransactionValidation.Configuration.Options;
-using TransactionValidation.Configuration.Authentication;
 using TransactionValidation.Core.Interfaces;
 using TransactionValidation.Gateway.Contracts.Interfaces;
 using TransactionValidation.Gateway.PolicyStore.Extensions;

@@ -126,6 +126,7 @@ public sealed class GatewayPolicyDbContext(DbContextOptions<GatewayPolicyDbConte
             entity.HasKey(audit => audit.Id);
             entity.Property(audit => audit.Id).UseIdentityAlwaysColumn();
             entity.Property(audit => audit.OccurredAt).HasColumnType("timestamp with time zone");
+            entity.HasIndex(audit => audit.OccurredAt);
             entity.Property(audit => audit.AdminIssuer).HasMaxLength(512).IsRequired();
             entity.Property(audit => audit.AdminSubject).HasMaxLength(256).IsRequired();
             entity.Property(audit => audit.AdminClientId).HasMaxLength(256);

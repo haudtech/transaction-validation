@@ -254,7 +254,7 @@ This approved package/migration spike was performed in the same `/tmp/transactio
 - [x] Return the generated backend credential only in the successful issue response; exclude raw values from reads and audit records.
 - [x] Append audit records for backend issue/revoke actions with OIDC issuer, subject, optional admin client ID, action, target, time, and outcome. Client operations and auth-failure auditing remain pending.
 - [x] Use backend-row optimistic concurrency and fail closed with `503` on API/Gateway dependency outages.
-- [ ] Create a safe local bootstrap process for initial admin and client; do not embed production admin users, keys, or passwords in the repo.
+- [~] Local bootstrap for the initial client and first backend credential is done (`Gateway.LocalBootstrap`, no admin user or Keycloak yet; nothing embedded in the repo). The initial admin identity remains pending with Keycloak.
 
 **Verification tasks:**
 
@@ -273,8 +273,8 @@ This approved package/migration spike was performed in the same `/tmp/transactio
 - [ ] Configure HTTPS client→local ingress→gateway, gateway→API, and TLS PostgreSQL/Redis connections. Correctly configure database TLS rather than treating database protocols as HTTPS.
 - [ ] Full Compose default includes Gateway, Management API, API, Mock, RabbitMQ, PostgreSQL, Redis, and Keycloak. Keep API/Mock/data services internal; expose gateway only.
 - [ ] Add an infrastructure-only Compose profile for IDE use, including dependencies the API still needs (Mock/RabbitMQ/Redis/PostgreSQL/Keycloak/TLS as applicable).
-- [ ] Add startup ordering/readiness and health checks without treating `depends_on` alone as service readiness.
-- [ ] Seed a local-only TransactionValidation v1 client with explicit finite but generous limits. Store its one-time secret in ignored `.secrets/`; never apply the seed to cloud deployments.
+- [x] Add startup ordering/readiness and health checks without treating `depends_on` alone as service readiness. Done for the local Gateway profile: bootstrap `service_completed_successfully`, API/Gateway `/healthz` healthchecks, Gateway waits for a healthy API; the bootstrap exits 1 on failure (verified with a bad DB password).
+- [~] Local bootstrap seeds a local-only TransactionValidation v1 client and the first backend credential (`docker-compose.gateway.yml`, `LocalBootstrap` project); verified 2026-11-12 with Docker: `up --wait` healthy, valid key 202, wrong/missing key 401, idempotent re-run. Limits are deferred to Slice 7. Original item: Seed a local-only TransactionValidation v1 client with explicit finite but generous limits. Store its one-time secret in ignored `.secrets/`; never apply the seed to cloud deployments.
 
 **Verification tasks:**
 

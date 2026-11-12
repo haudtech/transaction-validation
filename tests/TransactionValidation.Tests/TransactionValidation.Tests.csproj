@@ -32,6 +32,7 @@
     <ProjectReference Include="..\..\src\TransactionValidation.Gateway.PolicyStore\TransactionValidation.Gateway.PolicyStore.csproj" />
     <ProjectReference Include="..\..\src\TransactionValidation.Gateway.Secrets\TransactionValidation.Gateway.Secrets.csproj" />
     <ProjectReference Include="..\..\src\TransactionValidation.Gateway.Management\TransactionValidation.Gateway.Management.csproj" />
+    <ProjectReference Include="..\..\src\TransactionValidation.Gateway.LocalBootstrap\TransactionValidation.Gateway.LocalBootstrap.csproj" />
     <ProjectReference Include="..\..\src\TransactionValidation.Integration\TransactionValidation.Integration.csproj" />
     <ProjectReference Include="..\..\src\TransactionValidation.Mock\TransactionValidation.Mock.csproj" />
     <ProjectReference Include="..\..\src\TransactionValidation.Messaging\TransactionValidation.Messaging.csproj" />

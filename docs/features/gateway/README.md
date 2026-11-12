@@ -129,6 +129,18 @@ Client credential management, route kill switches, quotas, policy caching, full 
 - **Implementation references** - `Program`; `GatewayServiceCollectionExtensions`; `SecretProviderOptionsValidator`; `GatewayPolicyStore` service registration.
 - **Verification** - Gateway startup, unavailable-store/secret, proxy timeout, and cancellation integration tests.
 
+## Local development profile
+
+`docker-compose.gateway.yml` overlays the base Compose file with PostgreSQL, a one-shot `gateway-bootstrap`, the Gateway, and the API in Gateway authentication mode. Set `COMPOSE_FILE=docker-compose.yml:docker-compose.gateway.yml` in `.env` (see `.env.example`) to make a plain `docker compose up` use this profile. Only the Gateway is published (`GATEWAY_HOST_PORT`, default `5100`).
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gateway.yml up --build
+curl -i -X POST "http://localhost:5100/transactions/v1/partner/transactions" \
+  -H "Authorization: ApiKey $(cat .secrets/local-client-credential)" ...
+```
+
+The bootstrap runs only in `Development`. It applies migrations, creates the peppers, seeds `local-client` with a `transaction-validation`/`v1` grant, writes its credential to `.secrets/local-client-credential`, and issues the first backend credential directly through the Management service (no Management API or Keycloak). It is idempotent and exits non-zero with a message if any step fails. The API and Gateway expose `/healthz` healthchecks, and the Gateway starts only after the API is healthy, so `docker compose up --wait` returns once the profile is ready. After resetting the PostgreSQL volume, delete `.secrets/` as well if the bootstrap reports a missing credential. On Linux hosts, files written by the container may be root-owned. Production secret providers, Keycloak/OIDC, TLS, and rate limits are deferred.
+
 ## Configuration contract
 
 | Setting or input | Contract | Purpose |

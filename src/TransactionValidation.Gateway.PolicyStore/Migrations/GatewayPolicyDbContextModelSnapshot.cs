@@ -51,13 +51,11 @@ public sealed class GatewayPolicyDbContextModelSnapshot : ModelSnapshot
             entity.Property<DateTimeOffset?>("PreviousSince").HasColumnType("timestamp with time zone");
             entity.HasKey("KeyId");
             entity.HasIndex("ClientId", "Status");
-            entity.HasIndex("ClientId")
+            entity.HasIndex(new[] { "ClientId" }, "IX_GatewayClientKeys_ClientId_Current")
                 .IsUnique()
-                .HasDatabaseName("IX_GatewayClientKeys_ClientId_Current")
                 .HasFilter("\"Status\" = 'Current'");
-            entity.HasIndex("ClientId")
+            entity.HasIndex(new[] { "ClientId" }, "IX_GatewayClientKeys_ClientId_Previous")
                 .IsUnique()
-                .HasDatabaseName("IX_GatewayClientKeys_ClientId_Previous")
                 .HasFilter("\"Status\" = 'Previous'");
             entity.ToTable("GatewayClientKeys", table =>
             {
@@ -88,13 +86,11 @@ public sealed class GatewayPolicyDbContextModelSnapshot : ModelSnapshot
             entity.Property<int>("Version").IsConcurrencyToken().HasColumnType("integer");
             entity.HasKey("KeyId");
             entity.HasIndex("ApiId", "KeyId");
-            entity.HasIndex("ApiId")
+            entity.HasIndex(new[] { "ApiId" }, "IX_GatewayBackendCredentials_ApiId_Current")
                 .IsUnique()
-                .HasDatabaseName("IX_GatewayBackendCredentials_ApiId_Current")
                 .HasFilter("\"Status\" = 'Current'");
-            entity.HasIndex("ApiId")
+            entity.HasIndex(new[] { "ApiId" }, "IX_GatewayBackendCredentials_ApiId_Previous")
                 .IsUnique()
-                .HasDatabaseName("IX_GatewayBackendCredentials_ApiId_Previous")
                 .HasFilter("\"Status\" = 'Previous'");
             entity.ToTable("GatewayBackendCredentials", table =>
             {
