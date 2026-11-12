@@ -11,6 +11,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 using TransactionValidation.Gateway;
+using TransactionValidation.Gateway.Contracts;
 
 using Xunit;
 
@@ -25,18 +26,41 @@ public sealed class GatewayProxyTests
         await using var backend = new TestBackend();
         await backend.StartAsync();
         using var factory = new GatewayHostFactory(backend.Address);
-        using var client = factory.CreateClient();
+        using var client = CreateAuthenticatedClient(factory);
 
-        using var response = await client.PostAsync(
-            "/transactions/v1/partner/transactions?source=test",
-            new StringContent("{\"transactionId\":\"tx-123\"}"));
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            "/transactions/v1/partner/transactions?source=test")
+        {
+            Content = new StringContent("{\"transactionId\":\"tx-123\"}")
+        };
+        request.Headers.Add("X-API-Key", "spoofed-client-key");
+        request.Headers.Add(GatewayAuthenticationHeaders.GatewayKey, "spoofed-backend-key");
+        request.Headers.Add(GatewayAuthenticationHeaders.AuthenticatedClientId, "spoofed-client");
+        request.Headers.Add("X-Forwarded-For", "192.0.2.10");
+        request.Headers.Add("X-Real-IP", "192.0.2.10");
+        request.Headers.Add("Cookie", "session=spoofed");
+        request.Headers.Add("Correlation-Id", "  client-correlation-01  ");
+        request.Headers.Add("Idempotency-Key", "transaction-key-01");
+        using var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         Assert.Equal("backend-result", response.Headers.GetValues("X-Backend-Result").Single());
         Assert.Equal("accepted", await response.Content.ReadAsStringAsync());
+        Assert.Equal("client-correlation-01", response.Headers.GetValues("Correlation-Id").Single());
         Assert.Equal("/api/v1/partner/transactions?source=test", backend.Requests.Single());
         Assert.Equal("{\"transactionId\":\"tx-123\"}", backend.RequestBodies.Single());
         Assert.Equal(1, backend.RequestCount);
+        var forwardedHeaders = backend.RequestHeaders.Single();
+        Assert.Equal("test-client", forwardedHeaders[GatewayAuthenticationHeaders.AuthenticatedClientId]);
+        Assert.Equal(GatewayTestCredentials.BackendCredential, forwardedHeaders[GatewayAuthenticationHeaders.GatewayKey]);
+        Assert.Equal("client-correlation-01", forwardedHeaders["Correlation-Id"]);
+        Assert.Equal("transaction-key-01", forwardedHeaders["Idempotency-Key"]);
+        Assert.DoesNotContain("Authorization", forwardedHeaders.Keys, StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain("X-API-Key", forwardedHeaders.Keys, StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain("X-Forwarded-For", forwardedHeaders.Keys, StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain("X-Real-IP", forwardedHeaders.Keys, StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Cookie", forwardedHeaders.Keys, StringComparer.OrdinalIgnoreCase);
     }
 
     [Trait("Category", "Integration")]
@@ -47,7 +71,7 @@ public sealed class GatewayProxyTests
     public async Task TransactionRoute_WhenMethodIsNotPost_ReturnsMethodNotAllowed(string method)
     {
         using var factory = new GatewayHostFactory("http://127.0.0.1:1/");
-        using var client = factory.CreateClient();
+        using var client = CreateAuthenticatedClient(factory);
 
         using var request = new HttpRequestMessage(new HttpMethod(method), "/transactions/v1/partner/transactions");
         using var response = await client.SendAsync(request);
@@ -61,11 +85,10 @@ public sealed class GatewayProxyTests
     public async Task PostTransaction_WhenBackendIsUnavailable_ReturnsSanitizedBadGateway()
     {
         using var factory = new GatewayHostFactory("http://127.0.0.1:1/");
-        using var client = factory.CreateClient();
+        using var client = CreateAuthenticatedClient(factory);
 
-        using var response = await client.PostAsync(
-            "/transactions/v1/partner/transactions",
-            new StringContent("{}"));
+        using var request = CreateAuthenticatedRequest(HttpMethod.Post, "/transactions/v1/partner/transactions", "{}");
+        using var response = await client.SendAsync(request);
         var responseBody = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
@@ -79,12 +102,11 @@ public sealed class GatewayProxyTests
         await using var backend = new TestBackend(blockResponse: true);
         await backend.StartAsync();
         using var factory = new GatewayHostFactory(backend.Address);
-        using var client = factory.CreateClient();
+        using var client = CreateAuthenticatedClient(factory);
         using var cancellation = new CancellationTokenSource();
 
-        var request = client.PostAsync(
-            "/transactions/v1/partner/transactions",
-            new StringContent("{}"),
+        var request = client.SendAsync(
+            CreateAuthenticatedRequest(HttpMethod.Post, "/transactions/v1/partner/transactions", "{}"),
             cancellation.Token);
 
         await backend.RequestReceived.WaitAsync(TimeSpan.FromSeconds(5));
@@ -101,11 +123,10 @@ public sealed class GatewayProxyTests
         await using var backend = new TestBackend(blockResponse: true);
         await backend.StartAsync();
         using var factory = new GatewayHostFactory(backend.Address, activityTimeout: "00:00:00.100");
-        using var client = factory.CreateClient();
+        using var client = CreateAuthenticatedClient(factory);
 
-        using var response = await client.PostAsync(
-            "/transactions/v1/partner/transactions",
-            new StringContent("{}"));
+        using var response = await client.SendAsync(
+            CreateAuthenticatedRequest(HttpMethod.Post, "/transactions/v1/partner/transactions", "{}"));
         var responseBody = await response.Content.ReadAsStringAsync();
 
         Assert.Equal(HttpStatusCode.GatewayTimeout, response.StatusCode);
@@ -117,31 +138,33 @@ public sealed class GatewayProxyTests
     public async Task GetUnknownRoute_WhenNoRouteMatches_ReturnsNotFound()
     {
         using var factory = new GatewayHostFactory("http://127.0.0.1:1/");
-        using var client = factory.CreateClient();
+        using var client = CreateAuthenticatedClient(factory);
 
         using var response = await client.GetAsync("/not-a-gateway-route");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    private sealed class GatewayHostFactory(string destinationAddress, string? activityTimeout = null) : WebApplicationFactory<GatewayEntryPoint>
+    private static HttpClient CreateAuthenticatedClient(GatewayHostFactory factory)
     {
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.ConfigureAppConfiguration((_, configuration) =>
-            {
-                var values = new Dictionary<string, string?>
-                {
-                    ["ReverseProxy:Clusters:transactionValidation:Destinations:api:Address"] = destinationAddress
-                };
-                if (activityTimeout is not null)
-                {
-                    values["ReverseProxy:Clusters:transactionValidation:HttpRequest:ActivityTimeout"] = activityTimeout;
-                }
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            System.Net.Http.Headers.AuthenticationHeaderValue.Parse(GatewayTestCredentials.Authorization);
+        return client;
+    }
 
-                configuration.AddInMemoryCollection(values);
-            });
-        }
+    private static HttpRequestMessage CreateAuthenticatedRequest(
+        HttpMethod method,
+        string uri,
+        string? content = null)
+    {
+        var request = new HttpRequestMessage(method, uri)
+        {
+            Content = content is null ? null : new StringContent(content)
+        };
+        request.Headers.Authorization =
+            System.Net.Http.Headers.AuthenticationHeaderValue.Parse(GatewayTestCredentials.Authorization);
+        return request;
     }
 
     private sealed class TestBackend : IAsyncDisposable
@@ -149,6 +172,7 @@ public sealed class GatewayProxyTests
         private readonly WebApplication _app;
         private readonly ConcurrentQueue<string> _requests = new();
         private readonly ConcurrentQueue<string> _requestBodies = new();
+        private readonly ConcurrentQueue<IReadOnlyDictionary<string, string>> _requestHeaders = new();
         private readonly bool _blockResponse;
         private readonly TaskCompletionSource _requestReceived = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _requestCount;
@@ -163,6 +187,10 @@ public sealed class GatewayProxyTests
             {
                 Interlocked.Increment(ref _requestCount);
                 _requests.Enqueue($"{context.Request.Path}{context.Request.QueryString}");
+                _requestHeaders.Enqueue(context.Request.Headers.ToDictionary(
+                    header => header.Key,
+                    header => header.Value.ToString(),
+                    StringComparer.OrdinalIgnoreCase));
                 using var reader = new StreamReader(context.Request.Body);
                 _requestBodies.Enqueue(await reader.ReadToEndAsync(context.RequestAborted));
                 _requestReceived.TrySetResult();
@@ -185,6 +213,8 @@ public sealed class GatewayProxyTests
         public IReadOnlyCollection<string> Requests => _requests.ToArray();
 
         public IReadOnlyCollection<string> RequestBodies => _requestBodies.ToArray();
+
+        public IReadOnlyCollection<IReadOnlyDictionary<string, string>> RequestHeaders => _requestHeaders.ToArray();
 
         public Task RequestReceived => _requestReceived.Task;
 

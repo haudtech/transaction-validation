@@ -14,6 +14,7 @@ public sealed record ClientCredentialRecord(
     DateTimeOffset NotBefore,
     DateTimeOffset? ExpiresAt,
     DateTimeOffset? RevokedAt,
+    DateTimeOffset? PreviousSince,
     bool ClientEnabled,
     IReadOnlyList<ClientApiGrant> ApiGrants);
 

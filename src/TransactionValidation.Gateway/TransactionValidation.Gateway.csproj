@@ -5,5 +5,6 @@
   <ItemGroup>
     <ProjectReference Include="..\TransactionValidation.Gateway.Contracts\TransactionValidation.Gateway.Contracts.csproj" />
     <ProjectReference Include="..\TransactionValidation.Gateway.PolicyStore\TransactionValidation.Gateway.PolicyStore.csproj" />
+    <ProjectReference Include="..\TransactionValidation.Gateway.Secrets\TransactionValidation.Gateway.Secrets.csproj" />
   </ItemGroup>
 </Project>

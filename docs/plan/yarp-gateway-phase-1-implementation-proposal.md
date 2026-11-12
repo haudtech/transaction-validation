@@ -2,9 +2,9 @@
 
 ## Status and approval boundary
 
-**Status: Slices 1–3 and 4A are implemented.** On 2026-11-09 the owner approved the proposed project names, direct Gateway HTTPS as the local TLS boundary, versioned Keycloak plus local-only bootstrap, retaining direct API tests while adding gateway-backed E2E coverage, and the narrow Slice 2 scope. The owner subsequently approved Slices 3 and 4A. Slice 4 and subsequent work remain gated.
+**Status: Slices 1–3, 4A, and the Gateway authentication/authorization implementation in Slice 4 are present.** On 2026-11-09 the owner approved the proposed project names, direct Gateway HTTPS as the local TLS boundary, versioned Keycloak plus local-only bootstrap, retaining direct API tests while adding gateway-backed E2E coverage, and the narrow Slice 2 scope. The owner approved proceeding with Slice 4. Targeted Gateway tests pass; human governance review and Docker-backed Gateway/API E2E remain pending. Subsequent work remains gated.
 
-Use `[ ]` for pending work and change to `[x]` only after completing and verifying the item; add evidence or a link beside the item when useful. Slices 1–3 and 4A are implemented; Slice 4 and subsequent work remain gated by their stated requirements. Gateway client authentication, credential lifecycle behavior, management behavior, and deployment behavior remain unimplemented.
+Use `[ ]` for pending work and change to `[x]` only after completing and verifying the item; add evidence or a link beside the item when useful. Gateway-side client authentication, credential lifecycle checks, API/version authorization, and trusted-header handling for Slice 4 are implemented and covered by targeted tests. Compose-backed E2E and human governance review remain pending; management behavior and deployment behavior are not part of this slice.
 
 ## Request and acceptance criteria
 
@@ -205,24 +205,26 @@ This approved package/migration spike was performed in the same `/tmp/transactio
 - [x] Test allowed/disallowed methods and backend status/body/header pass-through.
 - [x] Test client cancellation, backend connection failure, and upstream activity timeout.
 - [x] Verify a successful proxy request invokes the backend once and cancellation does not trigger a retry.
-- [ ] Gateway-backed API E2E remains pending until client authentication/trusted backend headers and Compose wiring are implemented.
+- [ ] Gateway-backed API E2E remains pending until the Compose path exercises the client authentication and trusted backend-header chain.
 
 ### Slice 4 — Client authentication and policy authorization
 
 - Depends on Slice 4A credential persistence and secret-provider foundations.
-- [ ] Implement key format `Authorization: ApiKey <opaque-key-id>.<secret>`; key IDs are unique and never reused.
-- [ ] Verify stored HMAC-SHA-256 verifier with constant-time comparison and versioned pepper retrieved from secret provider.
-- [ ] Enforce current/previous key states, expiry, one-hour overlap, and client disable.
-- [ ] Apply generic `401` for all invalid credentials before route lookup; after authentication return `404` for unknown API/version and `403` for disallowed API/version.
-- [ ] Enforce client API-prefix/version allowlist. Sanitize incoming auth, identity, correlation, and forwarding headers; set trusted `X-Authenticated-Client-Id`, backend `X-Gateway-Key`, and canonical correlation ID.
+- [x] Implement key format `Authorization: ApiKey <opaque-key-id>.<secret>`; key IDs are unique and never reused. The secret wire representation is 32 cryptographically random bytes encoded as unpadded Base64URL.
+- [x] Verify stored HMAC-SHA-256 verifier with constant-time comparison and versioned pepper retrieved from secret provider.
+- [x] Enforce current/previous key states, expiry, one-hour overlap, and client disable.
+- [x] Apply generic `401` for all invalid credentials before route lookup; after authentication return `404` for unknown API/version and `403` for disallowed API/version.
+- [x] Enforce the configured client API/version allowlist and POST method. Sanitize incoming auth, identity, correlation, and forwarding headers; set trusted `X-Authenticated-Client-Id`, backend `X-Gateway-Key`, and canonical correlation ID.
 
 **Verification tasks:**
 
-- [ ] Test credential parsing, malformed values, unknown IDs, and wrong verifiers.
-- [ ] Test active/expired/revoked keys, rotation overlap, and disabled clients.
-- [ ] Verify invalid credential cases produce equivalent generic `401` responses.
-- [ ] Test route permissions and spoofed-header removal.
-- [ ] Verify the backend never receives the client secret.
+- [x] Test credential parsing, malformed values, unknown IDs, and wrong verifiers.
+- [x] Test active/expired/revoked keys, rotation overlap, and disabled clients.
+- [x] Verify invalid credential cases produce equivalent generic `401` responses.
+- [x] Test route permissions and spoofed-header removal.
+- [x] Verify the backend never receives the client secret.
+
+**Status:** Gateway authentication, authorization, trusted-header handling, and targeted host/proxy tests are implemented. The end-to-end Docker path and human governance review remain pending; Slice 4 is not a governance certification.
 
 ### Slice 4A — Credential persistence and local secret-provider foundations
 

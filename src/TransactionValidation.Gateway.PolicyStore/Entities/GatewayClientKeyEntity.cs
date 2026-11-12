@@ -20,5 +20,7 @@ public sealed class GatewayClientKeyEntity
 
     public DateTimeOffset? RevokedAt { get; set; }
 
+    public DateTimeOffset? PreviousSince { get; set; }
+
     public GatewayClientEntity Client { get; set; } = null!;
 }

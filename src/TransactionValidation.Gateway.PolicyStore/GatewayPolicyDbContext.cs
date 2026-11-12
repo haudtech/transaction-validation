@@ -35,6 +35,9 @@ public sealed class GatewayPolicyDbContext(DbContextOptions<GatewayPolicyDbConte
                     "CK_GatewayClientKeys_Revocation",
                     "(\"Status\" = 'Revoked' AND \"RevokedAt\" IS NOT NULL) OR (\"Status\" <> 'Revoked' AND \"RevokedAt\" IS NULL)");
                 table.HasCheckConstraint(
+                    "CK_GatewayClientKeys_PreviousWindow",
+                    "(\"Status\" = 'Previous' AND \"PreviousSince\" IS NOT NULL AND \"ExpiresAt\" IS NOT NULL AND \"ExpiresAt\" > \"PreviousSince\" AND \"ExpiresAt\" <= \"PreviousSince\" + INTERVAL '1 hour') OR (\"Status\" <> 'Previous' AND \"PreviousSince\" IS NULL)");
+                table.HasCheckConstraint(
                     "CK_GatewayClientKeys_Validity",
                     "\"ExpiresAt\" IS NULL OR \"ExpiresAt\" > \"NotBefore\"");
             });
@@ -47,11 +50,18 @@ public sealed class GatewayPolicyDbContext(DbContextOptions<GatewayPolicyDbConte
             entity.Property(key => key.NotBefore).HasColumnType("timestamp with time zone");
             entity.Property(key => key.ExpiresAt).HasColumnType("timestamp with time zone");
             entity.Property(key => key.RevokedAt).HasColumnType("timestamp with time zone");
+            entity.Property(key => key.PreviousSince).HasColumnType("timestamp with time zone");
             entity.HasIndex(key => new { key.ClientId, key.Status });
             entity.HasOne(key => key.Client)
                 .WithMany(client => client.Keys)
                 .HasForeignKey(key => key.ClientId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(key => key.ClientId, "IX_GatewayClientKeys_ClientId_Current")
+                .IsUnique()
+                .HasFilter("\"Status\" = 'Current'");
+            entity.HasIndex(key => key.ClientId, "IX_GatewayClientKeys_ClientId_Previous")
+                .IsUnique()
+                .HasFilter("\"Status\" = 'Previous'");
         });
 
         modelBuilder.Entity<GatewayClientApiGrantEntity>(entity =>

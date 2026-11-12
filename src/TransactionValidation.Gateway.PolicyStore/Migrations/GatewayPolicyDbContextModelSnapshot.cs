@@ -46,8 +46,17 @@ public sealed class GatewayPolicyDbContextModelSnapshot : ModelSnapshot
             entity.Property<DateTimeOffset>("NotBefore").HasColumnType("timestamp with time zone");
             entity.Property<DateTimeOffset?>("ExpiresAt").HasColumnType("timestamp with time zone");
             entity.Property<DateTimeOffset?>("RevokedAt").HasColumnType("timestamp with time zone");
+            entity.Property<DateTimeOffset?>("PreviousSince").HasColumnType("timestamp with time zone");
             entity.HasKey("KeyId");
             entity.HasIndex("ClientId", "Status");
+            entity.HasIndex("ClientId")
+                .IsUnique()
+                .HasDatabaseName("IX_GatewayClientKeys_ClientId_Current")
+                .HasFilter("\"Status\" = 'Current'");
+            entity.HasIndex("ClientId")
+                .IsUnique()
+                .HasDatabaseName("IX_GatewayClientKeys_ClientId_Previous")
+                .HasFilter("\"Status\" = 'Previous'");
             entity.ToTable("GatewayClientKeys", table =>
             {
                 table.HasCheckConstraint("CK_GatewayClientKeys_VerifierLength", "octet_length(\"Verifier\") = 32");
@@ -55,6 +64,9 @@ public sealed class GatewayPolicyDbContextModelSnapshot : ModelSnapshot
                 table.HasCheckConstraint(
                     "CK_GatewayClientKeys_Revocation",
                     "(\"Status\" = 'Revoked' AND \"RevokedAt\" IS NOT NULL) OR (\"Status\" <> 'Revoked' AND \"RevokedAt\" IS NULL)");
+                table.HasCheckConstraint(
+                    "CK_GatewayClientKeys_PreviousWindow",
+                    "(\"Status\" = 'Previous' AND \"PreviousSince\" IS NOT NULL AND \"ExpiresAt\" IS NOT NULL AND \"ExpiresAt\" > \"PreviousSince\" AND \"ExpiresAt\" <= \"PreviousSince\" + INTERVAL '1 hour') OR (\"Status\" <> 'Previous' AND \"PreviousSince\" IS NULL)");
                 table.HasCheckConstraint("CK_GatewayClientKeys_Validity", "\"ExpiresAt\" IS NULL OR \"ExpiresAt\" > \"NotBefore\"");
             });
         });

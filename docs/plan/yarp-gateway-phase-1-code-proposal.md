@@ -2,9 +2,9 @@
 
 ## Status and approval boundary
 
-**Slices 1–3 and 4A are implemented.** On 2026-11-09 the owner approved the proposed project names, direct Gateway HTTPS as the local TLS boundary, versioned Keycloak plus local-only bootstrap, retaining direct API tests while adding gateway-backed E2E coverage, and the narrow Slice 2 scope. The owner subsequently approved Slices 3 and 4A. Slice 4 and subsequent work remain gated.
+**Slices 1–3, 4A, and the Gateway authentication/authorization implementation in Slice 4 are present.** On 2026-11-09 the owner approved the proposed project names, direct Gateway HTTPS as the local TLS boundary, versioned Keycloak plus local-only bootstrap, retaining direct API tests while adding gateway-backed E2E coverage, and the narrow Slice 2 scope. Slice 4 targeted host tests pass; human governance review and Docker-backed Gateway/API E2E remain pending. Management and later phase work remain gated.
 
-This document breaks Phase 1 of the [YARP Gateway Implementation Plan](yarp-gateway-implementation-plan.md) into owned code slices, dependencies, tests, and approval gates. The .NET 10 upgrade of the existing solution is complete, and minimum Phase 1 Redis enforcement is a confirmed decision. Gateway client authentication, credential lifecycle behavior, management behavior, and Docker Compose topology remain unimplemented.
+This document breaks Phase 1 of the [YARP Gateway Implementation Plan](yarp-gateway-implementation-plan.md) into owned code slices, dependencies, tests, and approval gates. The .NET 10 upgrade of the existing solution is complete, and minimum Phase 1 Redis enforcement is a confirmed decision. Credential management/issuance, policy caching, and Docker Compose topology remain unimplemented.
 
 ## Request and acceptance criteria
 
@@ -46,7 +46,7 @@ Phase 1 is accepted when:
 - `TransactionValidation.Api` exposes `POST /api/v1/partner/transactions`. Its default Gateway authentication mode validates configured `X-Gateway-Key` and `X-Authenticated-Client-Id`; explicit `DirectApiKey` mode is restricted to Development for local E2E and direct API tests.
 - `docker-compose.yml` currently runs API, Mock, RabbitMQ, and Redis. The API depends on all three supporting services for the current transaction path.
 - The test project targets `net10.0`; its direct API integration tests explicitly select `DirectApiKey` mode and host the API through `WebApplicationFactory<ApiEntryPoint>`. `ApiEntryPoint` is a marker in the API assembly because the test project also references the Mock assembly, which exposes its own global `Program`.
-- The Gateway has a configured TransactionValidation v1 route and Compose-DNS destination. `Gateway.PolicyStore` now has the initial client/key/grant schema, migration, and read-only lookup; `Gateway.Secrets` provides the local file adapter. Gateway client authentication, management API, Keycloak realm import, credential lifecycle, and local HTTPS CA setup remain unimplemented.
+- The Gateway has a configured TransactionValidation v1 route and Compose-DNS destination. `Gateway.PolicyStore` has client/key/grant schema, migrations, and read-only lookup; `Gateway.Secrets` provides the local file adapter. Gateway client authentication, lifecycle checks, API/version authorization, and trusted-header construction are implemented; management API, Keycloak realm import, credential issuance/rotation, and local HTTPS CA setup remain unimplemented.
 
 The implementation must not accidentally discard the existing backend dependencies or silently break direct API tests while switching the deployed/local gateway-backed path to gateway credentials.
 
@@ -111,21 +111,23 @@ Before adding production behavior:
 - Map connection failures/activity timeouts to sanitized `502`/`504`; never expose exception text/backend host details.
 - Allow only configured HTTP methods; unsupported method returns `405`.
 
-**Tests:** route matching, rewrite, query/body preservation, HTTP methods, pass-through status/body/headers, cancellation, backend unavailable/activity timeout responses, and proof that proxying does not retry. Correlation and trusted-header handling are covered by later slices. Gateway-backed API E2E remains pending until trusted backend headers and Compose wiring are implemented.
+**Tests:** route matching, rewrite, query/body preservation, HTTP methods, pass-through status/body/headers, cancellation, backend unavailable/activity timeout responses, and proof that proxying does not retry. Slice 4 adds canonical correlation and trusted-header tests. Gateway-backed API E2E remains pending until Compose wiring is implemented.
 
 ### Slice 4 — Client key authentication and API/version authorization
 
 Depends on Slice 4A's persisted client-key lookup and versioned local secret-provider foundations.
 
 - Parse `Authorization: ApiKey <opaque-key-id>.<secret>`; reject missing/malformed forms.
+- Use a 32-byte cryptographically random client secret encoded as unpadded Base64URL (43 characters).
 - Look up opaque key ID, enforce client/key active/expiry/revocation state, compute HMAC-SHA-256 using the verifier’s pepper version, and compare in constant time.
 - Use versioned verifiers/pepper metadata. Never return secret after issuance; never log credential material; never reuse key IDs.
-- Support one current plus one previous key per client for one-hour rotation overlap; support immediate client disable subject to the 30-second policy cache bound.
-- Authenticate before revealing route existence. Use one generic `401` for every invalid key condition; then resolve route (`404` unknown), client allowlist (`403` denied), and route kill-switch.
-- Require one active route/client grant before enabling a client. No implicit/unlimited client defaults.
-- Sanitize incoming identity/forwarding headers and set trusted `X-Authenticated-Client-Id` and `X-Gateway-Key`.
+- Support one current plus one previous key per client for one-hour rotation overlap; read persisted client state on each request so disable takes effect without a stale policy cache.
+- Authenticate before revealing route existence. Use one generic `401` for every invalid key condition; then resolve route (`404` unknown) and client allowlist (`403` denied).
+- Require an explicit API/version grant for access; do not infer permissions or provide a default allow.
+- Sanitize incoming auth, identity, correlation, and forwarding headers; set trusted `X-Authenticated-Client-Id`, separate backend `X-Gateway-Key`, and canonical correlation ID.
+- Route kill switches and management-time enforcement that at least one grant exists before client enablement are deferred to Slice 5.
 
-**Tests:** supported credential parsing, malformed and unknown IDs, wrong secret, key status/expiry, overlap expiry, pepper version, constant-time helper usage review, generic 401 equivalence, authorization outcomes, disable, route kill switch, and policy cache refresh/expiry.
+**Tests:** supported credential parsing, malformed and unknown IDs, wrong secret, key status/expiry, overlap expiry and validity, disabled clients, generic 401 equivalence, authorization outcomes, dependency outages, correlation canonicalization, spoofed-header removal, and proof the client key is not forwarded. Constant-time comparison is reviewed at the implementation boundary. Route kill-switch tests belong to Slice 5.
 
 ### Slice 4A — Credential persistence and local secret-provider foundations
 
