@@ -2,9 +2,9 @@
 
 ## Status and approval boundary
 
-**Status: Slices 1–3, 4A, and the Gateway authentication/authorization implementation in Slice 4 are present.** On 2026-11-09 the owner approved the proposed project names, direct Gateway HTTPS as the local TLS boundary, versioned Keycloak plus local-only bootstrap, retaining direct API tests while adding gateway-backed E2E coverage, and the narrow Slice 2 scope. The owner approved proceeding with Slice 4. Targeted Gateway tests pass; human governance review and Docker-backed Gateway/API E2E remain pending. Subsequent work remains gated.
+**Status: Slices 1–3, 4A, and the Gateway authentication/authorization implementation in Slice 4 are present. The narrow backend-credential PoC in Slice 5 is under implementation.** On 2026-11-09 the owner approved the proposed project names, direct Gateway HTTPS as the local TLS boundary, versioned Keycloak plus local-only bootstrap, retaining direct API tests while adding gateway-backed E2E coverage, and the narrow Slice 2 scope. Targeted unit/host tests pass; PostgreSQL-backed verification, Docker Gateway/API E2E, and human governance review remain pending. Broader Slice 5/6 work remains gated.
 
-Use `[ ]` for pending work and change to `[x]` only after completing and verifying the item; add evidence or a link beside the item when useful. Gateway-side client authentication, credential lifecycle checks, API/version authorization, and trusted-header handling for Slice 4 are implemented and covered by targeted tests. Compose-backed E2E and human governance review remain pending; management behavior and deployment behavior are not part of this slice.
+Use `[ ]` for pending work and change to `[x]` only after completing and verifying the item; add evidence or a link beside the item when useful. Gateway-side client authentication, credential lifecycle checks, API/version authorization, and trusted-header handling for Slice 4 are implemented and covered by targeted tests. The initial Slice 5 PoC issues and rotates backend credentials, stores only verifiers in PostgreSQL, and verifies the gateway credential in the API; Compose-backed E2E and human governance review remain pending.
 
 ## Request and acceptance criteria
 
@@ -247,22 +247,24 @@ This approved package/migration spike was performed in the same `/tmp/transactio
 
 ### Slice 5 — Management API, PostgreSQL, OIDC, and audit
 
-- [ ] Extend the Slice 4A schema with explicit limits, backend credential verifiers/rotation, route kill switch, optimistic concurrency, and audit entries.
-- [ ] Add private management host and OIDC bearer validation configured by issuer/audience; require read/write scopes.
+- [x] Add backend credential verifier metadata, one-current/one-previous indexes, a one-hour overlap constraint, concurrency token, audit table, and append-only audit trigger. Explicit client limits and route kill switch remain pending.
+- [x] Add the private management host’s OIDC bearer validation configured by HTTPS issuer/audience and scoped backend-credential endpoints (`gateway.read` / `gateway.write`).
 - [ ] Configure Keycloak import for local realm, client, scopes, and test identities. Keep development credentials in `.secrets/`.
-- [ ] Implement client/key issue, rotate, revoke, disable, permissions, quota policy metadata, backend credential metadata, route kill switch, and audited change endpoints.
-- [ ] Show generated client/backend secret only once; never include secrets in read responses, logs, or audit entries.
-- [ ] Implement append-only audit for admin changes and auth failures; retain stable OIDC `iss`+`sub` and admin client ID, action, target, time, outcome.
-- [ ] Enforce optimistic concurrency and fail closed with `503` on PostgreSQL outage.
+- [x] Implement backend credential metadata, issue, rotate, and revoke endpoints; client/key lifecycle, permissions, quota policy, and route kill-switch operations remain pending.
+- [x] Return the generated backend credential only in the successful issue response; exclude raw values from reads and audit records.
+- [x] Append audit records for backend issue/revoke actions with OIDC issuer, subject, optional admin client ID, action, target, time, and outcome. Client operations and auth-failure auditing remain pending.
+- [x] Use backend-row optimistic concurrency and fail closed with `503` on API/Gateway dependency outages.
 - [ ] Create a safe local bootstrap process for initial admin and client; do not embed production admin users, keys, or passwords in the repo.
 
 **Verification tasks:**
 
-- [ ] Test OIDC issuer/audience/scope failures and unauthorized/forbidden results.
-- [ ] Test admin CRUD and concurrency conflicts.
-- [ ] Verify one-time secret behavior, non-retrievability, and secret-free audit/logging.
-- [ ] Test key-ID uniqueness/no reuse, disabled client, and append-only audit behavior.
-- [ ] Test fail-closed behavior during PostgreSQL outage.
+- [x] Test that management credential metadata requires authentication and that read/write scopes are enforced independently.
+- [ ] Test OIDC issuer/audience/scope failures and forbidden results with signed-token host tests.
+- [ ] Run the opt-in PostgreSQL test for issue → API verifier success → rotation overlap → revoke → append-only audit; it is currently skipped because `GATEWAY_TEST_POSTGRES` is not configured.
+- [x] Unit-test API HMAC verification, active/expired credential handling, secret file writes, and Gateway credential lookup.
+- [ ] Verify management concurrency conflicts, full secret non-retrievability/logging, and PostgreSQL outage behavior.
+
+**PoC boundary:** This is the backend credential proof only. It does not complete the broader management lifecycle, Keycloak provisioning, local bootstrap, full Compose topology, or Phase 1 governance/E2E gates.
 
 ### Slice 6 — Local TLS, secret provider, and Compose profiles
 

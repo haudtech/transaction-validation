@@ -2,8 +2,11 @@ using TransactionValidation.Gateway.Contracts.Interfaces;
 
 namespace TransactionValidation.Gateway.Secrets.Providers;
 
-public sealed class LocalFileSecretProvider : ISecretProvider
+public sealed class LocalFileSecretProvider : ISecretProvider, ISecretWriter
 {
+    private const UnixFileMode PrivateDirectoryMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+    private const UnixFileMode PrivateFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+
     private const UnixFileMode InsecureFileModes =
         UnixFileMode.GroupRead
         | UnixFileMode.GroupWrite
@@ -62,6 +65,108 @@ public sealed class LocalFileSecretProvider : ISecretProvider
         }
 
         return secret;
+    }
+
+    public async ValueTask WriteSecretAsync(
+        string secretName,
+        ReadOnlyMemory<byte> secret,
+        CancellationToken cancellationToken)
+    {
+        ValidateSecretName(secretName);
+        if (secret.IsEmpty)
+        {
+            throw new ArgumentException("Secrets cannot be empty.", nameof(secret));
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            throw new PlatformNotSupportedException(
+                "The local file secret provider requires Unix permission validation and is not supported on Windows.");
+        }
+
+        EnsurePrivateRootDirectory();
+        var destinationPath = Path.Combine(rootDirectory, secretName);
+        var temporaryPath = Path.Combine(rootDirectory, $".{secretName}.{Guid.NewGuid():N}.tmp");
+
+        try
+        {
+            await using (var stream = new FileStream(
+                temporaryPath,
+                new FileStreamOptions
+                {
+                    Mode = FileMode.CreateNew,
+                    Access = FileAccess.Write,
+                    Share = FileShare.None,
+                    Options = FileOptions.Asynchronous | FileOptions.WriteThrough,
+                    UnixCreateMode = PrivateFileMode
+                }))
+            {
+                await stream.WriteAsync(secret, cancellationToken);
+                await stream.FlushAsync(cancellationToken);
+            }
+
+            File.Move(temporaryPath, destinationPath);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
+        }
+    }
+
+    public ValueTask DeleteSecretAsync(string secretName, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ValidateSecretName(secretName);
+        EnsurePrivateRootDirectory();
+        var secretPath = Path.Combine(rootDirectory, secretName);
+        if (File.Exists(secretPath))
+        {
+            var attributes = File.GetAttributes(secretPath);
+            if ((attributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0)
+            {
+                throw new InvalidOperationException("Local secret paths must be regular files.");
+            }
+
+            File.Delete(secretPath);
+        }
+
+        return ValueTask.CompletedTask;
+    }
+
+    private void EnsurePrivateRootDirectory()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            throw new PlatformNotSupportedException(
+                "The local file secret provider requires Unix permission validation and is not supported on Windows.");
+        }
+
+        if (!Directory.Exists(rootDirectory))
+        {
+            Directory.CreateDirectory(rootDirectory, PrivateDirectoryMode);
+        }
+
+        var attributes = File.GetAttributes(rootDirectory);
+        if ((attributes & FileAttributes.Directory) == 0 || (attributes & FileAttributes.ReparsePoint) != 0)
+        {
+            throw new InvalidOperationException("The configured local secret path must be a non-symbolic-link directory.");
+        }
+
+        EnsurePrivateDirectoryPermissions(rootDirectory);
+    }
+
+    private static void ValidateSecretName(string secretName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(secretName);
+        if (!IsSafeSecretName(secretName))
+        {
+            throw new ArgumentException(
+                "Secret names may contain only ASCII letters, digits, hyphens, and underscores.",
+                nameof(secretName));
+        }
     }
 
     private static bool IsSafeSecretName(string secretName)

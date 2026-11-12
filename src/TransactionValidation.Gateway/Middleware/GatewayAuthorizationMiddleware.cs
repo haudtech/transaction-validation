@@ -2,18 +2,17 @@ using System.Security.Cryptography;
 using System.Text;
 
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Options;
 
+using TransactionValidation.Gateway.Contracts.Exceptions;
 using TransactionValidation.Gateway.Contracts.Interfaces;
 using TransactionValidation.Gateway.Contracts.Models;
-using TransactionValidation.Gateway.Options;
 
 namespace TransactionValidation.Gateway.Middleware;
 
 public sealed class GatewayAuthorizationMiddleware(
     RequestDelegate next,
-    ISecretProvider secretProvider,
-    IOptions<GatewayRuntimeOptions> options)
+    IBackendCredentialStore backendCredentialStore,
+    ISecretProvider secretProvider)
 {
     private const string TransactionPath = "/transactions/v1/partner/transactions";
     private const string ApiId = "transaction-validation";
@@ -67,12 +66,18 @@ public sealed class GatewayAuthorizationMiddleware(
         string backendCredential;
         try
         {
-            var secretBytes = await secretProvider.GetSecretAsync(
-                options.Value.BackendCredentialSecretName,
-                context.RequestAborted);
+            var credentialReference = await backendCredentialStore.GetCurrentAsync(ApiId, context.RequestAborted);
+            if (credentialReference is null)
+            {
+                await WriteErrorAsync(context, StatusCodes.Status503ServiceUnavailable, "Service unavailable");
+                return;
+            }
+
+            var secretBytes = await secretProvider.GetSecretAsync(credentialReference.SecretName, context.RequestAborted);
             try
             {
-                backendCredential = new UTF8Encoding(false, true).GetString(secretBytes);
+                var secret = new UTF8Encoding(false, true).GetString(secretBytes);
+                backendCredential = $"{credentialReference.KeyId}.{secret}";
             }
             finally
             {
@@ -123,7 +128,8 @@ public sealed class GatewayAuthorizationMiddleware(
             or UnauthorizedAccessException
             or InvalidOperationException
             or PlatformNotSupportedException
-            or DecoderFallbackException;
+            or DecoderFallbackException
+            or GatewayPolicyStoreUnavailableException;
 
     private static async Task WriteErrorAsync(HttpContext context, int statusCode, string error)
     {

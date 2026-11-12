@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+
 using TransactionValidation.Gateway.Contracts.Models;
 using TransactionValidation.Gateway.PolicyStore.Context;
 
@@ -69,6 +71,61 @@ public sealed class GatewayPolicyDbContextModelSnapshot : ModelSnapshot
                     "(\"Status\" = 'Previous' AND \"PreviousSince\" IS NOT NULL AND \"ExpiresAt\" IS NOT NULL AND \"ExpiresAt\" > \"PreviousSince\" AND \"ExpiresAt\" <= \"PreviousSince\" + INTERVAL '1 hour') OR (\"Status\" <> 'Previous' AND \"PreviousSince\" IS NULL)");
                 table.HasCheckConstraint("CK_GatewayClientKeys_Validity", "\"ExpiresAt\" IS NULL OR \"ExpiresAt\" > \"NotBefore\"");
             });
+        });
+
+        modelBuilder.Entity("TransactionValidation.Gateway.PolicyStore.Entities.GatewayBackendCredentialEntity", entity =>
+        {
+            entity.Property<string>("KeyId").HasMaxLength(64).HasColumnType("character varying(64)");
+            entity.Property<string>("ApiId").IsRequired().HasMaxLength(64).HasColumnType("character varying(64)");
+            entity.Property<byte[]>("Verifier").IsRequired().HasColumnType("bytea");
+            entity.Property<string>("PepperVersion").IsRequired().HasMaxLength(64).HasColumnType("character varying(64)");
+            entity.Property<string>("SecretName").IsRequired().HasMaxLength(64).HasColumnType("character varying(64)");
+            entity.Property<string>("Status").IsRequired().HasMaxLength(16).HasColumnType("character varying(16)");
+            entity.Property<DateTimeOffset>("NotBefore").HasColumnType("timestamp with time zone");
+            entity.Property<DateTimeOffset?>("ExpiresAt").HasColumnType("timestamp with time zone");
+            entity.Property<DateTimeOffset?>("RevokedAt").HasColumnType("timestamp with time zone");
+            entity.Property<DateTimeOffset?>("PreviousSince").HasColumnType("timestamp with time zone");
+            entity.Property<int>("Version").IsConcurrencyToken().HasColumnType("integer");
+            entity.HasKey("KeyId");
+            entity.HasIndex("ApiId", "KeyId");
+            entity.HasIndex("ApiId")
+                .IsUnique()
+                .HasDatabaseName("IX_GatewayBackendCredentials_ApiId_Current")
+                .HasFilter("\"Status\" = 'Current'");
+            entity.HasIndex("ApiId")
+                .IsUnique()
+                .HasDatabaseName("IX_GatewayBackendCredentials_ApiId_Previous")
+                .HasFilter("\"Status\" = 'Previous'");
+            entity.ToTable("GatewayBackendCredentials", table =>
+            {
+                table.HasCheckConstraint("CK_GatewayBackendCredentials_VerifierLength", "octet_length(\"Verifier\") = 32");
+                table.HasCheckConstraint("CK_GatewayBackendCredentials_Status", "\"Status\" IN ('Current', 'Previous', 'Revoked')");
+                table.HasCheckConstraint(
+                    "CK_GatewayBackendCredentials_Revocation",
+                    "(\"Status\" = 'Revoked' AND \"RevokedAt\" IS NOT NULL) OR (\"Status\" <> 'Revoked' AND \"RevokedAt\" IS NULL)");
+                table.HasCheckConstraint(
+                    "CK_GatewayBackendCredentials_PreviousWindow",
+                    "(\"Status\" = 'Previous' AND \"PreviousSince\" IS NOT NULL AND \"ExpiresAt\" IS NOT NULL AND \"ExpiresAt\" > \"PreviousSince\" AND \"ExpiresAt\" <= \"PreviousSince\" + INTERVAL '1 hour') OR (\"Status\" <> 'Previous' AND \"PreviousSince\" IS NULL)");
+                table.HasCheckConstraint("CK_GatewayBackendCredentials_Validity", "\"ExpiresAt\" IS NULL OR \"ExpiresAt\" > \"NotBefore\"");
+            });
+        });
+
+        modelBuilder.Entity("TransactionValidation.Gateway.PolicyStore.Entities.GatewayAuditEventEntity", entity =>
+        {
+            entity.Property<long>("Id")
+                .ValueGeneratedOnAdd()
+                .HasColumnType("bigint")
+                .HasAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityAlwaysColumn);
+            entity.Property<DateTimeOffset>("OccurredAt").HasColumnType("timestamp with time zone");
+            entity.Property<string>("AdminIssuer").IsRequired().HasMaxLength(512).HasColumnType("character varying(512)");
+            entity.Property<string>("AdminSubject").IsRequired().HasMaxLength(256).HasColumnType("character varying(256)");
+            entity.Property<string>("AdminClientId").HasMaxLength(256).HasColumnType("character varying(256)");
+            entity.Property<string>("Action").IsRequired().HasMaxLength(64).HasColumnType("character varying(64)");
+            entity.Property<string>("Target").IsRequired().HasMaxLength(256).HasColumnType("character varying(256)");
+            entity.Property<string>("Outcome").IsRequired().HasMaxLength(32).HasColumnType("character varying(32)");
+            entity.HasKey("Id");
+            entity.HasIndex("OccurredAt");
+            entity.ToTable("GatewayAuditEvents");
         });
 
         modelBuilder.Entity("TransactionValidation.Gateway.PolicyStore.Entities.GatewayClientApiGrantEntity", entity =>

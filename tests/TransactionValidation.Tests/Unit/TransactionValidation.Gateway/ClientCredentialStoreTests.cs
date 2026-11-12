@@ -128,10 +128,13 @@ public sealed class ClientCredentialStoreTests
         Assert.Contains("CK_GatewayClientKeys_PreviousWindow", schema, StringComparison.Ordinal);
         Assert.Contains("IX_GatewayClientKeys_ClientId_Current", schema, StringComparison.Ordinal);
         Assert.Contains("IX_GatewayClientKeys_ClientId_Previous", schema, StringComparison.Ordinal);
-        Assert.DoesNotContain("Secret", schema, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("SecretName", schema, StringComparison.Ordinal);
+        Assert.DoesNotContain("RawSecret", schema, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("202611090001_InitialCredentialPolicy", migrations);
         Assert.Contains("202611110001_ClientKeyAuthenticationPolicy", migrations);
+        Assert.Contains("202611120001_BackendCredentialsAndAudit", migrations);
         Assert.Contains("TR_GatewayClientKeys_PreserveKeyId", migrationScript, StringComparison.Ordinal);
+        Assert.Contains("TR_GatewayAuditEvents_AppendOnly", migrationScript, StringComparison.Ordinal);
     }
 
     [PostgreSqlFact]

@@ -7,7 +7,11 @@ using TransactionValidation.Api.HealthChecks;
 using TransactionValidation.Api.Idempotency;
 using TransactionValidation.Configuration.Extensions;
 using TransactionValidation.Configuration.Options;
+using TransactionValidation.Configuration.Authentication;
 using TransactionValidation.Core.Interfaces;
+using TransactionValidation.Gateway.Contracts.Interfaces;
+using TransactionValidation.Gateway.PolicyStore.Extensions;
+using TransactionValidation.Gateway.Secrets.Extensions;
 using TransactionValidation.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,6 +24,16 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddTransactionValidationCommonServices(builder.Configuration);
+if (string.Equals(
+        builder.Configuration[$"{BackendAuthenticationOptions.SectionName}:AuthenticationMode"],
+        BackendAuthenticationMode.Gateway.ToString(),
+        StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddGatewayPolicyStore(builder.Configuration);
+    builder.Services.AddConfiguredSecretProvider(builder.Configuration, builder.Environment);
+    builder.Services.AddSingleton(TimeProvider.System);
+    builder.Services.AddScoped<IGatewayCredentialVerifier, DatabaseGatewayCredentialVerifier>();
+}
 builder.Services.AddTransactionValidationObservability(builder.Configuration, "TransactionValidation.Api");
 builder.Services.AddConfiguredBroker(
     builder.Configuration,

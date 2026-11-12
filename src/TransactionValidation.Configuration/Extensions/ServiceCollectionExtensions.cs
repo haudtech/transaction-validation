@@ -49,7 +49,7 @@ public static class ServiceCollectionExtensions
         services.Configure<SerilogOptions>(configuration.GetSection(SerilogOptions.SectionName));
 
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<ApiKeyOptions>>().Value);
-        services.AddSingleton<IGatewayCredentialVerifier, ConfiguredGatewayCredentialVerifier>();
+        services.AddSingleton<IGatewayCredentialVerifier, RejectingGatewayCredentialVerifier>();
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<IdempotencyOptions>>().Value);
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<PartnerVerificationOptions>>().Value);
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<SerilogOptions>>().Value);

@@ -19,9 +19,7 @@ public sealed class BackendAuthenticationOptionsValidator : IValidateOptions<Bac
     {
         return options.AuthenticationMode switch
         {
-            BackendAuthenticationMode.Gateway => string.IsNullOrWhiteSpace(options.GatewayKey)
-                ? ValidateOptionsResult.Fail("Gateway authentication mode requires a gateway credential.")
-                : ValidateOptionsResult.Success,
+            BackendAuthenticationMode.Gateway => ValidateOptionsResult.Success,
             BackendAuthenticationMode.DirectApiKey => ValidateDirectApiKeyMode(),
             _ => ValidateOptionsResult.Fail("The backend authentication mode is not supported.")
         };

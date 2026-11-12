@@ -64,6 +64,52 @@ public sealed class LocalFileSecretProviderTests
     }
 
     [Fact]
+    public async Task WriteSecretAsync_CreatesPrivateSecretFileThatCanBeReadBack()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        var provider = new LocalFileSecretProvider(root);
+        var secret = new byte[] { 9, 8, 7 };
+        try
+        {
+            await provider.WriteSecretAsync("issued-key", secret, CancellationToken.None);
+
+            Assert.Equal(secret, await provider.GetSecretAsync("issued-key", CancellationToken.None));
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(Path.Combine(root, "issued-key")));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task WriteSecretAsync_DoesNotOverwriteAnExistingSecret()
+    {
+        var root = CreateSecureDirectory();
+        try
+        {
+            WritePrivateFile(root, "issued-key", [1]);
+            var provider = new LocalFileSecretProvider(root);
+
+            await Assert.ThrowsAsync<IOException>(
+                () => provider.WriteSecretAsync("issued-key", new byte[] { 2 }, CancellationToken.None).AsTask());
+            Assert.Equal([1], await provider.GetSecretAsync("issued-key", CancellationToken.None));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task GetSecretAsync_RejectsFilesReadableByGroupOrOtherUsers()
     {
         if (OperatingSystem.IsWindows())

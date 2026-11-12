@@ -42,6 +42,19 @@ public sealed class BackendAuthenticationOptionsValidatorTests
         result.Succeeded.Should().BeTrue();
     }
 
+    [Fact]
+    public void Validate_WhenGatewayModeUsesPersistedCredential_SucceedsWithoutStaticKey()
+    {
+        var configuration = new ConfigurationBuilder().Build();
+        var validator = new BackendAuthenticationOptionsValidator(configuration, CreateEnvironment("Production"));
+
+        var result = validator.Validate(
+            null,
+            new BackendAuthenticationOptions { AuthenticationMode = BackendAuthenticationMode.Gateway });
+
+        result.Succeeded.Should().BeTrue();
+    }
+
     private static IHostEnvironment CreateEnvironment(string environmentName)
     {
         return new TestHostEnvironment(environmentName);

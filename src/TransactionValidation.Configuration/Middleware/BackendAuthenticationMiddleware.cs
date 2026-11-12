@@ -20,7 +20,7 @@ public sealed class BackendAuthenticationMiddleware
         HttpContext context,
         IOptions<BackendAuthenticationOptions> backendOptions,
         IOptions<ApiKeyOptions> apiKeyOptions,
-        IGatewayCredentialVerifier gatewayCredentialVerifier)
+        IGatewayCredentialVerifier? gatewayCredentialVerifier = null)
     {
         if (context.Request.Path.StartsWithSegments("/healthz"))
         {
@@ -28,14 +28,25 @@ public sealed class BackendAuthenticationMiddleware
             return;
         }
 
-        var isAuthenticated = backendOptions.Value.AuthenticationMode switch
+        var authenticationStatus = backendOptions.Value.AuthenticationMode switch
         {
-            BackendAuthenticationMode.Gateway => IsValidGatewayRequest(context, gatewayCredentialVerifier),
-            BackendAuthenticationMode.DirectApiKey => IsValidDirectApiKey(context, apiKeyOptions.Value),
-            _ => false
+            BackendAuthenticationMode.Gateway => gatewayCredentialVerifier is null
+                ? GatewayCredentialVerificationStatus.Invalid
+                : await VerifyGatewayRequestAsync(context, gatewayCredentialVerifier),
+            BackendAuthenticationMode.DirectApiKey => IsValidDirectApiKey(context, apiKeyOptions.Value)
+                ? GatewayCredentialVerificationStatus.Valid
+                : GatewayCredentialVerificationStatus.Invalid,
+            _ => GatewayCredentialVerificationStatus.Invalid
         };
 
-        if (!isAuthenticated)
+        if (authenticationStatus == GatewayCredentialVerificationStatus.Unavailable)
+        {
+            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            await context.Response.WriteAsJsonAsync(new { error = "Service unavailable" });
+            return;
+        }
+
+        if (authenticationStatus != GatewayCredentialVerificationStatus.Valid)
         {
             context.Response.StatusCode = StatusCodes.Status401Unauthorized;
             await context.Response.WriteAsJsonAsync(new { error = "Unauthorized" });
@@ -45,7 +56,7 @@ public sealed class BackendAuthenticationMiddleware
         await _next(context);
     }
 
-    private static bool IsValidGatewayRequest(
+    private static async Task<GatewayCredentialVerificationStatus> VerifyGatewayRequestAsync(
         HttpContext context,
         IGatewayCredentialVerifier credentialVerifier)
     {
@@ -53,10 +64,11 @@ public sealed class BackendAuthenticationMiddleware
             || !TryGetSingleHeader(context, GatewayAuthenticationHeaders.AuthenticatedClientId, out var clientId)
             || !AuthenticatedClientId.TryParse(clientId, out _))
         {
-            return false;
+            return GatewayCredentialVerificationStatus.Invalid;
         }
 
-        return credentialVerifier.IsValid(credential);
+        var result = await credentialVerifier.VerifyAsync(credential, context.RequestAborted);
+        return result.Status;
     }
 
     private static bool IsValidDirectApiKey(HttpContext context, ApiKeyOptions options)

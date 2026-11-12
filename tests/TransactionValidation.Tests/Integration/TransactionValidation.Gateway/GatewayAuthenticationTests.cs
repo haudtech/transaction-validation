@@ -162,7 +162,8 @@ public sealed class GatewayAuthenticationTests
     {
         using var factory = new GatewayHostFactory(
             "http://127.0.0.1:1/",
-            secretProvider: GatewayTestCredentials.CreateSecretProvider(includeBackendCredential: false));
+            secretProvider: GatewayTestCredentials.CreateSecretProvider(includeBackendCredential: false),
+            backendCredentialStore: GatewayTestCredentials.CreateBackendCredentialStore(includeCredential: false));
         using var client = factory.CreateClient();
         using var request = CreateRequest(
             "/transactions/v1/partner/transactions",

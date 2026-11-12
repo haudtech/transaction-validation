@@ -37,7 +37,7 @@ public sealed class ApiSecurityHostTests
         var publisher = new RecordingMessagePublisher();
         using var factory = new ApiHostTestFactory(messagePublisher: publisher, useGatewayAuthentication: true);
         using var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Add(GatewayAuthenticationHeaders.GatewayKey, "wrong-gateway-key");
+        client.DefaultRequestHeaders.Add(GatewayAuthenticationHeaders.GatewayKey, "wrong-backend-key");
         client.DefaultRequestHeaders.Add(GatewayAuthenticationHeaders.AuthenticatedClientId, "client-123");
 
         var response = await client.PostAsJsonAsync(
@@ -56,7 +56,7 @@ public sealed class ApiSecurityHostTests
         var publisher = new RecordingMessagePublisher();
         using var factory = new ApiHostTestFactory(messagePublisher: publisher, useGatewayAuthentication: true);
         using var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Add(GatewayAuthenticationHeaders.GatewayKey, ApiHostTestFactory.GatewayKey);
+        client.DefaultRequestHeaders.Add(GatewayAuthenticationHeaders.GatewayKey, ApiHostTestFactory.GatewayCredential);
 
         var response = await client.PostAsJsonAsync(
             "/api/v1/partner/transactions",
@@ -74,7 +74,7 @@ public sealed class ApiSecurityHostTests
         var publisher = new RecordingMessagePublisher();
         using var factory = new ApiHostTestFactory(messagePublisher: publisher, useGatewayAuthentication: true);
         using var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Add(GatewayAuthenticationHeaders.GatewayKey, ApiHostTestFactory.GatewayKey);
+        client.DefaultRequestHeaders.Add(GatewayAuthenticationHeaders.GatewayKey, ApiHostTestFactory.GatewayCredential);
         client.DefaultRequestHeaders.Add(GatewayAuthenticationHeaders.AuthenticatedClientId, "client-123");
 
         var response = await client.PostAsJsonAsync(

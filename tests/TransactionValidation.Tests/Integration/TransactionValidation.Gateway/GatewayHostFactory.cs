@@ -18,7 +18,8 @@ internal sealed class GatewayHostFactory(
     string destinationAddress,
     string? activityTimeout = null,
     IClientCredentialStore? credentialStore = null,
-    ISecretProvider? secretProvider = null) : WebApplicationFactory<GatewayEntryPoint>
+    ISecretProvider? secretProvider = null,
+    IBackendCredentialStore? backendCredentialStore = null) : WebApplicationFactory<GatewayEntryPoint>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -27,6 +28,8 @@ internal sealed class GatewayHostFactory(
             var values = new Dictionary<string, string?>
             {
                 ["ConnectionStrings:GatewayPolicy"] = "Host=127.0.0.1;Database=gateway_test;Username=test",
+                ["Secrets:Provider"] = "LocalFile",
+                ["Secrets:Directory"] = ".secrets",
                 ["ReverseProxy:Clusters:transactionValidation:Destinations:api:Address"] = destinationAddress
             };
             if (activityTimeout is not null)
@@ -43,6 +46,8 @@ internal sealed class GatewayHostFactory(
             services.AddSingleton(credentialStore ?? GatewayTestCredentials.CreateStore());
             services.RemoveAll<ISecretProvider>();
             services.AddSingleton(secretProvider ?? GatewayTestCredentials.CreateSecretProvider());
+            services.RemoveAll<IBackendCredentialStore>();
+            services.AddSingleton(backendCredentialStore ?? GatewayTestCredentials.CreateBackendCredentialStore());
         });
     }
 }
@@ -54,7 +59,9 @@ internal static class GatewayTestCredentials
     public static string Authorization => $"ApiKey {KeyId}.{ClientSecret}";
     public const string ClientId = "test-client";
     public const string PepperVersion = "pepper-v1";
-    public const string BackendCredential = "test-gateway-backend-credential";
+    public const string BackendCredentialKeyId = "backend-test-key";
+    public static readonly string BackendCredentialSecret = new('B', 43);
+    public static string BackendCredential => $"{BackendCredentialKeyId}.{BackendCredentialSecret}";
     private static readonly byte[] Pepper = Enumerable.Range(0, 32).Select(value => (byte)value).ToArray();
 
     public static ClientCredentialRecord CreateCredential(
@@ -94,11 +101,16 @@ internal static class GatewayTestCredentials
         };
         if (includeBackendCredential)
         {
-            secrets["transaction-validation-backend"] = Encoding.UTF8.GetBytes(BackendCredential);
+            secrets[BackendCredentialKeyId] = Encoding.UTF8.GetBytes(BackendCredentialSecret);
         }
 
         return new InMemorySecretProvider(secrets);
     }
+
+    public static InMemoryBackendCredentialStore CreateBackendCredentialStore(bool includeCredential = true) =>
+        new(includeCredential
+            ? new BackendCredentialSecretReference(BackendCredentialKeyId, BackendCredentialKeyId)
+            : null);
 }
 
 internal sealed class InMemoryClientCredentialStore(IEnumerable<ClientCredentialRecord> credentials)
@@ -126,5 +138,26 @@ internal sealed class InMemorySecretProvider(IReadOnlyDictionary<string, byte[]>
         }
 
         return ValueTask.FromResult(secret.ToArray());
+    }
+}
+
+internal sealed class InMemoryBackendCredentialStore(BackendCredentialSecretReference? credential)
+    : IBackendCredentialStore
+{
+    public Task<BackendCredentialSecretReference?> GetCurrentAsync(
+        string apiId,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(credential);
+    }
+
+    public Task<BackendCredentialRecord?> GetByKeyIdAsync(
+        string apiId,
+        string keyId,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult<BackendCredentialRecord?>(null);
     }
 }

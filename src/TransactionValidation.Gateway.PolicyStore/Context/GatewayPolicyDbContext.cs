@@ -13,6 +13,10 @@ public sealed class GatewayPolicyDbContext(DbContextOptions<GatewayPolicyDbConte
 
     public DbSet<GatewayClientApiGrantEntity> ClientApiGrants => Set<GatewayClientApiGrantEntity>();
 
+    public DbSet<GatewayBackendCredentialEntity> BackendCredentials => Set<GatewayBackendCredentialEntity>();
+
+    public DbSet<GatewayAuditEventEntity> AuditEvents => Set<GatewayAuditEventEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<GatewayClientEntity>(entity =>
@@ -75,6 +79,59 @@ public sealed class GatewayPolicyDbContext(DbContextOptions<GatewayPolicyDbConte
                 .WithMany(client => client.ApiGrants)
                 .HasForeignKey(grant => grant.ClientId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<GatewayBackendCredentialEntity>(entity =>
+        {
+            entity.ToTable("GatewayBackendCredentials", table =>
+            {
+                table.HasCheckConstraint("CK_GatewayBackendCredentials_VerifierLength", "octet_length(\"Verifier\") = 32");
+                table.HasCheckConstraint(
+                    "CK_GatewayBackendCredentials_Status",
+                    "\"Status\" IN ('Current', 'Previous', 'Revoked')");
+                table.HasCheckConstraint(
+                    "CK_GatewayBackendCredentials_Revocation",
+                    "(\"Status\" = 'Revoked' AND \"RevokedAt\" IS NOT NULL) OR (\"Status\" <> 'Revoked' AND \"RevokedAt\" IS NULL)");
+                table.HasCheckConstraint(
+                    "CK_GatewayBackendCredentials_PreviousWindow",
+                    "(\"Status\" = 'Previous' AND \"PreviousSince\" IS NOT NULL AND \"ExpiresAt\" IS NOT NULL AND \"ExpiresAt\" > \"PreviousSince\" AND \"ExpiresAt\" <= \"PreviousSince\" + INTERVAL '1 hour') OR (\"Status\" <> 'Previous' AND \"PreviousSince\" IS NULL)");
+                table.HasCheckConstraint(
+                    "CK_GatewayBackendCredentials_Validity",
+                    "\"ExpiresAt\" IS NULL OR \"ExpiresAt\" > \"NotBefore\"");
+            });
+            entity.HasKey(credential => credential.KeyId);
+            entity.Property(credential => credential.KeyId).HasMaxLength(64);
+            entity.Property(credential => credential.ApiId).HasMaxLength(64).IsRequired();
+            entity.Property(credential => credential.Verifier).HasColumnType("bytea").IsRequired();
+            entity.Property(credential => credential.PepperVersion).HasMaxLength(64).IsRequired();
+            entity.Property(credential => credential.SecretName).HasMaxLength(64).IsRequired();
+            entity.Property(credential => credential.Status).HasMaxLength(16).IsRequired();
+            entity.Property(credential => credential.NotBefore).HasColumnType("timestamp with time zone");
+            entity.Property(credential => credential.ExpiresAt).HasColumnType("timestamp with time zone");
+            entity.Property(credential => credential.RevokedAt).HasColumnType("timestamp with time zone");
+            entity.Property(credential => credential.PreviousSince).HasColumnType("timestamp with time zone");
+            entity.Property(credential => credential.Version).IsConcurrencyToken();
+            entity.HasIndex(credential => credential.ApiId, "IX_GatewayBackendCredentials_ApiId_Current")
+                .IsUnique()
+                .HasFilter("\"Status\" = 'Current'");
+            entity.HasIndex(credential => credential.ApiId, "IX_GatewayBackendCredentials_ApiId_Previous")
+                .IsUnique()
+                .HasFilter("\"Status\" = 'Previous'");
+            entity.HasIndex(credential => new { credential.ApiId, credential.KeyId });
+        });
+
+        modelBuilder.Entity<GatewayAuditEventEntity>(entity =>
+        {
+            entity.ToTable("GatewayAuditEvents");
+            entity.HasKey(audit => audit.Id);
+            entity.Property(audit => audit.Id).UseIdentityAlwaysColumn();
+            entity.Property(audit => audit.OccurredAt).HasColumnType("timestamp with time zone");
+            entity.Property(audit => audit.AdminIssuer).HasMaxLength(512).IsRequired();
+            entity.Property(audit => audit.AdminSubject).HasMaxLength(256).IsRequired();
+            entity.Property(audit => audit.AdminClientId).HasMaxLength(256);
+            entity.Property(audit => audit.Action).HasMaxLength(64).IsRequired();
+            entity.Property(audit => audit.Target).HasMaxLength(256).IsRequired();
+            entity.Property(audit => audit.Outcome).HasMaxLength(32).IsRequired();
         });
     }
 }

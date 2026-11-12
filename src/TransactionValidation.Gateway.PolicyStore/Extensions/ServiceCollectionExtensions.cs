@@ -45,6 +45,7 @@ public static class ServiceCollectionExtensions
                 postgres => postgres.CommandTimeout(options.CommandTimeoutSeconds));
         });
         services.AddScoped<IClientCredentialStore, EfClientCredentialStore>();
+        services.AddScoped<IBackendCredentialStore, EfBackendCredentialStore>();
 
         return services;
     }

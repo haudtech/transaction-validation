@@ -32,7 +32,7 @@ public class BackendAuthenticationMiddlewareTests
             context,
             MicrosoftOptions.Create(new BackendAuthenticationOptions { AuthenticationMode = BackendAuthenticationMode.Gateway }),
             MicrosoftOptions.Create(new ApiKeyOptions()),
-            new StubGatewayCredentialVerifier(isValid: true));
+            new StubGatewayCredentialVerifier(GatewayCredentialVerificationResult.Valid));
 
         called.Should().BeTrue();
     }
@@ -54,7 +54,7 @@ public class BackendAuthenticationMiddlewareTests
             context,
             MicrosoftOptions.Create(new BackendAuthenticationOptions { AuthenticationMode = BackendAuthenticationMode.Gateway }),
             MicrosoftOptions.Create(new ApiKeyOptions()),
-            new StubGatewayCredentialVerifier(isValid: false));
+            new StubGatewayCredentialVerifier(GatewayCredentialVerificationResult.Invalid));
 
         context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
         called.Should().BeFalse();
@@ -80,7 +80,7 @@ public class BackendAuthenticationMiddlewareTests
             context,
             MicrosoftOptions.Create(new BackendAuthenticationOptions { AuthenticationMode = BackendAuthenticationMode.Gateway }),
             MicrosoftOptions.Create(new ApiKeyOptions()),
-            new StubGatewayCredentialVerifier(isValid: true));
+            new StubGatewayCredentialVerifier(GatewayCredentialVerificationResult.Valid));
 
         context.Response.StatusCode.Should().Be(StatusCodes.Status401Unauthorized);
         called.Should().BeFalse();
@@ -102,7 +102,7 @@ public class BackendAuthenticationMiddlewareTests
             context,
             MicrosoftOptions.Create(new BackendAuthenticationOptions { AuthenticationMode = BackendAuthenticationMode.DirectApiKey }),
             MicrosoftOptions.Create(new ApiKeyOptions { ApiKey = "direct-test-key" }),
-            new StubGatewayCredentialVerifier(isValid: false));
+            new StubGatewayCredentialVerifier(GatewayCredentialVerificationResult.Invalid));
 
         called.Should().BeTrue();
     }
@@ -123,13 +123,33 @@ public class BackendAuthenticationMiddlewareTests
             context,
             MicrosoftOptions.Create(new BackendAuthenticationOptions { AuthenticationMode = BackendAuthenticationMode.Gateway }),
             MicrosoftOptions.Create(new ApiKeyOptions()),
-            new StubGatewayCredentialVerifier(isValid: false));
+            new StubGatewayCredentialVerifier(GatewayCredentialVerificationResult.Invalid));
 
         called.Should().BeTrue();
     }
 
-    private sealed class StubGatewayCredentialVerifier(bool isValid) : IGatewayCredentialVerifier
+    [Fact]
+    public async Task InvokeAsync_WhenCredentialStoreIsUnavailable_ReturnsServiceUnavailable()
     {
-        public bool IsValid(string credential) => isValid;
+        var middleware = new BackendAuthenticationMiddleware(_ => Task.CompletedTask);
+        var context = new DefaultHttpContext();
+        context.Request.Headers[GatewayAuthenticationHeaders.GatewayKey] = "gateway-secret";
+        context.Request.Headers[GatewayAuthenticationHeaders.AuthenticatedClientId] = "client-123";
+
+        await middleware.InvokeAsync(
+            context,
+            MicrosoftOptions.Create(new BackendAuthenticationOptions { AuthenticationMode = BackendAuthenticationMode.Gateway }),
+            MicrosoftOptions.Create(new ApiKeyOptions()),
+            new StubGatewayCredentialVerifier(GatewayCredentialVerificationResult.Unavailable));
+
+        context.Response.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+    }
+
+    private sealed class StubGatewayCredentialVerifier(
+        GatewayCredentialVerificationResult result) : IGatewayCredentialVerifier
+    {
+        public ValueTask<GatewayCredentialVerificationResult> VerifyAsync(
+            string credential,
+            CancellationToken cancellationToken) => ValueTask.FromResult(result);
     }
 }

@@ -1,6 +1,10 @@
+using TransactionValidation.Gateway.Contracts.Models;
+
 namespace TransactionValidation.Gateway.Contracts.Interfaces;
 
 public interface IGatewayCredentialVerifier
 {
-    bool IsValid(string credential);
+    ValueTask<GatewayCredentialVerificationResult> VerifyAsync(
+        string credential,
+        CancellationToken cancellationToken);
 }
