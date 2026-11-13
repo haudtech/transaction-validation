@@ -286,15 +286,15 @@ This approved package/migration spike was performed in the same `/tmp/transactio
 
 Implement the approved minimum Redis-backed token bucket and daily/monthly UTC quota path in Phase 1 so the local seeded client is usable and subject to its explicit finite limits. Phase 2 generalizes and hardens policy enforcement across APIs and operational scenarios; it does not introduce the first enforcement path.
 
-- [ ] Implement the minimum rate and quota check as one atomic Redis decision/update; define and test concurrency and counter-expiry behavior.
-- [ ] Require explicit finite settings per client/API, including the local seed client; no unlimited defaults or bypass configuration.
+- [x] Implement the minimum rate and quota check as one atomic Redis decision/update; define and test concurrency and counter-expiry behavior. _Evidence: `RedisClientRequestLimiter` single Lua script; `RedisClientRequestLimiterTests` against real Redis (`GATEWAY_TEST_REDIS`)._
+- [x] Require explicit finite settings per client/API, including the local seed client; no unlimited defaults or bypass configuration. _Evidence: `GatewayClientApiLimits` table with check constraints; a missing limit returns 503; the bootstrap seeds 600/min, burst 100, 100,000/day, 2,000,000/month._
 
 **Verification tasks:**
 
-- [ ] Verify counters are per client+API and shared across versions; quota is charged after authentication/authorization and before rate-limit evaluation/forwarding.
-- [ ] Test `429` responses and appropriate `Retry-After` values for token-bucket and UTC quota exhaustion.
-- [ ] Test fail-closed `503` behavior on Redis failure.
-- [ ] Verify local seed limits are generous but finite and no integration test bypasses enforcement.
+- [x] Verify counters are per client+API and shared across versions; quota is charged after authentication/authorization and before rate-limit evaluation/forwarding. _Evidence: Redis tests; keys use the `{client|api}` hash tag; a denied request consumes nothing._
+- [x] Test `429` responses and appropriate `Retry-After` values for token-bucket and UTC quota exhaustion. _Evidence: `GatewayRateLimitTests` (`Retry-After` 7 and 10800); Docker burst returned 429 with `Retry-After: 1`._
+- [x] Test fail-closed `503` behavior on Redis failure. _Evidence: `GatewayRateLimitTests`; Docker with Redis stopped returned 503._
+- [x] Verify local seed limits are generous but finite and no integration test bypasses enforcement. _Evidence: `GatewayHostFactory` uses `InMemoryClientRequestLimiter` by default; limits are validated finite in the bootstrap._
 
 ### Slice 8 — Observability, errors, and readiness
 

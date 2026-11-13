@@ -24,6 +24,10 @@ builder.Services.AddOptions<LocalBootstrapOptions>()
             && !string.IsNullOrWhiteSpace(options.ClientPepperVersion)
             && !string.IsNullOrWhiteSpace(options.CredentialSecretName),
         "LocalBootstrap client, key, pepper, and credential names are required.")
+    .Validate(options =>
+            options.RatePerMinute > 0 && options.Burst > 0 && options.DailyQuota > 0
+            && options.MonthlyQuota >= options.DailyQuota,
+        "LocalBootstrap limits must be finite and positive, and the monthly quota must not be below the daily quota.")
     .ValidateOnStart();
 builder.Services.AddOptions<BackendCredentialManagementOptions>()
     .Bind(builder.Configuration.GetSection(BackendCredentialManagementOptions.SectionName))

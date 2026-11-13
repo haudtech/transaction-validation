@@ -29,7 +29,10 @@ public sealed class GatewayAuthorizationMiddleware(
     };
 
     // Scoped services must be injected per request; middleware is constructed once.
-    public async Task InvokeAsync(HttpContext context, IBackendCredentialStore backendCredentialStore)
+    public async Task InvokeAsync(
+        HttpContext context,
+        IBackendCredentialStore backendCredentialStore,
+        IClientRequestLimiter requestLimiter)
     {
         if (context.Request.Path.Equals("/healthz", StringComparison.OrdinalIgnoreCase))
         {
@@ -60,6 +63,37 @@ public sealed class GatewayAuthorizationMiddleware(
         {
             context.Response.StatusCode = StatusCodes.Status405MethodNotAllowed;
             context.Response.Headers[AllowHeaderName] = HttpMethods.Post;
+            return;
+        }
+
+        var limit = credential.ApiLimits.FirstOrDefault(
+            candidate => string.Equals(candidate.ApiId, ApiId, StringComparison.Ordinal));
+        if (limit is null)
+        {
+            // Explicit finite limits are mandatory; a missing policy never means unlimited.
+            await WriteErrorAsync(context, StatusCodes.Status503ServiceUnavailable, "Service unavailable");
+            return;
+        }
+
+        RequestLimitDecision decision;
+        try
+        {
+            decision = await requestLimiter.TryAcquireAsync(credential.ClientId, limit, context.RequestAborted);
+        }
+        catch (GatewayRequestLimiterUnavailableException)
+        {
+            await WriteErrorAsync(context, StatusCodes.Status503ServiceUnavailable, "Service unavailable");
+            return;
+        }
+
+        if (!decision.Allowed)
+        {
+            var retryAfterSeconds = Math.Max(1, (int)Math.Ceiling(decision.RetryAfter.TotalSeconds));
+            context.Response.Headers["Retry-After"] = retryAfterSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            await WriteErrorAsync(
+                context,
+                StatusCodes.Status429TooManyRequests,
+                decision.Denial == RequestLimitDenial.RateLimit ? "Rate limit exceeded" : "Quota exceeded");
             return;
         }
 

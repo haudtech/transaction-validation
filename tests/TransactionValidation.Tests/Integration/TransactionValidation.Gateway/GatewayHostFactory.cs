@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
+using TransactionValidation.Gateway.Contracts.Exceptions;
 using TransactionValidation.Gateway.Contracts.Interfaces;
 using TransactionValidation.Gateway.Contracts.Models;
 using TransactionValidation.Gateway.Hosting;
@@ -19,7 +20,8 @@ internal sealed class GatewayHostFactory(
     string? activityTimeout = null,
     IClientCredentialStore? credentialStore = null,
     ISecretProvider? secretProvider = null,
-    IBackendCredentialStore? backendCredentialStore = null) : WebApplicationFactory<GatewayEntryPoint>
+    IBackendCredentialStore? backendCredentialStore = null,
+    IClientRequestLimiter? requestLimiter = null) : WebApplicationFactory<GatewayEntryPoint>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -28,6 +30,7 @@ internal sealed class GatewayHostFactory(
             var values = new Dictionary<string, string?>
             {
                 ["ConnectionStrings:GatewayPolicy"] = "Host=127.0.0.1;Database=gateway_test;Username=test",
+                ["ConnectionStrings:GatewayRedis"] = "127.0.0.1:1,abortConnect=false",
                 ["Secrets:Provider"] = "LocalFile",
                 ["Secrets:Directory"] = ".secrets",
                 ["ReverseProxy:Clusters:transactionValidation:Destinations:api:Address"] = destinationAddress
@@ -48,6 +51,8 @@ internal sealed class GatewayHostFactory(
             services.AddSingleton(secretProvider ?? GatewayTestCredentials.CreateSecretProvider());
             services.RemoveAll<IBackendCredentialStore>();
             services.AddSingleton(backendCredentialStore ?? GatewayTestCredentials.CreateBackendCredentialStore());
+            services.RemoveAll<IClientRequestLimiter>();
+            services.AddSingleton(requestLimiter ?? new InMemoryClientRequestLimiter());
         });
     }
 }
@@ -62,6 +67,7 @@ internal static class GatewayTestCredentials
     public const string BackendCredentialKeyId = "backend-test-key";
     public static readonly string BackendCredentialSecret = new('B', 43);
     public static string BackendCredential => $"{BackendCredentialKeyId}.{BackendCredentialSecret}";
+    public static readonly ClientApiLimit DefaultLimit = new("transaction-validation", 600, 100, 100_000, 2_000_000);
     private static readonly byte[] Pepper = Enumerable.Range(0, 32).Select(value => (byte)value).ToArray();
 
     public static ClientCredentialRecord CreateCredential(
@@ -73,7 +79,8 @@ internal static class GatewayTestCredentials
         DateTimeOffset? previousSince = null,
         bool clientEnabled = true,
         IReadOnlyList<ClientApiGrant>? grants = null,
-        byte[]? verifier = null)
+        byte[]? verifier = null,
+        IReadOnlyList<ClientApiLimit>? limits = null)
     {
         var now = DateTimeOffset.UtcNow;
         return new ClientCredentialRecord(
@@ -87,7 +94,8 @@ internal static class GatewayTestCredentials
             revokedAt,
             previousSince,
             clientEnabled,
-            grants ?? [new ClientApiGrant("transaction-validation", "v1")]);
+            grants ?? [new ClientApiGrant("transaction-validation", "v1")],
+            limits ?? [DefaultLimit]);
     }
 
     public static InMemoryClientCredentialStore CreateStore() =>
@@ -160,4 +168,43 @@ internal sealed class InMemoryBackendCredentialStore(BackendCredentialSecretRefe
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult<BackendCredentialRecord?>(null);
     }
+}
+
+/// <summary>Enforcing in-memory limiter with the same decision contract as the Redis implementation.</summary>
+internal sealed class InMemoryClientRequestLimiter : IClientRequestLimiter
+{
+    private readonly Dictionary<string, long> counts = new(StringComparer.Ordinal);
+
+    public Task<RequestLimitDecision> TryAcquireAsync(
+        string clientId,
+        ClientApiLimit limit,
+        CancellationToken cancellationToken)
+    {
+        lock (counts)
+        {
+            var key = $"{clientId}|{limit.ApiId}";
+            counts.TryGetValue(key, out var count);
+            if (count >= limit.DailyQuota)
+            {
+                return Task.FromResult(new RequestLimitDecision(RequestLimitDenial.DailyQuota, TimeSpan.FromHours(3)));
+            }
+
+            if (count >= limit.Burst)
+            {
+                return Task.FromResult(new RequestLimitDecision(RequestLimitDenial.RateLimit, TimeSpan.FromMilliseconds(6100)));
+            }
+
+            counts[key] = count + 1;
+            return Task.FromResult(RequestLimitDecision.Allow);
+        }
+    }
+}
+
+internal sealed class UnavailableClientRequestLimiter : IClientRequestLimiter
+{
+    public Task<RequestLimitDecision> TryAcquireAsync(
+        string clientId,
+        ClientApiLimit limit,
+        CancellationToken cancellationToken) =>
+        throw new GatewayRequestLimiterUnavailableException("Redis is down.", new InvalidOperationException());
 }

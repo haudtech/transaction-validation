@@ -9,4 +9,6 @@ public sealed class GatewayClientEntity
     public ICollection<GatewayClientKeyEntity> Keys { get; set; } = [];
 
     public ICollection<GatewayClientApiGrantEntity> ApiGrants { get; set; } = [];
+
+    public ICollection<GatewayClientApiLimitEntity> ApiLimits { get; set; } = [];
 }

@@ -166,7 +166,7 @@ public sealed class GatewayProxyTests
         return request;
     }
 
-    private sealed class TestBackend : IAsyncDisposable
+    internal sealed class TestBackend : IAsyncDisposable
     {
         private readonly WebApplication _app;
         private readonly ConcurrentQueue<string> _requests = new();

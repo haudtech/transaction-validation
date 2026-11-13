@@ -47,6 +47,21 @@ public sealed class LocalClientSeeder(
             });
         }
 
+        if (!await dbContext.ClientApiLimits.AnyAsync(
+                limit => limit.ClientId == settings.ClientId && limit.ApiId == ApiId,
+                cancellationToken))
+        {
+            dbContext.ClientApiLimits.Add(new GatewayClientApiLimitEntity
+            {
+                ClientId = settings.ClientId,
+                ApiId = ApiId,
+                RatePerMinute = settings.RatePerMinute,
+                Burst = settings.Burst,
+                DailyQuota = settings.DailyQuota,
+                MonthlyQuota = settings.MonthlyQuota
+            });
+        }
+
         if (await dbContext.ClientKeys.AnyAsync(key => key.KeyId == settings.ClientKeyId, cancellationToken))
         {
             // The one-time secret cannot be recovered from its verifier.

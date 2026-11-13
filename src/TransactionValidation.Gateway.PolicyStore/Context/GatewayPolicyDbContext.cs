@@ -13,6 +13,8 @@ public sealed class GatewayPolicyDbContext(DbContextOptions<GatewayPolicyDbConte
 
     public DbSet<GatewayClientApiGrantEntity> ClientApiGrants => Set<GatewayClientApiGrantEntity>();
 
+    public DbSet<GatewayClientApiLimitEntity> ClientApiLimits => Set<GatewayClientApiLimitEntity>();
+
     public DbSet<GatewayBackendCredentialEntity> BackendCredentials => Set<GatewayBackendCredentialEntity>();
 
     public DbSet<GatewayAuditEventEntity> AuditEvents => Set<GatewayAuditEventEntity>();
@@ -78,6 +80,24 @@ public sealed class GatewayPolicyDbContext(DbContextOptions<GatewayPolicyDbConte
             entity.HasOne(grant => grant.Client)
                 .WithMany(client => client.ApiGrants)
                 .HasForeignKey(grant => grant.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<GatewayClientApiLimitEntity>(entity =>
+        {
+            entity.ToTable("GatewayClientApiLimits", table =>
+            {
+                table.HasCheckConstraint("CK_GatewayClientApiLimits_Rate", "\"RatePerMinute\" > 0 AND \"Burst\" > 0");
+                table.HasCheckConstraint(
+                    "CK_GatewayClientApiLimits_Quota",
+                    "\"DailyQuota\" > 0 AND \"MonthlyQuota\" >= \"DailyQuota\"");
+            });
+            entity.HasKey(limit => new { limit.ClientId, limit.ApiId });
+            entity.Property(limit => limit.ClientId).HasMaxLength(128);
+            entity.Property(limit => limit.ApiId).HasMaxLength(64);
+            entity.HasOne(limit => limit.Client)
+                .WithMany(client => client.ApiLimits)
+                .HasForeignKey(limit => limit.ClientId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

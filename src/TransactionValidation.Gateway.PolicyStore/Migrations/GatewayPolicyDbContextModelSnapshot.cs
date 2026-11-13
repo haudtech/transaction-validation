@@ -34,6 +34,24 @@ public sealed class GatewayPolicyDbContextModelSnapshot : ModelSnapshot
             entity.ToTable("GatewayClientApiGrants");
         });
 
+        modelBuilder.Entity("TransactionValidation.Gateway.PolicyStore.Entities.GatewayClientApiLimitEntity", entity =>
+        {
+            entity.Property<string>("ClientId").HasMaxLength(128).HasColumnType("character varying(128)");
+            entity.Property<string>("ApiId").HasMaxLength(64).HasColumnType("character varying(64)");
+            entity.Property<int>("RatePerMinute").HasColumnType("integer");
+            entity.Property<int>("Burst").HasColumnType("integer");
+            entity.Property<long>("DailyQuota").HasColumnType("bigint");
+            entity.Property<long>("MonthlyQuota").HasColumnType("bigint");
+            entity.HasKey("ClientId", "ApiId");
+            entity.ToTable("GatewayClientApiLimits", table =>
+            {
+                table.HasCheckConstraint("CK_GatewayClientApiLimits_Rate", "\"RatePerMinute\" > 0 AND \"Burst\" > 0");
+                table.HasCheckConstraint(
+                    "CK_GatewayClientApiLimits_Quota",
+                    "\"DailyQuota\" > 0 AND \"MonthlyQuota\" >= \"DailyQuota\"");
+            });
+        });
+
         modelBuilder.Entity("TransactionValidation.Gateway.PolicyStore.Entities.GatewayClientKeyEntity", entity =>
         {
             entity.Property<string>("KeyId").HasMaxLength(64).HasColumnType("character varying(64)");
@@ -134,6 +152,16 @@ public sealed class GatewayPolicyDbContextModelSnapshot : ModelSnapshot
             entity.Navigation("Client");
         });
 
+        modelBuilder.Entity("TransactionValidation.Gateway.PolicyStore.Entities.GatewayClientApiLimitEntity", entity =>
+        {
+            entity.HasOne("TransactionValidation.Gateway.PolicyStore.Entities.GatewayClientEntity", "Client")
+                .WithMany("ApiLimits")
+                .HasForeignKey("ClientId")
+                .OnDelete(DeleteBehavior.Restrict)
+                .IsRequired();
+            entity.Navigation("Client");
+        });
+
         modelBuilder.Entity("TransactionValidation.Gateway.PolicyStore.Entities.GatewayClientKeyEntity", entity =>
         {
             entity.HasOne("TransactionValidation.Gateway.PolicyStore.Entities.GatewayClientEntity", "Client")
@@ -147,6 +175,7 @@ public sealed class GatewayPolicyDbContextModelSnapshot : ModelSnapshot
         modelBuilder.Entity("TransactionValidation.Gateway.PolicyStore.Entities.GatewayClientEntity", entity =>
         {
             entity.Navigation("ApiGrants");
+            entity.Navigation("ApiLimits");
             entity.Navigation("Keys");
         });
     }

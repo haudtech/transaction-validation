@@ -154,6 +154,7 @@ The bootstrap runs only in `Development`. It applies migrations, creates the pep
 | `Management:Oidc:ReadScope` / `WriteScope` | Defaults to `gateway.read` / `gateway.write`. | Separates metadata reads from credential issue/revoke actions. |
 | `Gateway:PolicyStore:ConnectionTimeoutSeconds` / `CommandTimeoutSeconds` | Defaults to 5; each is validated to 1–30 seconds. | Bounds Gateway credential-store database access. |
 | `ConnectionStrings:GatewayPolicy` | Required and parsed as an Npgsql connection string at startup. | Configures the Gateway policy-store connection. |
+| `ConnectionStrings:GatewayRedis` | Required; StackExchange.Redis connection string (Compose uses `redis:6379,abortConnect=false`). | Backs the per-client/API token bucket and UTC daily/monthly quotas. Redis failure or a missing client limit returns `503` (fail closed); exhaustion returns `429` with `Retry-After`. |
 | `GATEWAY_TEST_POSTGRES` | Opt-in test-only connection string. | Runs migration and lookup verification in a uniquely named temporary schema. |
 
 The Gateway, API, and Management hosts use the same `Secrets:Provider` selection and fail startup when it is missing, unsupported, or incompatible with the environment. Management also requires the selected provider to implement `ISecretWriter`. `LocalFile` is currently the only implemented provider and is restricted to Development; production provider adapters and their workload identity configuration remain to be implemented.

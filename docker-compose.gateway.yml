@@ -57,6 +57,7 @@ services:
     environment:
       <<: *gateway-data
       ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__GatewayRedis: redis:6379,abortConnect=false
     volumes:
       - ./.secrets:/secrets
     healthcheck: *healthcheck
@@ -64,6 +65,8 @@ services:
       gateway-bootstrap:
         condition: service_completed_successfully
       api:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   api:

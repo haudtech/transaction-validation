@@ -51,6 +51,17 @@ public sealed class EfClientCredentialStore(GatewayPolicyDbContext dbContext) : 
                 .ThenBy(grant => grant.ApiVersion)
                 .ToArray();
 
+            var limits = await dbContext.ClientApiLimits.AsNoTracking()
+                .Where(limit => limit.ClientId == credential.ClientId)
+                .OrderBy(limit => limit.ApiId)
+                .Select(limit => new ClientApiLimit(
+                    limit.ApiId,
+                    limit.RatePerMinute,
+                    limit.Burst,
+                    limit.DailyQuota,
+                    limit.MonthlyQuota))
+                .ToListAsync(cancellationToken);
+
             return new ClientCredentialRecord(
                 credential.KeyId,
                 credential.ClientId,
@@ -62,7 +73,8 @@ public sealed class EfClientCredentialStore(GatewayPolicyDbContext dbContext) : 
                 credential.RevokedAt,
                 credential.PreviousSince,
                 credential.ClientEnabled,
-                grants);
+                grants,
+                limits);
         }
         catch (System.Data.Common.DbException exception)
         {

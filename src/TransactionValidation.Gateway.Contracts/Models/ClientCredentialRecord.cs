@@ -11,7 +11,8 @@ public sealed record ClientCredentialRecord(
     DateTimeOffset? RevokedAt,
     DateTimeOffset? PreviousSince,
     bool ClientEnabled,
-    IReadOnlyList<ClientApiGrant> ApiGrants);
+    IReadOnlyList<ClientApiGrant> ApiGrants,
+    IReadOnlyList<ClientApiLimit> ApiLimits);
 
 public sealed record ClientApiGrant(string ApiId, string ApiVersion);
 
