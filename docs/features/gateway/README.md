@@ -21,6 +21,8 @@ Client credential management, route kill switches, quotas, policy caching, full 
 - Resolve the current backend key ID and secret reference from PostgreSQL; validate `<key-id>.<secret>` in the API against a stored HMAC-SHA-256 verifier and a dedicated backend pepper.
 - Protect management list/issue/revoke endpoints with OIDC bearer validation and `gateway.read` / `gateway.write` scopes; record backend issue/revoke actions in append-only audit storage.
 - Configure bounded PostgreSQL connect/command timeouts at Gateway startup and fail closed when credential or backend-secret dependencies are unavailable.
+- Gateway-generated errors use `application/problem+json`, with `type` (`https://httpstatuses.com/<status>`), `title`, `status`, sanitized `detail`, `code`, and `correlationId`. The same correlation ID is returned in `Correlation-Id`; proxied backend responses are preserved.
+- Gateway access logs contain metadata rather than request bodies, query values, or credentials. Unauthenticated requests log only route, outcome, source IP, and correlation ID.
 
 ## Technologies and techniques
 

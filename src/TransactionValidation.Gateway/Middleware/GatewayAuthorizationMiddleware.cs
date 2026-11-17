@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using TransactionValidation.Gateway.Contracts.Exceptions;
 using TransactionValidation.Gateway.Contracts.Interfaces;
 using TransactionValidation.Gateway.Contracts.Models;
+using TransactionValidation.Gateway.Errors;
 
 namespace TransactionValidation.Gateway.Middleware;
 
@@ -47,22 +48,24 @@ public sealed class GatewayAuthorizationMiddleware(
 
         if (!context.Request.Path.Equals(TransactionPath, StringComparison.OrdinalIgnoreCase))
         {
-            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            await GatewayProblemWriter.WriteAsync(context, StatusCodes.Status404NotFound, GatewayErrorCodes.NotFound, "The requested route was not found.");
             return;
         }
+
+        GatewayRequestMetadata.SetApi(context, ApiId, ApiVersion);
 
         if (!credential.ApiGrants.Any(grant =>
                 string.Equals(grant.ApiId, ApiId, StringComparison.Ordinal)
                 && string.Equals(grant.ApiVersion, ApiVersion, StringComparison.Ordinal)))
         {
-            await WriteErrorAsync(context, StatusCodes.Status403Forbidden, "Forbidden");
+            await GatewayProblemWriter.WriteAsync(context, StatusCodes.Status403Forbidden, GatewayErrorCodes.Forbidden, "Access denied.");
             return;
         }
 
         if (!HttpMethods.IsPost(context.Request.Method))
         {
-            context.Response.StatusCode = StatusCodes.Status405MethodNotAllowed;
             context.Response.Headers[AllowHeaderName] = HttpMethods.Post;
+            await GatewayProblemWriter.WriteAsync(context, StatusCodes.Status405MethodNotAllowed, GatewayErrorCodes.MethodNotAllowed, "The request method is not allowed.");
             return;
         }
 
@@ -71,7 +74,7 @@ public sealed class GatewayAuthorizationMiddleware(
         if (limit is null)
         {
             // Explicit finite limits are mandatory; a missing policy never means unlimited.
-            await WriteErrorAsync(context, StatusCodes.Status503ServiceUnavailable, "Service unavailable");
+            await GatewayProblemWriter.WriteAsync(context, StatusCodes.Status503ServiceUnavailable, GatewayErrorCodes.PolicyUnavailable, "Service unavailable.");
             return;
         }
 
@@ -82,7 +85,7 @@ public sealed class GatewayAuthorizationMiddleware(
         }
         catch (GatewayRequestLimiterUnavailableException)
         {
-            await WriteErrorAsync(context, StatusCodes.Status503ServiceUnavailable, "Service unavailable");
+            await GatewayProblemWriter.WriteAsync(context, StatusCodes.Status503ServiceUnavailable, GatewayErrorCodes.LimiterUnavailable, "Service unavailable.");
             return;
         }
 
@@ -90,9 +93,10 @@ public sealed class GatewayAuthorizationMiddleware(
         {
             var retryAfterSeconds = Math.Max(1, (int)Math.Ceiling(decision.RetryAfter.TotalSeconds));
             context.Response.Headers["Retry-After"] = retryAfterSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            await WriteErrorAsync(
+            await GatewayProblemWriter.WriteAsync(
                 context,
                 StatusCodes.Status429TooManyRequests,
+                decision.Denial == RequestLimitDenial.RateLimit ? GatewayErrorCodes.RateLimitExceeded : GatewayErrorCodes.QuotaExceeded,
                 decision.Denial == RequestLimitDenial.RateLimit ? "Rate limit exceeded" : "Quota exceeded");
             return;
         }
@@ -103,7 +107,7 @@ public sealed class GatewayAuthorizationMiddleware(
             var credentialReference = await backendCredentialStore.GetCurrentAsync(ApiId, context.RequestAborted);
             if (credentialReference is null)
             {
-                await WriteErrorAsync(context, StatusCodes.Status503ServiceUnavailable, "Service unavailable");
+                await GatewayProblemWriter.WriteAsync(context, StatusCodes.Status503ServiceUnavailable, GatewayErrorCodes.PolicyUnavailable, "Service unavailable.");
                 return;
             }
 
@@ -120,19 +124,20 @@ public sealed class GatewayAuthorizationMiddleware(
         }
         catch (Exception exception) when (IsSecretProviderUnavailable(exception))
         {
-            await WriteErrorAsync(context, StatusCodes.Status503ServiceUnavailable, "Service unavailable");
+            await GatewayProblemWriter.WriteAsync(context, StatusCodes.Status503ServiceUnavailable, GatewayErrorCodes.PolicyUnavailable, "Service unavailable.");
             return;
         }
 
         if (!IsValidBackendCredential(backendCredential))
         {
-            await WriteErrorAsync(context, StatusCodes.Status503ServiceUnavailable, "Service unavailable");
+            await GatewayProblemWriter.WriteAsync(context, StatusCodes.Status503ServiceUnavailable, GatewayErrorCodes.PolicyUnavailable, "Service unavailable.");
             return;
         }
 
         SanitizeRequestHeaders(context);
         context.Request.Headers[GatewayAuthenticationHeaders.AuthenticatedClientId] = credential.ClientId;
         context.Request.Headers[GatewayAuthenticationHeaders.GatewayKey] = backendCredential;
+        GatewayRequestMetadata.SetDecision(context, GatewayRequestMetadata.Forwarded);
         await next(context);
     }
 
@@ -149,7 +154,7 @@ public sealed class GatewayAuthorizationMiddleware(
         if (context.Items.TryGetValue(GatewayCorrelationMiddleware.CorrelationIdItemKey, out var value)
             && value is string correlationId)
         {
-            context.Request.Headers["Correlation-Id"] = correlationId;
+            context.Request.Headers[GatewayProblemConventions.CorrelationHeaderName] = correlationId;
         }
     }
 
@@ -165,9 +170,4 @@ public sealed class GatewayAuthorizationMiddleware(
             or DecoderFallbackException
             or GatewayPolicyStoreUnavailableException;
 
-    private static async Task WriteErrorAsync(HttpContext context, int statusCode, string error)
-    {
-        context.Response.StatusCode = statusCode;
-        await context.Response.WriteAsJsonAsync(new { error }, context.RequestAborted);
-    }
 }

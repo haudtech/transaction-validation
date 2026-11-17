@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 
 using TransactionValidation.Gateway.Contracts.Exceptions;
 using TransactionValidation.Gateway.Contracts.Interfaces;
@@ -21,7 +22,8 @@ internal sealed class GatewayHostFactory(
     IClientCredentialStore? credentialStore = null,
     ISecretProvider? secretProvider = null,
     IBackendCredentialStore? backendCredentialStore = null,
-    IClientRequestLimiter? requestLimiter = null) : WebApplicationFactory<GatewayEntryPoint>
+    IClientRequestLimiter? requestLimiter = null,
+    ILoggerProvider? loggerProvider = null) : WebApplicationFactory<GatewayEntryPoint>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -54,6 +56,10 @@ internal sealed class GatewayHostFactory(
             services.RemoveAll<IClientRequestLimiter>();
             services.AddSingleton(requestLimiter ?? new InMemoryClientRequestLimiter());
         });
+        if (loggerProvider is not null)
+        {
+            builder.ConfigureLogging(logging => logging.AddProvider(loggerProvider));
+        }
     }
 }
 

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text.Json;
 
 using TransactionValidation.Gateway.Contracts.Exceptions;
 using TransactionValidation.Gateway.Contracts.Interfaces;
@@ -72,6 +73,7 @@ public sealed class GatewayAuthenticationTests
         foreach (var testCase in requests)
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, testCase.Path);
+            request.Headers.Add("Correlation-Id", "test-correlation");
             if (testCase.Authorization is not null)
             {
                 request.Headers.Authorization = AuthenticationHeaderValue.Parse(testCase.Authorization);
@@ -121,7 +123,7 @@ public sealed class GatewayAuthenticationTests
         using var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-        Assert.Equal("{\"error\":\"Forbidden\"}", await response.Content.ReadAsStringAsync());
+        await AssertProblemAsync(response, "forbidden");
     }
 
     [Trait("Category", "Integration")]
@@ -153,7 +155,7 @@ public sealed class GatewayAuthenticationTests
         using var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-        Assert.Equal("{\"error\":\"Service unavailable\"}", await response.Content.ReadAsStringAsync());
+        await AssertProblemAsync(response, "policy_unavailable");
     }
 
     [Trait("Category", "Integration")]
@@ -174,7 +176,7 @@ public sealed class GatewayAuthenticationTests
         using var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-        Assert.Equal("{\"error\":\"Service unavailable\"}", await response.Content.ReadAsStringAsync());
+        await AssertProblemAsync(response, "policy_unavailable");
     }
 
     [Trait("Category", "Integration")]
@@ -220,6 +222,15 @@ public sealed class GatewayAuthenticationTests
         Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
         Assert.Equal(32, correlationId.Length);
         Assert.True(Guid.TryParseExact(correlationId, "N", out _));
+    }
+
+    private static async Task AssertProblemAsync(HttpResponseMessage response, string code)
+    {
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(code, problem.RootElement.GetProperty("code").GetString());
+        Assert.Equal((int)response.StatusCode, problem.RootElement.GetProperty("status").GetInt32());
+        Assert.Equal(response.Headers.GetValues("Correlation-Id").Single(), problem.RootElement.GetProperty("correlationId").GetString());
     }
 
     private static HttpRequestMessage CreateRequest(string path, string keyId, HttpMethod? method = null)

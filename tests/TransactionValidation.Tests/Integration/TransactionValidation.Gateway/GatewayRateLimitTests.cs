@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 
 using TransactionValidation.Gateway.Contracts.Models;
 
@@ -25,7 +26,7 @@ public sealed class GatewayRateLimitTests
 
         Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
         Assert.Equal("7", limited.Headers.GetValues("Retry-After").Single());
-        Assert.Contains("Rate limit exceeded", await limited.Content.ReadAsStringAsync());
+        await AssertProblemCodeAsync(limited, "rate_limit_exceeded");
         Assert.Equal(2, backend.RequestCount);
     }
 
@@ -43,7 +44,7 @@ public sealed class GatewayRateLimitTests
 
         Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
         Assert.Equal("10800", limited.Headers.GetValues("Retry-After").Single());
-        Assert.Contains("Quota exceeded", await limited.Content.ReadAsStringAsync());
+        await AssertProblemCodeAsync(limited, "quota_exceeded");
     }
 
     [Trait("Category", "Integration")]
@@ -58,6 +59,7 @@ public sealed class GatewayRateLimitTests
         using var response = await client.PostAsync(Route, new StringContent("{}"));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        await AssertProblemCodeAsync(response, "limiter_unavailable");
         Assert.Equal(0, backend.RequestCount);
     }
 
@@ -74,6 +76,7 @@ public sealed class GatewayRateLimitTests
         using var response = await client.PostAsync(Route, new StringContent("{}"));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        await AssertProblemCodeAsync(response, "policy_unavailable");
         Assert.Equal(0, backend.RequestCount);
     }
 
@@ -81,6 +84,14 @@ public sealed class GatewayRateLimitTests
         new(
             backend.Address,
             credentialStore: new InMemoryClientCredentialStore([GatewayTestCredentials.CreateCredential(limits: [limit])]));
+
+    private static async Task AssertProblemCodeAsync(HttpResponseMessage response, string code)
+    {
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(code, document.RootElement.GetProperty("code").GetString());
+        Assert.Equal(response.Headers.GetValues("Correlation-Id").Single(), document.RootElement.GetProperty("correlationId").GetString());
+    }
 
     private static HttpClient CreateClient(GatewayHostFactory factory)
     {

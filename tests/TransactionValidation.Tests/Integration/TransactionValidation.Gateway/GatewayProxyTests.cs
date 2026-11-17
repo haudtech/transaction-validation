@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net;
+using System.Text.Json;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -92,6 +93,9 @@ public sealed class GatewayProxyTests
 
         Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
         Assert.DoesNotContain("127.0.0.1", responseBody, StringComparison.Ordinal);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        using var problem = JsonDocument.Parse(responseBody);
+        Assert.Equal("upstream_unavailable", problem.RootElement.GetProperty("code").GetString());
     }
 
     [Trait("Category", "Integration")]
@@ -130,6 +134,26 @@ public sealed class GatewayProxyTests
 
         Assert.Equal(HttpStatusCode.GatewayTimeout, response.StatusCode);
         Assert.DoesNotContain(backend.Address, responseBody, StringComparison.Ordinal);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        using var problem = JsonDocument.Parse(responseBody);
+        Assert.Equal("upstream_timeout", problem.RootElement.GetProperty("code").GetString());
+    }
+
+    [Trait("Category", "Integration")]
+    [Fact]
+    public async Task PostTransaction_WhenBackendReturnsError_PreservesBackendResponse()
+    {
+        await using var backend = new TestBackend(responseStatus: StatusCodes.Status502BadGateway);
+        await backend.StartAsync();
+        using var factory = new GatewayHostFactory(backend.Address);
+        using var client = CreateAuthenticatedClient(factory);
+
+        using var response = await client.SendAsync(
+            CreateAuthenticatedRequest(HttpMethod.Post, "/transactions/v1/partner/transactions", "{}"));
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        Assert.Equal("accepted", await response.Content.ReadAsStringAsync());
+        Assert.Equal("backend-result", response.Headers.GetValues("X-Backend-Result").Single());
     }
 
     [Trait("Category", "Integration")]
@@ -176,7 +200,7 @@ public sealed class GatewayProxyTests
         private readonly TaskCompletionSource _requestReceived = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _requestCount;
 
-        public TestBackend(bool blockResponse = false)
+        public TestBackend(bool blockResponse = false, int responseStatus = StatusCodes.Status202Accepted)
         {
             _blockResponse = blockResponse;
             var builder = WebApplication.CreateBuilder();
@@ -199,7 +223,7 @@ public sealed class GatewayProxyTests
                     return;
                 }
 
-                context.Response.StatusCode = StatusCodes.Status202Accepted;
+                context.Response.StatusCode = responseStatus;
                 context.Response.Headers["X-Backend-Result"] = "backend-result";
                 await context.Response.WriteAsync("accepted");
             });

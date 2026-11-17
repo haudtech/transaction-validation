@@ -2,12 +2,14 @@ using System.Diagnostics;
 
 using Microsoft.AspNetCore.Http;
 
+using TransactionValidation.Gateway.Contracts.Models;
+
 namespace TransactionValidation.Gateway.Middleware;
 
 public sealed class GatewayCorrelationMiddleware(RequestDelegate next)
 {
     public const string CorrelationIdItemKey = "TransactionValidation.GatewayCorrelationId";
-    private const string CorrelationHeaderName = "Correlation-Id";
+    private const string CorrelationHeaderName = GatewayProblemConventions.CorrelationHeaderName;
     private const int MaximumCorrelationIdLength = 128;
 
     public async Task InvokeAsync(HttpContext context)
@@ -23,6 +25,9 @@ public sealed class GatewayCorrelationMiddleware(RequestDelegate next)
 
         await next(context);
     }
+
+    internal static string? GetCorrelationId(HttpContext context) =>
+        context.Items.TryGetValue(CorrelationIdItemKey, out var value) ? value as string : null;
 
     private static string ResolveCorrelationId(HttpContext context)
     {

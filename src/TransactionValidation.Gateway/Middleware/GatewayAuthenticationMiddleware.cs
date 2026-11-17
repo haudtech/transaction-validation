@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using TransactionValidation.Gateway.Authentication;
 using TransactionValidation.Gateway.Contracts.Interfaces;
 using TransactionValidation.Gateway.Contracts.Models;
+using TransactionValidation.Gateway.Errors;
 
 namespace TransactionValidation.Gateway.Middleware;
 
@@ -22,7 +23,7 @@ public sealed class GatewayAuthenticationMiddleware(RequestDelegate next)
         var authorization = context.Request.Headers[AuthorizationHeaderName];
         if (authorization.Count != 1)
         {
-            await WriteErrorAsync(context, StatusCodes.Status401Unauthorized, "Unauthorized");
+            await GatewayProblemWriter.WriteAsync(context, StatusCodes.Status401Unauthorized, GatewayErrorCodes.Unauthorized, "Authentication failed.");
             return;
         }
 
@@ -32,13 +33,13 @@ public sealed class GatewayAuthenticationMiddleware(RequestDelegate next)
 
         if (result.Status == GatewayClientAuthenticationStatus.Invalid)
         {
-            await WriteErrorAsync(context, StatusCodes.Status401Unauthorized, "Unauthorized");
+            await GatewayProblemWriter.WriteAsync(context, StatusCodes.Status401Unauthorized, GatewayErrorCodes.Unauthorized, "Authentication failed.");
             return;
         }
 
         if (result.Status == GatewayClientAuthenticationStatus.Unavailable)
         {
-            await WriteErrorAsync(context, StatusCodes.Status503ServiceUnavailable, "Service unavailable");
+            await GatewayProblemWriter.WriteAsync(context, StatusCodes.Status503ServiceUnavailable, GatewayErrorCodes.PolicyUnavailable, "Service unavailable.");
             return;
         }
 
@@ -59,9 +60,4 @@ public sealed class GatewayAuthenticationMiddleware(RequestDelegate next)
         return false;
     }
 
-    private static async Task WriteErrorAsync(HttpContext context, int statusCode, string error)
-    {
-        context.Response.StatusCode = statusCode;
-        await context.Response.WriteAsJsonAsync(new { error }, context.RequestAborted);
-    }
 }

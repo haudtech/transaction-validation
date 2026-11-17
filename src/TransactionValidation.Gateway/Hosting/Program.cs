@@ -11,6 +11,8 @@ var app = builder.Build();
 
 app.MapHealthChecks("/healthz");
 app.UseMiddleware<GatewayCorrelationMiddleware>();
+app.UseMiddleware<GatewayAccessLogMiddleware>();
+app.UseMiddleware<GatewayErrorHandlingMiddleware>();
 app.UseMiddleware<GatewayAuthenticationMiddleware>();
 app.UseMiddleware<GatewayAuthorizationMiddleware>();
 app.MapReverseProxy();
