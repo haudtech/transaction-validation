@@ -59,7 +59,7 @@ public sealed partial class GatewayErrorHandlingMiddleware(
             return;
         }
 
-        if (forwarderError.Exception is BadHttpRequestException { StatusCode: StatusCodes.Status413PayloadTooLarge })
+        if (IsPayloadTooLarge(forwarderError.Exception))
         {
             await WritePayloadTooLargeAsync(context);
             return;
@@ -95,6 +95,15 @@ public sealed partial class GatewayErrorHandlingMiddleware(
             GatewayErrorCodes.PayloadTooLarge,
             "The request body is too large.");
     }
+
+    private static bool IsPayloadTooLarge(Exception? exception) =>
+        exception switch
+        {
+            BadHttpRequestException { StatusCode: StatusCodes.Status413PayloadTooLarge } => true,
+            AggregateException aggregate => aggregate.InnerExceptions.Any(IsPayloadTooLarge),
+            { InnerException: not null } => IsPayloadTooLarge(exception.InnerException),
+            _ => false
+        };
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Unhandled gateway exception of type {ExceptionType}.")]
     private static partial void LogUnhandledException(ILogger logger, string exceptionType);

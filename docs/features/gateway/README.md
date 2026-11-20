@@ -22,6 +22,7 @@ Client credential management, route kill switches, quotas, policy caching, full 
 - Protect management list/issue/revoke endpoints with OIDC bearer validation and `gateway.read` / `gateway.write` scopes; record backend issue/revoke actions in append-only audit storage.
 - Configure bounded PostgreSQL connect/command timeouts at Gateway startup and fail closed when credential or backend-secret dependencies are unavailable.
 - Gateway-generated errors use `application/problem+json`, with `type` (`https://httpstatuses.com/<status>`), `title`, `status`, sanitized `detail`, `code`, and `correlationId`. The same correlation ID is returned in `Correlation-Id`; proxied backend responses are preserved.
+- Gateway binds `Kestrel:Limits:MaxRequestBodySize` (default 1 MiB) and rejects an oversized declared `Content-Length` before forwarding. Bodies without a length are streamed; the backend may receive a partial body before Kestrel detects an over-limit upload. HTTP/1.1 chunk framing counts toward that limit. When forwarding fails on an oversized body, the Gateway returns a 413 Problem Details response if the response has not started; an already-started response cannot be replaced. Per-route size overrides remain pending.
 - Gateway access logs contain metadata rather than request bodies, query values, or credentials. Unauthenticated requests log only route, outcome, source IP, and correlation ID.
 
 ## Technologies and techniques
@@ -203,6 +204,7 @@ Gateway source files are grouped by responsibility, and each namespace follows i
 | `ManagementIssuance_RotationAndRevocationAreVerifiedByApiAndAudited` | Opt-in PostgreSQL integration covers management issuance, API verification, rotation overlap, revocation, and append-only audit. |
 | `LocalFileSecretProviderTests` | Safe reads/writes, non-overwrite behavior, invalid names, missing files, links, permissions, and platform fail-closed behavior. |
 | Gateway authentication and proxy integration tests | Generic authentication failures, key lifecycle/overlap, grants, route ordering, backend secret handling, spoofed-header removal, health exemptions, cancellation, and proxy status/error handling. |
+| `GatewayRequestSizeTests` | Real Gateway/Kestrel known-length and chunked boundaries, 413 Problem Details, and an early backend response during an oversized chunked upload. |
 
 ## Operational boundaries
 

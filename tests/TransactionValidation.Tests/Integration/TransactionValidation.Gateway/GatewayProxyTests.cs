@@ -198,9 +198,13 @@ public sealed class GatewayProxyTests
         private readonly ConcurrentQueue<IReadOnlyDictionary<string, string>> _requestHeaders = new();
         private readonly bool _blockResponse;
         private readonly TaskCompletionSource _requestReceived = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _responseSent = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _requestCount;
 
-        public TestBackend(bool blockResponse = false, int responseStatus = StatusCodes.Status202Accepted)
+        public TestBackend(
+            bool blockResponse = false,
+            int responseStatus = StatusCodes.Status202Accepted,
+            bool readBody = true)
         {
             _blockResponse = blockResponse;
             var builder = WebApplication.CreateBuilder();
@@ -214,8 +218,11 @@ public sealed class GatewayProxyTests
                     header => header.Key,
                     header => header.Value.ToString(),
                     StringComparer.OrdinalIgnoreCase));
-                using var reader = new StreamReader(context.Request.Body);
-                _requestBodies.Enqueue(await reader.ReadToEndAsync(context.RequestAborted));
+                if (readBody)
+                {
+                    using var reader = new StreamReader(context.Request.Body);
+                    _requestBodies.Enqueue(await reader.ReadToEndAsync(context.RequestAborted));
+                }
                 _requestReceived.TrySetResult();
                 if (_blockResponse)
                 {
@@ -226,6 +233,8 @@ public sealed class GatewayProxyTests
                 context.Response.StatusCode = responseStatus;
                 context.Response.Headers["X-Backend-Result"] = "backend-result";
                 await context.Response.WriteAsync("accepted");
+                await context.Response.Body.FlushAsync(context.RequestAborted);
+                _responseSent.TrySetResult();
             });
         }
 
@@ -240,6 +249,8 @@ public sealed class GatewayProxyTests
         public IReadOnlyCollection<IReadOnlyDictionary<string, string>> RequestHeaders => _requestHeaders.ToArray();
 
         public Task RequestReceived => _requestReceived.Task;
+
+        public Task ResponseSent => _responseSent.Task;
 
         public async Task StartAsync()
         {
