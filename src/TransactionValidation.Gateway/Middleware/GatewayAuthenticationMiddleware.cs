@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 
 using TransactionValidation.Gateway.Authentication;
 using TransactionValidation.Gateway.Contracts.Interfaces;
 using TransactionValidation.Gateway.Contracts.Models;
 using TransactionValidation.Gateway.Errors;
+using TransactionValidation.Gateway.HealthChecks;
 
 namespace TransactionValidation.Gateway.Middleware;
 
@@ -12,9 +14,9 @@ public sealed class GatewayAuthenticationMiddleware(RequestDelegate next)
     private const string CredentialItemKey = "TransactionValidation.GatewayClientCredential";
     private const string AuthorizationHeaderName = "Authorization";
 
-    public async Task InvokeAsync(HttpContext context, GatewayClientAuthenticator authenticator)
+    public async Task InvokeAsync(HttpContext context)
     {
-        if (context.Request.Path.Equals("/healthz", StringComparison.OrdinalIgnoreCase))
+        if (GatewayHealthPaths.IsHealthProbe(context.Request.Path))
         {
             await next(context);
             return;
@@ -27,6 +29,7 @@ public sealed class GatewayAuthenticationMiddleware(RequestDelegate next)
             return;
         }
 
+        var authenticator = context.RequestServices.GetRequiredService<GatewayClientAuthenticator>();
         var result = await authenticator.AuthenticateAsync(
             authorization[0],
             context.RequestAborted);

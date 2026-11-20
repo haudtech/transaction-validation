@@ -2,11 +2,13 @@ using System.Security.Cryptography;
 using System.Text;
 
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 
 using TransactionValidation.Gateway.Contracts.Exceptions;
 using TransactionValidation.Gateway.Contracts.Interfaces;
 using TransactionValidation.Gateway.Contracts.Models;
 using TransactionValidation.Gateway.Errors;
+using TransactionValidation.Gateway.HealthChecks;
 
 namespace TransactionValidation.Gateway.Middleware;
 
@@ -29,13 +31,9 @@ public sealed class GatewayAuthorizationMiddleware(
         "User-Agent"
     };
 
-    // Scoped services must be injected per request; middleware is constructed once.
-    public async Task InvokeAsync(
-        HttpContext context,
-        IBackendCredentialStore backendCredentialStore,
-        IClientRequestLimiter requestLimiter)
+    public async Task InvokeAsync(HttpContext context)
     {
-        if (context.Request.Path.Equals("/healthz", StringComparison.OrdinalIgnoreCase))
+        if (GatewayHealthPaths.IsHealthProbe(context.Request.Path))
         {
             await next(context);
             return;
@@ -45,6 +43,9 @@ public sealed class GatewayAuthorizationMiddleware(
         {
             throw new InvalidOperationException("Gateway authorization requires an authenticated client.");
         }
+
+        var backendCredentialStore = context.RequestServices.GetRequiredService<IBackendCredentialStore>();
+        var requestLimiter = context.RequestServices.GetRequiredService<IClientRequestLimiter>();
 
         if (!context.Request.Path.Equals(TransactionPath, StringComparison.OrdinalIgnoreCase))
         {

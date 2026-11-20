@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
 using TransactionValidation.Gateway.Errors;
+using TransactionValidation.Gateway.HealthChecks;
 
 using Yarp.ReverseProxy.Model;
 
@@ -21,7 +22,7 @@ public sealed partial class GatewayAccessLogMiddleware(
 
     public async Task InvokeAsync(HttpContext context)
     {
-        if (context.Request.Path.Equals("/healthz", StringComparison.OrdinalIgnoreCase))
+        if (GatewayHealthPaths.IsHealthProbe(context.Request.Path))
         {
             await next(context);
             return;

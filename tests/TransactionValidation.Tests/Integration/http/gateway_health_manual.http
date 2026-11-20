@@ -1,0 +1,10 @@
+@gatewayUrl = http://localhost:5100
+
+### Legacy liveness probe
+GET {{gatewayUrl}}/healthz
+
+### Liveness probe
+GET {{gatewayUrl}}/health/live
+
+### Dependency readiness probe
+GET {{gatewayUrl}}/health/ready

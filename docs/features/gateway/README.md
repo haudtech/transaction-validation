@@ -24,6 +24,7 @@ Client credential management, route kill switches, quotas, policy caching, full 
 - Gateway-generated errors use `application/problem+json`, with `type` (`https://httpstatuses.com/<status>`), `title`, `status`, sanitized `detail`, `code`, and `correlationId`. The same correlation ID is returned in `Correlation-Id`; proxied backend responses are preserved.
 - Gateway binds `Kestrel:Limits:MaxRequestBodySize` (default 1 MiB) and rejects an oversized declared `Content-Length` before forwarding. Bodies without a length are streamed; the backend may receive a partial body before Kestrel detects an over-limit upload. HTTP/1.1 chunk framing counts toward that limit. When forwarding fails on an oversized body, the Gateway returns a 413 Problem Details response if the response has not started; an already-started response cannot be replaced. Per-route size overrides remain pending.
 - Gateway access logs contain metadata rather than request bodies, query values, or credentials. Unauthenticated requests log only route, outcome, source IP, and correlation ID.
+- Unauthenticated `/health/live` and legacy `/healthz` report process liveness; `/health/ready` returns 200 only when the policy tables are queryable and Redis responds to a ping, otherwise 503. Dependency failures are recorded by ASP.NET Core health-check logging without exposing details in the probe response.
 
 ## Technologies and techniques
 
@@ -142,7 +143,7 @@ curl -i -X POST "http://localhost:5100/transactions/v1/partner/transactions" \
   -H "Authorization: ApiKey $(cat .secrets/local-client-credential)" ...
 ```
 
-The bootstrap runs only in `Development`. It applies migrations, creates the peppers, seeds `local-client` with a `transaction-validation`/`v1` grant, writes its credential to `.secrets/local-client-credential`, and issues the first backend credential directly through the Management service (no Management API or Keycloak). It is idempotent and exits non-zero with a message if any step fails. The API and Gateway expose `/healthz` healthchecks, and the Gateway starts only after the API is healthy, so `docker compose up --wait` returns once the profile is ready. After resetting the PostgreSQL volume, delete `.secrets/` as well if the bootstrap reports a missing credential. On Linux hosts, files written by the container may be root-owned. Production secret providers, Keycloak/OIDC, TLS, and rate limits are deferred.
+The bootstrap runs only in `Development`. It applies migrations, creates the peppers, seeds `local-client` with a `transaction-validation`/`v1` grant, writes its credential to `.secrets/local-client-credential`, and issues the first backend credential directly through the Management service (no Management API or Keycloak). It is idempotent and exits non-zero with a message if any step fails. The API and Gateway Compose healthchecks use `/healthz` for liveness; a healthy Compose status does not establish Gateway dependency readiness. Query `/health/ready` separately. After resetting the PostgreSQL volume, delete `.secrets/` as well if the bootstrap reports a missing credential. On Linux hosts, files written by the container may be root-owned. Production secret providers, Keycloak/OIDC, and TLS are deferred.
 
 ## Configuration contract
 
@@ -205,12 +206,15 @@ Gateway source files are grouped by responsibility, and each namespace follows i
 | `LocalFileSecretProviderTests` | Safe reads/writes, non-overwrite behavior, invalid names, missing files, links, permissions, and platform fail-closed behavior. |
 | Gateway authentication and proxy integration tests | Generic authentication failures, key lifecycle/overlap, grants, route ordering, backend secret handling, spoofed-header removal, health exemptions, cancellation, and proxy status/error handling. |
 | `GatewayRequestSizeTests` | Real Gateway/Kestrel known-length and chunked boundaries, 413 Problem Details, and an early backend response during an oversized chunked upload. |
+| `GatewayHealthTests` | Probe auth exemptions, independent liveness, readiness combinations, a real unavailable policy store, and a simulated Redis ping failure. |
+| [Gateway health HTTP requests](../../../tests/TransactionValidation.Tests/Integration/http/gateway_health_manual.http) | Manual liveness and readiness probes against the local Gateway. |
 
 ## Operational boundaries
 
 - Backend credential issue/rotation/revoke and the API verification path are implemented; client credential management, route kill switches, quotas, policy caching, full Compose wiring, and deployment configuration remain pending.
 - The API validates the HMAC-verified backend credential and trusted client-ID header in gateway mode; local direct API-key mode remains development-only.
 - Gateway, API gateway-auth mode, and Management require a valid policy-store connection string and deployment-shared versioned secrets.
+- Readiness currently checks live PostgreSQL table queries and Redis ping only. It does not validate Redis script/write permissions, secret availability, upstream availability, or a fresh policy cache; no policy cache exists yet, so PostgreSQL outages return unready immediately. The planned 30-second cached-policy outage behavior remains pending.
 - Windows local secret-file access is unsupported until an ACL validation implementation and its tests are added.
 - PostgreSQL verification is opt-in through `GATEWAY_TEST_POSTGRES`; it creates and drops a uniquely named schema.
 - Docker image builds and CI remain deferred to final Phase 1 verification.
