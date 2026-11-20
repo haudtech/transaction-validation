@@ -1,6 +1,10 @@
+using System.Net;
 using System.Text.Json;
 
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using TransactionValidation.Gateway.Middleware;
@@ -35,5 +39,60 @@ public sealed class GatewayErrorHandlingMiddlewareTests
         Assert.Equal(code, document.RootElement.GetProperty("code").GetString());
         Assert.Equal("test-correlation", document.RootElement.GetProperty("correlationId").GetString());
         Assert.DoesNotContain("private", document.RootElement.GetRawText(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_WhenKestrelRejectsOversizedBody_ReturnsPayloadTooLargeProblem()
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 16);
+        await using var app = builder.Build();
+        app.UseMiddleware<GatewayErrorHandlingMiddleware>();
+        app.Run(async context =>
+        {
+            using var reader = new StreamReader(context.Request.Body);
+            await reader.ReadToEndAsync();
+        });
+        await app.StartAsync();
+
+        using var client = new HttpClient();
+        using var response = await client.PostAsync(new Uri(app.Urls.First()), new StringContent(new string('a', 1024)));
+
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("payload_too_large", document.RootElement.GetProperty("code").GetString());
+        await app.StopAsync();
+    }
+
+    [Fact]
+    public async Task InvokeAsync_WhenContentLengthExceedsLimit_ReturnsPayloadTooLargeWithoutCallingNext()
+    {
+        var context = new DefaultHttpContext();
+        context.Features.Set<IHttpMaxRequestBodySizeFeature>(new MaxBodySizeFeature(16));
+        context.Request.ContentLength = 17;
+        await using var body = new MemoryStream();
+        context.Response.Body = body;
+        var called = false;
+        var middleware = new GatewayErrorHandlingMiddleware(
+            _ =>
+            {
+                called = true;
+                return Task.CompletedTask;
+            },
+            NullLogger<GatewayErrorHandlingMiddleware>.Instance);
+
+        await middleware.InvokeAsync(context);
+
+        Assert.False(called);
+        Assert.Equal(StatusCodes.Status413PayloadTooLarge, context.Response.StatusCode);
+    }
+
+    private sealed class MaxBodySizeFeature(long? limit) : IHttpMaxRequestBodySizeFeature
+    {
+        public bool IsReadOnly => false;
+
+        public long? MaxRequestBodySize { get; set; } = limit;
     }
 }

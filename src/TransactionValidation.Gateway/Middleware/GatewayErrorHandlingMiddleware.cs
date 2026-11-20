@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Logging;
 
 using TransactionValidation.Gateway.Errors;
@@ -10,20 +11,22 @@ namespace TransactionValidation.Gateway.Middleware;
 /// <summary>
 /// Converts Gateway-originated failures into sanitized problem responses; backend responses pass through unchanged.
 /// </summary>
-public sealed class GatewayErrorHandlingMiddleware(
+public sealed partial class GatewayErrorHandlingMiddleware(
     RequestDelegate next,
     ILogger<GatewayErrorHandlingMiddleware> logger)
 {
-    private static readonly Action<ILogger, string, Exception?> LogUnhandledExceptionMessage =
-        LoggerMessage.Define<string>(
-            LogLevel.Error,
-            new EventId(0, nameof(LogUnhandledException)),
-            "Unhandled gateway exception of type {ExceptionType}.");
-
     public async Task InvokeAsync(HttpContext context)
     {
         try
         {
+            // Kestrel enforces the limit only on body reads, and a backend can answer before the proxy reads it all.
+            var maxBodySize = context.Features.Get<IHttpMaxRequestBodySizeFeature>()?.MaxRequestBodySize;
+            if (maxBodySize is not null && context.Request.ContentLength > maxBodySize)
+            {
+                await WritePayloadTooLargeAsync(context);
+                return;
+            }
+
             await next(context);
         }
         catch (Exception exception) when (
@@ -93,6 +96,6 @@ public sealed class GatewayErrorHandlingMiddleware(
             "The request body is too large.");
     }
 
-    private static void LogUnhandledException(ILogger logger, string exceptionType) =>
-        LogUnhandledExceptionMessage(logger, exceptionType, null);
+    [LoggerMessage(Level = LogLevel.Error, Message = "Unhandled gateway exception of type {ExceptionType}.")]
+    private static partial void LogUnhandledException(ILogger logger, string exceptionType);
 }

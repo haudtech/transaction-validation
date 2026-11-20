@@ -3,6 +3,10 @@ using TransactionValidation.Gateway.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Kestrel does not bind its Limits section from configuration automatically.
+builder.WebHost.ConfigureKestrel((context, options) =>
+    context.Configuration.GetSection("Kestrel:Limits").Bind(options.Limits));
+
 builder.Services.AddHealthChecks();
 builder.Services.AddGatewayAuthentication(builder.Configuration, builder.Environment);
 builder.Services.AddReverseProxy().LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));

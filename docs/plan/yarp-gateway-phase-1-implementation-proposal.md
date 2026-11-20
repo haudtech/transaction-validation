@@ -301,8 +301,9 @@ Implement the approved minimum Redis-backed token bucket and daily/monthly UTC q
 - [ ] Add metadata-only structured access/security logs; include stable route ID, API/version, client/key ID where safe, source IP, status, latency, decision, and canonical correlation ID. Omit query values and bodies; never log credentials.
 - [ ] For unparseable credentials, log outcome, source IP, correlation ID, and route ID only.
 - [ ] Return canonical correlation ID in `Correlation-Id`; validate/generate inbound ID and overwrite client-supplied trusted headers.
-- [ ] Add a consistent JSON schema for gateway-generated errors; preserve backend responses. Implement agreed status mapping: `401`, `403`, `404`, `405`, `410`, `413`, `429`, sanitized `502`/`504`, and `503` store/policy failures.
-- Gateway-generated errors use Problem Details with `type`, `title`, `status`, sanitized `detail`, `code`, and `correlationId`; backend responses are not rewritten. Route lifecycle (`410`) remains pending.
+- [ ] Add a consistent JSON schema for gateway-generated errors; preserve backend responses. Implement status mapping: `401`, `403`, `404`, `405`, `413`, `429`, sanitized `502`/`504`, and `503` store/policy failures.
+- Gateway-generated errors use Problem Details with `type`, `title`, `status`, sanitized `detail`, `code`, and `correlationId`; backend responses are not rewritten. `413` is enforced by a 1 MiB Kestrel limit (`Kestrel:Limits`, bound explicitly) plus a `Content-Length` pre-check; verified in Docker (2 MB body returned `413` Problem Details).
+- **Deferred:** Route lifecycle and `410` for a retired version require an explicit sunset policy and lifecycle data; implement and test them in the later routing/version-retirement work, not Slice 8. This does not defer the separate API/version kill-switch requirement.
 - [ ] Add liveness and readiness separate endpoints exempt from client auth. Readiness reflects request capability: fresh policy cache and Redis availability; fresh PostgreSQL outage cache is usable only until TTL.
 - [ ] Add network-restricted Prometheus endpoint and low-cardinality aggregate metrics; never use client/key IDs as metric labels.
 
